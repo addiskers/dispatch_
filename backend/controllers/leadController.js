@@ -60,31 +60,28 @@ exports.getMyLeads = async (req, res) => {
  */
 exports.updatePaymentStatus = async (req, res) => {
   try {
-    const { leadId } = req.params;
-    const { paymentStatus } = req.body; // "yes" or "no"
+    if (req.user.role !== "accounts") {
+      return res.status(403).json({ message: "Access denied: Only accounts can update payment status" });
+    }
 
-    const lead = await Lead.findOne({ 
-      leadId, 
-      salesUser: req.user.userId 
-    });
+    const { leadId } = req.params;
+    const { paymentStatus } = req.body;
+
+    const lead = await Lead.findOne({ leadId });
     if (!lead) {
-      return res.status(404).json({ message: "Lead not found or not yours" });
+      return res.status(404).json({ message: "Lead not found" });
     }
 
     lead.paymentStatus = paymentStatus;
     await lead.save();
 
-    return res.json({
-      message: "Payment status updated",
-      lead,
-    });
+    res.status(200).json({ message: "Payment status updated", lead });
   } catch (error) {
-    return res.status(500).json({ 
-      message: "Error updating payment status", 
-      error 
-    });
+    console.error("Error updating payment status:", error);
+    res.status(500).json({ message: "Internal server error" });
   }
 };
+
 
 /**
  * 4) DELETE LEAD (Sales)
@@ -162,5 +159,16 @@ exports.updateDoneStatus = async (req, res) => {
       message: "Error updating done status", 
       error 
     });
+  }
+};
+
+
+exports.getAllLeads = async (req, res) => {
+  try {
+    const leads = await Lead.find(); // Fetch all leads
+    res.status(200).json(leads);
+  } catch (error) {
+    console.error("Error fetching all leads:", error);
+    res.status(500).json({ message: "Error fetching leads" });
   }
 };

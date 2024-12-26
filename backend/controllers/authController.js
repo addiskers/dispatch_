@@ -38,17 +38,20 @@ exports.login = async (req, res) => {
       return res.status(400).json({ message: "Invalid credentials" });
     }
 
-    const match = await bcrypt.compare(password, user.password);
-    if (!match) {
+    const isMatch = await bcrypt.compare(password, user.password);
+    if (!isMatch) {
       return res.status(400).json({ message: "Invalid credentials" });
     }
 
-    const token = jwt.sign({ userId: user._id, role: user.role }, process.env.JWT_SECRET, {
-      expiresIn: "1d",
-    });
+    const token = jwt.sign(
+      { userId: user._id, role: user.role },
+      process.env.JWT_SECRET,
+      { expiresIn: "1d" }
+    );
 
-    return res.status(200).json({ message: "Login successful", token });
-  } catch (error) {
-    return res.status(500).json({ message: "Error logging in", error });
+    res.status(200).json({ token, role: user.role });
+  } catch (err) {
+    console.error("Error during login:", err);
+    res.status(500).json({ message: "Server error" });
   }
 };

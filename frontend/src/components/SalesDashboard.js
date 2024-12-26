@@ -1,6 +1,8 @@
-// src/components/SalesDashboard.js
 import React, { useState, useEffect } from "react";
 import axios from "axios";
+import Table from "react-bootstrap/Table";
+import Button from "react-bootstrap/Button";
+import Form from "react-bootstrap/Form";
 
 function SalesDashboard({ token, onLogout }) {
   const [leads, setLeads] = useState([]);
@@ -12,7 +14,6 @@ function SalesDashboard({ token, onLogout }) {
     projectDescription: "",
     paymentStatus: "no",
   });
-  const [statusUpdate, setStatusUpdate] = useState({ leadId: "", paymentStatus: "no" });
 
   useEffect(() => {
     fetchMyLeads();
@@ -21,9 +22,7 @@ function SalesDashboard({ token, onLogout }) {
   async function fetchMyLeads() {
     try {
       const res = await axios.get("http://localhost:5000/api/leads/my-leads", {
-        headers: {
-          Authorization: `Bearer ${token}`,
-        },
+        headers: { Authorization: `Bearer ${token}` },
       });
       setLeads(res.data);
     } catch (err) {
@@ -35,9 +34,7 @@ function SalesDashboard({ token, onLogout }) {
     e.preventDefault();
     try {
       await axios.post("http://localhost:5000/api/leads", form, {
-        headers: {
-          Authorization: `Bearer ${token}`,
-        },
+        headers: { Authorization: `Bearer ${token}` },
       });
       alert("Lead created!");
       setForm({
@@ -51,23 +48,6 @@ function SalesDashboard({ token, onLogout }) {
       fetchMyLeads();
     } catch (err) {
       console.error("Error creating lead:", err);
-    }
-  }
-
-  async function handleUpdatePayment(e) {
-    e.preventDefault();
-    try {
-      await axios.patch(
-        `http://localhost:5000/api/leads/${statusUpdate.leadId}/payment-status`,
-        { paymentStatus: statusUpdate.paymentStatus },
-        {
-          headers: { Authorization: `Bearer ${token}` },
-        }
-      );
-      alert("Payment status updated!");
-      fetchMyLeads();
-    } catch (err) {
-      console.error("Error updating payment status:", err);
     }
   }
 
@@ -85,77 +65,89 @@ function SalesDashboard({ token, onLogout }) {
   }
 
   return (
-    <div style={{ margin: 20 }}>
-      <h2>Sales Dashboard</h2>
-      <button onClick={onLogout} style={{ float: "right" }}>
+    <div className="container mt-5">
+      <Button onClick={onLogout} variant="danger" style={{ float: "right" }}>
         Logout
-      </button>
+      </Button>
+      <h2>Sales Dashboard</h2>
 
-      <h3>Create Lead</h3>
-      <form onSubmit={handleCreateLead}>
-        <input
-          placeholder="Lead ID"
-          value={form.leadId}
-          onChange={(e) => setForm({ ...form, leadId: e.target.value })}
-        />
-        <input
-          placeholder="Client Name"
-          value={form.clientName}
-          onChange={(e) => setForm({ ...form, clientName: e.target.value })}
-        />
-        <input
-          placeholder="Client Email"
-          value={form.clientEmail}
-          onChange={(e) => setForm({ ...form, clientEmail: e.target.value })}
-        />
-        <input
-          placeholder="Project Name"
-          value={form.projectName}
-          onChange={(e) => setForm({ ...form, projectName: e.target.value })}
-        />
-        <textarea
-          placeholder="Project Description"
-          value={form.projectDescription}
-          onChange={(e) => setForm({ ...form, projectDescription: e.target.value })}
-        />
-        <select
-          value={form.paymentStatus}
-          onChange={(e) => setForm({ ...form, paymentStatus: e.target.value })}
-        >
-          <option value="no">No</option>
-          <option value="yes">Yes</option>
-        </select>
-        <button type="submit">Create Lead</button>
-      </form>
+      <Form className="mt-4" onSubmit={handleCreateLead}>
+        <h3>Create Lead</h3>
+        <Form.Group className="mb-3">
+          <Form.Control
+            placeholder="Lead ID"
+            value={form.leadId}
+            onChange={(e) => setForm({ ...form, leadId: e.target.value })}
+          />
+        </Form.Group>
+        <Form.Group className="mb-3">
+          <Form.Control
+            placeholder="Client Name"
+            value={form.clientName}
+            onChange={(e) => setForm({ ...form, clientName: e.target.value })}
+          />
+        </Form.Group>
+        <Form.Group className="mb-3">
+          <Form.Control
+            placeholder="Client Email"
+            value={form.clientEmail}
+            onChange={(e) => setForm({ ...form, clientEmail: e.target.value })}
+          />
+        </Form.Group>
+        <Form.Group className="mb-3">
+          <Form.Control
+            placeholder="Project Name"
+            value={form.projectName}
+            onChange={(e) => setForm({ ...form, projectName: e.target.value })}
+          />
+        </Form.Group>
+        <Form.Group className="mb-3">
+          <Form.Control
+            as="textarea"
+            placeholder="Project Description"
+            value={form.projectDescription}
+            onChange={(e) => setForm({ ...form, projectDescription: e.target.value })}
+          />
+        </Form.Group>
+        <Button type="submit" className="mt-3" variant="primary">
+          Create Lead
+        </Button>
+      </Form>
 
-      <h3>My Leads</h3>
-      <ul>
-        {leads.map((lead) => (
-          <li key={lead._id} style={{ marginBottom: 10 }}>
-            <strong>ID:</strong> {lead.leadId} | <strong>Name:</strong> {lead.clientName} | 
-            <strong>Email:</strong> {lead.clientEmail} | 
-            <strong>Payment:</strong> {lead.paymentStatus} | 
-            <button onClick={() => handleDeleteLead(lead.leadId)}>Delete</button>
-          </li>
-        ))}
-      </ul>
-
-      <h3>Update Payment Status</h3>
-      <form onSubmit={handleUpdatePayment}>
-        <input
-          placeholder="Lead ID"
-          value={statusUpdate.leadId}
-          onChange={(e) => setStatusUpdate({ ...statusUpdate, leadId: e.target.value })}
-        />
-        <select
-          value={statusUpdate.paymentStatus}
-          onChange={(e) => setStatusUpdate({ ...statusUpdate, paymentStatus: e.target.value })}
-        >
-          <option value="no">No</option>
-          <option value="yes">Yes</option>
-        </select>
-        <button type="submit">Update</button>
-      </form>
+      <h3 className="mt-5">My Leads</h3>
+      <Table striped bordered hover>
+        <thead>
+          <tr>
+            <th>Lead ID</th>
+            <th>Client Name</th>
+            <th>Client Email</th>
+            <th>Project Name</th>
+            <th>Project Description</th>
+            <th>Payment Status</th>
+            <th>Actions</th>
+          </tr>
+        </thead>
+        <tbody>
+          {leads.map((lead) => (
+            <tr key={lead.leadId}>
+              <td>{lead.leadId}</td>
+              <td>{lead.clientName}</td>
+              <td>{lead.clientEmail}</td>
+              <td>{lead.projectName}</td>
+              <td>{lead.projectDescription}</td>
+              <td>{lead.paymentStatus}</td> {/* Static text */}
+              <td>
+                <Button
+                  variant="danger"
+                  onClick={() => handleDeleteLead(lead.leadId)}
+                >
+                  Delete
+                </Button>
+              </td>
+            </tr>
+          ))}
+        </tbody>
+      </Table>
     </div>
   );
 }

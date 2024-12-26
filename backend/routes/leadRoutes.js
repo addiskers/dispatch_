@@ -15,4 +15,7 @@ router.delete("/:leadId", authMiddleware, leadController.deleteLead);
 router.get("/uploader/list", authMiddleware, leadController.getLeadListForUploader);
 router.patch("/:leadId/done", authMiddleware, leadController.updateDoneStatus);
 
+
+router.get("/accounts/all-leads", authMiddleware, leadController.getAllLeads);
+
 module.exports = router;

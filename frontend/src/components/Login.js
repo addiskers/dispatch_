@@ -1,4 +1,3 @@
-// src/components/Login.js
 import React, { useState } from "react";
 import axios from "axios";
 
@@ -17,36 +16,15 @@ function Login({ onLoginSuccess }) {
         password,
       });
 
-      // 2) The response should have { token, role } or something similar
-      const { token } = res.data;
-      // We might need to fetch the role. If the backend returns it in the response, great.
-      // Otherwise, we do a "who am I" endpoint. But let's assume we have it here:
-      const userRole = await fetchUserRole(token);
+      // 2) The response should have { token, role }
+      const { token, role } = res.data;
 
       // 3) Notify parent (App) that login succeeded
-      onLoginSuccess(token, userRole);
+      onLoginSuccess(token, role);
     } catch (err) {
       console.error("Login error:", err);
       setErrorMsg("Invalid credentials or server error");
     }
-  }
-
-  // Example function to get user role from token or a separate endpoint
-  async function fetchUserRole(token) {
-    // If your login response doesn't contain role, you'll need another request:
-    // const me = await axios.get("http://localhost:5000/api/auth/me", {
-    //   headers: { Authorization: `Bearer ${token}` }
-    // });
-    // return me.data.role;
-
-    // If your backend returns role in login response, just parse it:
-    // e.g. if res.data.role = "sales" or "uploader"
-    // For this example, let's pretend it's always "sales" or "uploader"
-    
-    // Hard-coding for demonstration. Replace with your real logic.
-    if (username === "sales1") return "sales";
-    if (username === "uploader1") return "uploader";
-    return "sales"; // default fallback
   }
 
   return (

@@ -17,7 +17,11 @@ const app = express();
 // Middleware
 app.use(cors());
 app.use(express.json());
-
+app.use(cors({
+    origin: "http://localhost:3000", // Replace with your frontend URL
+    methods: ["GET", "POST", "PATCH", "DELETE"],
+    allowedHeaders: ["Content-Type", "Authorization"]
+  }));
 // Routes
 app.use("/api/auth", authRoutes);
 app.use("/api/leads", leadRoutes);

@@ -1,7 +1,10 @@
-// src/components/UploaderDashboard.js
 import React, { useState, useEffect } from "react";
 import axios from "axios";
 import MultipleFileUpload from "./MultipleFileUpload";
+import Table from "react-bootstrap/Table";
+import Form from "react-bootstrap/Form";
+import Button from "react-bootstrap/Button";
+import Badge from "react-bootstrap/Badge";
 
 function UploaderDashboard({ token, onLogout }) {
   const [leads, setLeads] = useState([]);
@@ -28,9 +31,7 @@ function UploaderDashboard({ token, onLogout }) {
       await axios.patch(
         `http://localhost:5000/api/leads/${doneUpdate.leadId}/done`,
         { done: doneUpdate.done },
-        {
-          headers: { Authorization: `Bearer ${token}` },
-        }
+        { headers: { Authorization: `Bearer ${token}` } }
       );
       alert("Done status updated!");
       fetchLeads();
@@ -40,43 +41,71 @@ function UploaderDashboard({ token, onLogout }) {
   }
 
   return (
-    <div style={{ margin: 20 }}>
-      <h2>Uploader Dashboard</h2>
-      <button onClick={onLogout} style={{ float: "right" }}>
+    <div className="container mt-5">
+      <Button onClick={onLogout} variant="danger" style={{ float: "right" }}>
         Logout
-      </button>
+      </Button>
+      <h2>Uploader Dashboard</h2>
 
-      <h3>Leads List</h3>
-      <ul>
-        {leads.map((lead, idx) => (
-          <li key={idx}>
-            <strong>ID:</strong> {lead.leadId} | 
-            <strong>Project:</strong> {lead.projectName} | 
-            <strong>Description:</strong> {lead.projectDescription} |
-            <strong>Paid?:</strong> {lead.paymentStatus} |
-            <strong>Done?:</strong> {lead.done ? "Yes" : "No"}
-          </li>
-        ))}
-      </ul>
+      <h3 className="mt-4">Leads List</h3>
+      <Table striped bordered hover responsive>
+        <thead>
+          <tr>
+            <th>Lead ID</th>
+            <th>Project Name</th>
+            <th>Description</th>
+            <th>Payment Status</th>
+            <th>Done</th>
+          </tr>
+        </thead>
+        <tbody>
+          {leads.map((lead, idx) => (
+            <tr key={idx}>
+              <td>{lead.leadId}</td>
+              <td>{lead.projectName}</td>
+              <td>{lead.projectDescription}</td>
+              <td>
+                {lead.paymentStatus === "yes" ? (
+                  <Badge bg="success">Paid</Badge>
+                ) : (
+                  <Badge bg="warning">Unpaid</Badge>
+                )}
+              </td>
+              <td>
+                {lead.done ? (
+                  <Badge bg="primary">Done</Badge>
+                ) : (
+                  <Badge bg="secondary">Undone</Badge>
+                )}
+              </td>
+            </tr>
+          ))}
+        </tbody>
+      </Table>
 
-      <h3>Mark Done/Undone</h3>
-      <form onSubmit={handleUpdateDone}>
-        <input
-          placeholder="Lead ID"
-          value={doneUpdate.leadId}
-          onChange={(e) => setDoneUpdate({ ...doneUpdate, leadId: e.target.value })}
-        />
-        <select
+      <h3 className="mt-5">Mark Done/Undone</h3>
+      <Form onSubmit={handleUpdateDone} className="mt-3">
+        <Form.Group className="mb-3">
+          <Form.Control
+            placeholder="Enter Lead ID"
+            value={doneUpdate.leadId}
+            onChange={(e) => setDoneUpdate({ ...doneUpdate, leadId: e.target.value })}
+          />
+        </Form.Group>
+        <Form.Select
           value={doneUpdate.done}
           onChange={(e) => setDoneUpdate({ ...doneUpdate, done: e.target.value === "true" })}
+          className="mb-3"
         >
-          <option value="false">Undone</option>
-          <option value="true">Done</option>
-        </select>
-        <button type="submit">Update</button>
-      </form>
+          <option value="false">Mark as Undone</option>
+          <option value="true">Mark as Done</option>
+        </Form.Select>
+        <Button type="submit" variant="primary">
+          Update Status
+        </Button>
+      </Form>
 
-      {/* Link to or include the multiple file upload component */}
+      <h3 className="mt-5">Upload Files</h3>
       <MultipleFileUpload token={token} />
     </div>
   );
