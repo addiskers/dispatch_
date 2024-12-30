@@ -18,7 +18,21 @@ function SalesDashboard({ token, onLogout }) {
   useEffect(() => {
     fetchMyLeads();
   }, []);
-
+  async function sendToResearcher(leadId) {
+    try {
+      const res = await axios.patch(
+        `http://localhost:5000/api/leads/${leadId}/send-to-researcher`,
+        {},
+        {
+          headers: { Authorization: `Bearer ${token}` },
+        }
+      );
+      alert("Lead sent to researcher!");
+      fetchMyLeads(); // Refresh leads
+    } catch (err) {
+      console.error("Error sending lead to researcher:", err);
+    }
+  }
   async function fetchMyLeads() {
     try {
       const res = await axios.get("http://localhost:5000/api/leads/my-leads", {
@@ -125,6 +139,8 @@ function SalesDashboard({ token, onLogout }) {
             <th>Project Description</th>
             <th>Payment Status</th>
             <th>Actions</th>
+            <th>Send to Researcher</th>
+            <th>Done</th>
           </tr>
         </thead>
         <tbody>
@@ -144,7 +160,19 @@ function SalesDashboard({ token, onLogout }) {
                   Delete
                 </Button>
               </td>
-            </tr>
+
+                <td>
+                  <Button
+                    variant="primary"
+                    onClick={() => sendToResearcher(lead.leadId)}
+                    disabled={lead.sentToResearcher} // Disable if already sent
+                  >
+                    {lead.sentToResearcher ? "Sent" : "Send to Researcher"}
+                  </Button>
+                </td>
+                <td>{lead.done ? "Yes" : "No"}</td>
+                            </tr>
+                            
           ))}
         </tbody>
       </Table>

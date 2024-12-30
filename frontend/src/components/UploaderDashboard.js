@@ -14,17 +14,22 @@ function UploaderDashboard({ token, onLogout }) {
     fetchLeads();
   }, []);
 
+  // Fetch leads sent to researcher
   async function fetchLeads() {
     try {
       const res = await axios.get("http://localhost:5000/api/leads/uploader/list", {
         headers: { Authorization: `Bearer ${token}` },
       });
-      setLeads(res.data);
+      console.log("API Response:", res.data); // Debugging log
+      const filteredLeads = res.data.filter((lead) => lead.sentToResearcher);
+      setLeads(filteredLeads);
     } catch (err) {
       console.error("Error fetching leads for uploader:", err);
     }
   }
+  
 
+  // Update Done/Undone status
   async function handleUpdateDone(e) {
     e.preventDefault();
     try {
@@ -33,10 +38,12 @@ function UploaderDashboard({ token, onLogout }) {
         { done: doneUpdate.done },
         { headers: { Authorization: `Bearer ${token}` } }
       );
-      alert("Done status updated!");
-      fetchLeads();
+      alert(`Lead marked as ${doneUpdate.done ? "Done" : "Undone"}!`);
+      setDoneUpdate({ leadId: "", done: false }); 
+      fetchLeads(); 
     } catch (err) {
       console.error("Error updating done status:", err);
+      alert("Failed to update status. Please try again.");
     }
   }
 
@@ -54,7 +61,6 @@ function UploaderDashboard({ token, onLogout }) {
             <th>Lead ID</th>
             <th>Project Name</th>
             <th>Description</th>
-            <th>Payment Status</th>
             <th>Done</th>
           </tr>
         </thead>
@@ -64,13 +70,6 @@ function UploaderDashboard({ token, onLogout }) {
               <td>{lead.leadId}</td>
               <td>{lead.projectName}</td>
               <td>{lead.projectDescription}</td>
-              <td>
-                {lead.paymentStatus === "yes" ? (
-                  <Badge bg="success">Paid</Badge>
-                ) : (
-                  <Badge bg="warning">Unpaid</Badge>
-                )}
-              </td>
               <td>
                 {lead.done ? (
                   <Badge bg="primary">Done</Badge>

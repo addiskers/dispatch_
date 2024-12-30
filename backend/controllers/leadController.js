@@ -1,21 +1,17 @@
-// controllers/leadController.js
-
 const Lead = require("../models/Lead");
 
 /**
- * 1) CREATE LEAD (Sales)
- *    - Allows setting paymentStatus if desired, else defaults to "no"
+ * Create a new lead
  */
 exports.createLead = async (req, res) => {
   try {
-    const { 
-      leadId, 
-      clientName, 
-      clientEmail, 
-      projectName, 
-      projectDescription,
-      paymentStatus // optional; will be "no" if not provided
-    } = req.body;
+    const { leadId, clientName, clientEmail, projectName, projectDescription, paymentStatus } = req.body;
+
+    // Check if leadId already exists
+    const existingLead = await Lead.findOne({ leadId });
+    if (existingLead) {
+      return res.status(400).json({ message: "Lead ID already exists" });
+    }
 
     const newLead = new Lead({
       leadId,
@@ -23,26 +19,19 @@ exports.createLead = async (req, res) => {
       clientEmail,
       projectName,
       projectDescription,
-      paymentStatus,         // new field
-      salesUser: req.user.userId, // from JWT (the sales user)
+      paymentStatus: paymentStatus || "no",
+      salesUser: req.user.userId,
     });
 
     await newLead.save();
-    return res.status(201).json({ 
-      message: "Lead created successfully", 
-      lead: newLead 
-    });
+    return res.status(201).json({ message: "Lead created successfully", lead: newLead });
   } catch (error) {
-    return res.status(500).json({ 
-      message: "Error creating lead", 
-      error 
-    });
+    return res.status(500).json({ message: "Error creating lead", error });
   }
 };
 
 /**
- * 2) GET "MY LEADS" (Sales)
- *    - Only fetch leads belonging to the logged-in sales user
+ * Get leads belonging to the logged-in sales user
  */
 exports.getMyLeads = async (req, res) => {
   try {
@@ -54,9 +43,7 @@ exports.getMyLeads = async (req, res) => {
 };
 
 /**
- * 3) UPDATE PAYMENT STATUS (Sales)
- *    - Expects req.params.leadId
- *    - Expects req.body.paymentStatus = "yes" or "no"
+ * Update payment status (accounts only)
  */
 exports.updatePaymentStatus = async (req, res) => {
   try {
@@ -67,13 +54,14 @@ exports.updatePaymentStatus = async (req, res) => {
     const { leadId } = req.params;
     const { paymentStatus } = req.body;
 
-    const lead = await Lead.findOne({ leadId });
+    if (!["yes", "no"].includes(paymentStatus)) {
+      return res.status(400).json({ message: "Invalid payment status value" });
+    }
+
+    const lead = await Lead.findOneAndUpdate({ leadId }, { paymentStatus }, { new: true });
     if (!lead) {
       return res.status(404).json({ message: "Lead not found" });
     }
-
-    lead.paymentStatus = paymentStatus;
-    await lead.save();
 
     res.status(200).json({ message: "Payment status updated", lead });
   } catch (error) {
@@ -82,93 +70,91 @@ exports.updatePaymentStatus = async (req, res) => {
   }
 };
 
-
 /**
- * 4) DELETE LEAD (Sales)
- *    - Removes a lead if owned by this Sales user
+ * Delete a lead (sales only)
  */
 exports.deleteLead = async (req, res) => {
   try {
     const { leadId } = req.params;
 
-    const lead = await Lead.findOneAndDelete({
-      leadId,
-      salesUser: req.user.userId,
-    });
+    const lead = await Lead.findOneAndDelete({ leadId, salesUser: req.user.userId });
     if (!lead) {
-      return res.status(404).json({ message: "Lead not found or not yours" });
+      return res.status(404).json({ message: "Lead not found or not owned by you" });
     }
 
-    return res.json({ message: "Lead deleted successfully" });
+    res.status(200).json({ message: "Lead deleted successfully" });
   } catch (error) {
-    return res.status(500).json({
-      message: "Error deleting lead",
-      error,
-    });
+    console.error("Error deleting lead:", error);
+    res.status(500).json({ message: "Internal server error" });
   }
 };
 
 /**
- * 5) GET LEAD LIST FOR UPLOADER
- *    - Shows leadId, projectName, projectDescription, paymentStatus, done
- *    - Hides clientName, clientEmail
+ * Get lead list for uploaders
  */
 exports.getLeadListForUploader = async (req, res) => {
   try {
-    const leads = await Lead.find({}, {
-      leadId: 1,
-      projectName: 1,
-      projectDescription: 1,
-      paymentStatus: 1,
-      done: 1,
-      _id: 0
-    });
-    return res.json(leads);
+    const leads = await Lead.find({ sentToResearcher: true });
+    console.log("Filtered Leads:", leads); 
+    return res.status(200).json(leads);
   } catch (error) {
-    return res.status(500).json({ 
-      message: "Error fetching lead list", 
-      error 
-    });
+    console.error("Error fetching leads for uploader:", error);
+    return res.status(500).json({ message: "Error fetching leads", error });
   }
 };
 
 /**
- * 6) UPDATE DONE STATUS (Uploader)
- *    - Expects req.params.leadId
- *    - Expects req.body.done = true/false
+ * Update done status (uploaders only)
  */
 exports.updateDoneStatus = async (req, res) => {
   try {
     const { leadId } = req.params;
-    const { done } = req.body; // boolean true or false
+    const { done } = req.body;
 
-    const lead = await Lead.findOne({ leadId });
+    if (typeof done !== "boolean") {
+      return res.status(400).json({ message: "Invalid done status" });
+    }
+
+    const lead = await Lead.findOneAndUpdate({ leadId }, { done }, { new: true });
     if (!lead) {
       return res.status(404).json({ message: "Lead not found" });
     }
 
-    lead.done = done;
-    await lead.save();
-
-    return res.json({
-      message: `Lead marked as ${done ? "done" : "undone"}`,
-      lead,
-    });
+    res.status(200).json({ message: `Lead marked as ${done ? "done" : "undone"}`, lead });
   } catch (error) {
-    return res.status(500).json({ 
-      message: "Error updating done status", 
-      error 
-    });
+    console.error("Error updating done status:", error);
+    res.status(500).json({ message: "Internal server error" });
   }
 };
 
-
+/**
+ * Get all leads (for accounts or admins)
+ */
 exports.getAllLeads = async (req, res) => {
   try {
-    const leads = await Lead.find(); // Fetch all leads
+    const leads = await Lead.find();
     res.status(200).json(leads);
   } catch (error) {
     console.error("Error fetching all leads:", error);
-    res.status(500).json({ message: "Error fetching leads" });
+    res.status(500).json({ message: "Error fetching leads", error });
+  }
+};
+
+/**
+ * Send lead to researcher (sales only)
+ */
+exports.sendToResearcher = async (req, res) => {
+  try {
+    const { leadId } = req.params;
+
+    const lead = await Lead.findOneAndUpdate({ leadId, salesUser: req.user.userId }, { sentToResearcher: true }, { new: true });
+    if (!lead) {
+      return res.status(404).json({ message: "Lead not found or not owned by you" });
+    }
+
+    res.status(200).json({ message: "Lead sent to researcher", lead });
+  } catch (error) {
+    console.error("Error sending lead to researcher:", error);
+    res.status(500).json({ message: "Server error" });
   }
 };

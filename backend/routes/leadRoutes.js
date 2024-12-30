@@ -17,5 +17,6 @@ router.patch("/:leadId/done", authMiddleware, leadController.updateDoneStatus);
 
 
 router.get("/accounts/all-leads", authMiddleware, leadController.getAllLeads);
+router.patch("/:leadId/send-to-researcher", authMiddleware, leadController.sendToResearcher);
 
 module.exports = router;
