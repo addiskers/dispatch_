@@ -33,6 +33,10 @@ const LeadSchema = new mongoose.Schema(
       type: Boolean,
       default: false,
     },
+    deliveryDate: {
+      type: Date,
+      required: false,
+    },
   },
   { timestamps: true } 
 );

@@ -1,8 +1,11 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useCallback } from "react";
 import axios from "axios";
 import Table from "react-bootstrap/Table";
 import Button from "react-bootstrap/Button";
 import Form from "react-bootstrap/Form";
+import "../styles/dashboard.css";
+import DatePicker from "react-datepicker";
+import "react-datepicker/dist/react-datepicker.css";
 
 function SalesDashboard({ token, onLogout }) {
   const [leads, setLeads] = useState([]);
@@ -13,27 +16,10 @@ function SalesDashboard({ token, onLogout }) {
     projectName: "",
     projectDescription: "",
     paymentStatus: "no",
+    deliveryDate: null,
   });
 
-  useEffect(() => {
-    fetchMyLeads();
-  }, []);
-  async function sendToResearcher(leadId) {
-    try {
-      const res = await axios.patch(
-        `http://localhost:5000/api/leads/${leadId}/send-to-researcher`,
-        {},
-        {
-          headers: { Authorization: `Bearer ${token}` },
-        }
-      );
-      alert("Lead sent to researcher!");
-      fetchMyLeads(); // Refresh leads
-    } catch (err) {
-      console.error("Error sending lead to researcher:", err);
-    }
-  }
-  async function fetchMyLeads() {
+  const fetchMyLeads = useCallback(async () => {
     try {
       const res = await axios.get("http://localhost:5000/api/leads/my-leads", {
         headers: { Authorization: `Bearer ${token}` },
@@ -41,6 +27,26 @@ function SalesDashboard({ token, onLogout }) {
       setLeads(res.data);
     } catch (err) {
       console.error("Error fetching leads:", err);
+    }
+  }, [token]);
+
+  useEffect(() => {
+    fetchMyLeads();
+  }, [fetchMyLeads]);
+
+  async function sendToResearcher(leadId) {
+    try {
+      await axios.patch(
+        `http://localhost:5000/api/leads/${leadId}/send-to-researcher`,
+        {},
+        {
+          headers: { Authorization: `Bearer ${token}` },
+        }
+      );
+      alert("Lead sent to researcher!");
+      fetchMyLeads();
+    } catch (err) {
+      console.error("Error sending lead to researcher:", err);
     }
   }
 
@@ -58,6 +64,7 @@ function SalesDashboard({ token, onLogout }) {
         projectName: "",
         projectDescription: "",
         paymentStatus: "no",
+        deliveryDate: null, // Reset delivery date
       });
       fetchMyLeads();
     } catch (err) {
@@ -123,6 +130,15 @@ function SalesDashboard({ token, onLogout }) {
             onChange={(e) => setForm({ ...form, projectDescription: e.target.value })}
           />
         </Form.Group>
+        <Form.Group className="mb-3">
+          <DatePicker
+            selected={form.deliveryDate}
+            onChange={(date) => setForm({ ...form, deliveryDate: date })}
+            dateFormat="yyyy-MM-dd"
+            placeholderText="Select Delivery Date"
+            className="form-control"
+          />
+        </Form.Group>
         <Button type="submit" className="mt-3" variant="primary">
           Create Lead
         </Button>
@@ -138,6 +154,7 @@ function SalesDashboard({ token, onLogout }) {
             <th>Project Name</th>
             <th>Project Description</th>
             <th>Payment Status</th>
+            <th>Delivery Date</th>
             <th>Actions</th>
             <th>Send to Researcher</th>
             <th>Done</th>
@@ -151,7 +168,12 @@ function SalesDashboard({ token, onLogout }) {
               <td>{lead.clientEmail}</td>
               <td>{lead.projectName}</td>
               <td>{lead.projectDescription}</td>
-              <td>{lead.paymentStatus}</td> {/* Static text */}
+              <td>{lead.paymentStatus}</td>
+              <td>
+                {lead.deliveryDate
+                  ? new Date(lead.deliveryDate).toLocaleDateString()
+                  : "Not Set"}
+              </td>
               <td>
                 <Button
                   variant="danger"
@@ -160,19 +182,17 @@ function SalesDashboard({ token, onLogout }) {
                   Delete
                 </Button>
               </td>
-
-                <td>
-                  <Button
-                    variant="primary"
-                    onClick={() => sendToResearcher(lead.leadId)}
-                    disabled={lead.sentToResearcher} // Disable if already sent
-                  >
-                    {lead.sentToResearcher ? "Sent" : "Send to Researcher"}
-                  </Button>
-                </td>
-                <td>{lead.done ? "Yes" : "No"}</td>
-                            </tr>
-                            
+              <td>
+                <Button
+                  variant="primary"
+                  onClick={() => sendToResearcher(lead.leadId)}
+                  disabled={lead.sentToResearcher}
+                >
+                  {lead.sentToResearcher ? "Sent" : "Send to Researcher"}
+                </Button>
+              </td>
+              <td>{lead.done ? "Yes" : "No"}</td>
+            </tr>
           ))}
         </tbody>
       </Table>

@@ -2,13 +2,12 @@ import React, { useState, useEffect } from "react";
 import axios from "axios";
 import MultipleFileUpload from "./MultipleFileUpload";
 import Table from "react-bootstrap/Table";
-import Form from "react-bootstrap/Form";
 import Button from "react-bootstrap/Button";
 import Badge from "react-bootstrap/Badge";
+import "../styles/dashboard.css";
 
 function UploaderDashboard({ token, onLogout }) {
   const [leads, setLeads] = useState([]);
-  const [doneUpdate, setDoneUpdate] = useState({ leadId: "", done: false });
 
   useEffect(() => {
     fetchLeads();
@@ -27,20 +26,22 @@ function UploaderDashboard({ token, onLogout }) {
       console.error("Error fetching leads for uploader:", err);
     }
   }
-  
 
   // Update Done/Undone status
-  async function handleUpdateDone(e) {
-    e.preventDefault();
+  async function handleUpdateDone(leadId, done) {
+    if (done) {
+      alert("You cannot mark a lead as undone once marked as done.");
+      return;
+    }
+
     try {
       await axios.patch(
-        `http://localhost:5000/api/leads/${doneUpdate.leadId}/done`,
-        { done: doneUpdate.done },
+        `http://localhost:5000/api/leads/${leadId}/done`,
+        { done: true },
         { headers: { Authorization: `Bearer ${token}` } }
       );
-      alert(`Lead marked as ${doneUpdate.done ? "Done" : "Undone"}!`);
-      setDoneUpdate({ leadId: "", done: false }); 
-      fetchLeads(); 
+      alert("Lead marked as Done!");
+      fetchLeads();
     } catch (err) {
       console.error("Error updating done status:", err);
       alert("Failed to update status. Please try again.");
@@ -61,15 +62,22 @@ function UploaderDashboard({ token, onLogout }) {
             <th>Lead ID</th>
             <th>Project Name</th>
             <th>Description</th>
+            <th>Delivery Date</th>
             <th>Done</th>
+            <th>Action</th>
           </tr>
         </thead>
         <tbody>
-          {leads.map((lead, idx) => (
-            <tr key={idx}>
+          {leads.map((lead) => (
+            <tr key={lead.leadId}>
               <td>{lead.leadId}</td>
               <td>{lead.projectName}</td>
               <td>{lead.projectDescription}</td>
+              <td>
+                {lead.deliveryDate
+                  ? new Date(lead.deliveryDate).toLocaleDateString()
+                  : "Not Set"}
+              </td>
               <td>
                 {lead.done ? (
                   <Badge bg="primary">Done</Badge>
@@ -77,32 +85,20 @@ function UploaderDashboard({ token, onLogout }) {
                   <Badge bg="secondary">Undone</Badge>
                 )}
               </td>
+              <td>
+                {!lead.done && (
+                  <Button
+                    variant="success"
+                    onClick={() => handleUpdateDone(lead.leadId, lead.done)}
+                  >
+                    Mark as Done
+                  </Button>
+                )}
+              </td>
             </tr>
           ))}
         </tbody>
       </Table>
-
-      <h3 className="mt-5">Mark Done/Undone</h3>
-      <Form onSubmit={handleUpdateDone} className="mt-3">
-        <Form.Group className="mb-3">
-          <Form.Control
-            placeholder="Enter Lead ID"
-            value={doneUpdate.leadId}
-            onChange={(e) => setDoneUpdate({ ...doneUpdate, leadId: e.target.value })}
-          />
-        </Form.Group>
-        <Form.Select
-          value={doneUpdate.done}
-          onChange={(e) => setDoneUpdate({ ...doneUpdate, done: e.target.value === "true" })}
-          className="mb-3"
-        >
-          <option value="false">Mark as Undone</option>
-          <option value="true">Mark as Done</option>
-        </Form.Select>
-        <Button type="submit" variant="primary">
-          Update Status
-        </Button>
-      </Form>
 
       <h3 className="mt-5">Upload Files</h3>
       <MultipleFileUpload token={token} />

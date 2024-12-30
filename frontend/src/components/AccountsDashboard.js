@@ -3,6 +3,7 @@ import axios from "axios";
 import Table from "react-bootstrap/Table";
 import Button from "react-bootstrap/Button";
 import Form from "react-bootstrap/Form";
+import "../styles/dashboard.css";
 
 function AccountsDashboard({ token, onLogout }) {
   const [leads, setLeads] = useState([]);

@@ -5,7 +5,7 @@ const Lead = require("../models/Lead");
  */
 exports.createLead = async (req, res) => {
   try {
-    const { leadId, clientName, clientEmail, projectName, projectDescription, paymentStatus } = req.body;
+    const { leadId, clientName, clientEmail, projectName, projectDescription, paymentStatus, deliveryDate } = req.body;
 
     // Check if leadId already exists
     const existingLead = await Lead.findOne({ leadId });
@@ -20,6 +20,7 @@ exports.createLead = async (req, res) => {
       projectName,
       projectDescription,
       paymentStatus: paymentStatus || "no",
+      deliveryDate: deliveryDate || null,
       salesUser: req.user.userId,
     });
 
@@ -111,19 +112,21 @@ exports.updateDoneStatus = async (req, res) => {
     const { leadId } = req.params;
     const { done } = req.body;
 
-    if (typeof done !== "boolean") {
-      return res.status(400).json({ message: "Invalid done status" });
-    }
-
-    const lead = await Lead.findOneAndUpdate({ leadId }, { done }, { new: true });
+    const lead = await Lead.findOne({ leadId });
     if (!lead) {
       return res.status(404).json({ message: "Lead not found" });
     }
+    if (lead.done && !done) {
+      return res.status(400).json({ message: "Cannot mark as Undone once Done" });
+    }
 
-    res.status(200).json({ message: `Lead marked as ${done ? "done" : "undone"}`, lead });
+    lead.done = done;
+    await lead.save();
+
+    return res.json({ message: `Lead marked as ${done ? "Done" : "Undone"}`, lead });
   } catch (error) {
     console.error("Error updating done status:", error);
-    res.status(500).json({ message: "Internal server error" });
+    return res.status(500).json({ message: "Internal server error" });
   }
 };
 

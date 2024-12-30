@@ -1,0 +1,120 @@
+/* General Layout */
+.container {
+    margin-top: 20px;
+    padding: 20px;
+    background-color: #f8f9fa; /* Light gray background */
+    border-radius: 10px; /* Rounded corners */
+    box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1); /* Subtle shadow */
+  }
+  
+  /* Headings */
+  h2 {
+    font-size: 24px;
+    color: #343a40; /* Dark gray */
+    margin-bottom: 20px;
+  }
+  
+  h3 {
+    font-size: 20px;
+    color: #495057; /* Medium gray */
+    margin-top: 20px;
+  }
+  
+  /* Buttons */
+  button {
+    margin-right: 10px;
+  }
+  
+  button:hover {
+    opacity: 0.9; /* Slight opacity change on hover */
+  }
+  
+  /* Logout Button */
+  button.logout {
+    float: right;
+    background-color: #dc3545; /* Red for danger */
+    color: #fff;
+    border: none;
+    padding: 10px 20px;
+    border-radius: 5px;
+  }
+  
+  button.logout:hover {
+    background-color: #c82333; /* Slightly darker red */
+  }
+  
+  /* Tables */
+  table {
+    width: 100%;
+    margin-top: 20px;
+    border-collapse: collapse;
+  }
+  
+  table thead th {
+    background-color: #007bff; /* Blue header */
+    color: white;
+    text-align: left;
+    padding: 10px;
+    font-size: 16px;
+  }
+  
+  table tbody td {
+    padding: 10px;
+    border-bottom: 1px solid #dee2e6; /* Subtle border */
+  }
+  
+  table tbody tr:hover {
+    background-color: #e9ecef; /* Light gray on hover */
+  }
+  
+  /* Badges */
+  .badge-success {
+    background-color: #28a745; /* Green */
+    color: #fff;
+  }
+  
+  .badge-warning {
+    background-color: #ffc107; /* Yellow */
+    color: #212529; /* Dark text */
+  }
+  
+  .badge-primary {
+    background-color: #007bff; /* Blue */
+    color: #fff;
+  }
+  
+  .badge-secondary {
+    background-color: #6c757d; /* Gray */
+    color: #fff;
+  }
+  
+  /* Forms */
+  form {
+    margin-top: 20px;
+  }
+  
+  form .form-group {
+    margin-bottom: 15px;
+  }
+  
+  form .form-control {
+    padding: 10px;
+    border-radius: 5px;
+    border: 1px solid #ced4da;
+  }
+  
+  form .form-control:focus {
+    border-color: #80bdff;
+    outline: none;
+    box-shadow: 0 0 5px rgba(0, 123, 255, 0.25); /* Blue shadow */
+  }
+  
+  form .btn-primary {
+    background-color: #007bff;
+    border: none;
+  }
+  
+  form .btn-primary:hover {
+    background-color: #0056b3; /* Darker blue */
+  }
+  

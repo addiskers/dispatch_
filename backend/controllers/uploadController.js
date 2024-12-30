@@ -1,4 +1,3 @@
-// controllers/uploadController.js
 const nodemailer = require("nodemailer");
 const { generatePresignedUrl } = require("./generatePresignedUrlFile");
 const Lead = require("../models/Lead");
@@ -20,11 +19,16 @@ exports.sendAllDeliverables = async (req, res) => {
       presignedUrls.push(url);
     }
 
-    // 3) Build an email body with all the links
-    let linksHtml = `<p>Here are your deliverables:</p>`;
+    // 3) Build an email body with simplified clickable links
+    let linksHtml = `<p>Dear Sir/Ma’am,</p>`;
+    linksHtml += `<p>I'm pleased to inform you that we've completed the ${lead.projectName}.</p>`;
+    linksHtml += `<p>Attached is the report in links:</p>`;
     presignedUrls.forEach((url, index) => {
-      linksHtml += `<p>File #${index + 1}: <a href="${url}">${url}</a></p>`;
+      linksHtml += `<p><a href="${url}" target="_blank">Download link #${index + 1}</a></p>`;
     });
+    linksHtml += `<p>Please review it at your convenience. If you have any questions or need clarification, feel free to reach out.</p>`;
+    linksHtml += `<p>We value your feedback and are committed to ensuring the report meets your expectations.</p>`;
+    linksHtml += `<p>Thank you for entrusting us with this project.</p>`;
 
     // 4) Send email to the client using nodemailer
     const transporter = nodemailer.createTransport({
