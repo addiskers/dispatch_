@@ -5,9 +5,9 @@ const Lead = require("../models/Lead");
  */
 exports.createLead = async (req, res) => {
   try {
+    console.log("Request Body:", req.body); 
     const { leadId, clientName, clientEmail, projectName, projectDescription, paymentStatus, deliveryDate } = req.body;
 
-    // Check if leadId already exists
     const existingLead = await Lead.findOne({ leadId });
     if (existingLead) {
       return res.status(400).json({ message: "Lead ID already exists" });
@@ -27,9 +27,11 @@ exports.createLead = async (req, res) => {
     await newLead.save();
     return res.status(201).json({ message: "Lead created successfully", lead: newLead });
   } catch (error) {
+    console.error("Error creating lead:", error);
     return res.status(500).json({ message: "Error creating lead", error });
   }
 };
+
 
 /**
  * Get leads belonging to the logged-in sales user
@@ -39,9 +41,11 @@ exports.getMyLeads = async (req, res) => {
     const leads = await Lead.find({ salesUser: req.user.userId });
     return res.status(200).json(leads);
   } catch (error) {
-    return res.status(500).json({ message: "Error fetching leads", error });
+    console.error("Error fetching leads:", error);
+    return res.status(500).json({ message: "Error fetching leads" });
   }
 };
+
 
 /**
  * Update payment status (accounts only)

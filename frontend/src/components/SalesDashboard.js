@@ -11,13 +11,15 @@ function SalesDashboard({ token, onLogout }) {
   const [leads, setLeads] = useState([]);
   const [form, setForm] = useState({
     leadId: "",
-    clientName: "",
-    clientEmail: "",
+    clientName: [], 
+    clientEmail: [],
     projectName: "",
     projectDescription: "",
     paymentStatus: "no",
     deliveryDate: null,
   });
+  const [nameInput, setNameInput] = useState("");
+  const [emailInput, setEmailInput] = useState(""); 
 
   const fetchMyLeads = useCallback(async () => {
     try {
@@ -34,24 +36,9 @@ function SalesDashboard({ token, onLogout }) {
     fetchMyLeads();
   }, [fetchMyLeads]);
 
-  async function sendToResearcher(leadId) {
-    try {
-      await axios.patch(
-        `http://localhost:5000/api/leads/${leadId}/send-to-researcher`,
-        {},
-        {
-          headers: { Authorization: `Bearer ${token}` },
-        }
-      );
-      alert("Lead sent to researcher!");
-      fetchMyLeads();
-    } catch (err) {
-      console.error("Error sending lead to researcher:", err);
-    }
-  }
-
   async function handleCreateLead(e) {
     e.preventDefault();
+    console.log("Form submitted:", form); 
     try {
       await axios.post("http://localhost:5000/api/leads", form, {
         headers: { Authorization: `Bearer ${token}` },
@@ -59,18 +46,19 @@ function SalesDashboard({ token, onLogout }) {
       alert("Lead created!");
       setForm({
         leadId: "",
-        clientName: "",
-        clientEmail: "",
+        clientName: [],
+        clientEmail: [],
         projectName: "",
         projectDescription: "",
         paymentStatus: "no",
-        deliveryDate: null, // Reset delivery date
+        deliveryDate: null,
       });
       fetchMyLeads();
     } catch (err) {
       console.error("Error creating lead:", err);
     }
   }
+  
 
   async function handleDeleteLead(leadId) {
     if (!window.confirm("Are you sure?")) return;
@@ -83,6 +71,40 @@ function SalesDashboard({ token, onLogout }) {
     } catch (err) {
       console.error("Error deleting lead:", err);
     }
+  }
+
+  function addClientName(e) {
+    if (e.key === "," && nameInput.trim()) {
+      setForm((prevForm) => ({
+        ...prevForm,
+        clientName: [...prevForm.clientName, nameInput.trim()],
+      }));
+      setNameInput("");
+    }
+  }
+
+  function addClientEmail(e) {
+    if (e.key === "," && emailInput.trim()) {
+      setForm((prevForm) => ({
+        ...prevForm,
+        clientEmail: [...prevForm.clientEmail, emailInput.trim()],
+      }));
+      setEmailInput("");
+    }
+  }
+
+  function removeClientName(index) {
+    setForm((prevForm) => ({
+      ...prevForm,
+      clientName: prevForm.clientName.filter((_, i) => i !== index),
+    }));
+  }
+
+  function removeClientEmail(index) {
+    setForm((prevForm) => ({
+      ...prevForm,
+      clientEmail: prevForm.clientEmail.filter((_, i) => i !== index),
+    }));
   }
 
   return (
@@ -102,18 +124,52 @@ function SalesDashboard({ token, onLogout }) {
           />
         </Form.Group>
         <Form.Group className="mb-3">
-          <Form.Control
-            placeholder="Client Name"
-            value={form.clientName}
-            onChange={(e) => setForm({ ...form, clientName: e.target.value })}
-          />
+          <div>
+            <label>Client Names:</label>
+            <div className="tags-input">
+              {form.clientName.map((name, index) => (
+                <span key={index} className="tag">
+                  {name}
+                  <Button
+                    variant="link"
+                    onClick={() => removeClientName(index)}
+                  >
+                    &times;
+                  </Button>
+                </span>
+              ))}
+              <Form.Control
+                placeholder="Add client name"
+                value={nameInput}
+                onChange={(e) => setNameInput(e.target.value)}
+                onKeyDown={addClientName}
+              />
+            </div>
+          </div>
         </Form.Group>
         <Form.Group className="mb-3">
-          <Form.Control
-            placeholder="Client Email"
-            value={form.clientEmail}
-            onChange={(e) => setForm({ ...form, clientEmail: e.target.value })}
-          />
+          <div>
+            <label>Client Email:</label>
+            <div className="tags-input">
+              {form.clientEmail.map((email, index) => (
+                <span key={index} className="tag">
+                  {email}
+                  <Button
+                    variant="link"
+                    onClick={() => removeClientEmail(index)}
+                  >
+                    &times;
+                  </Button>
+                </span>
+              ))}
+              <Form.Control
+                placeholder="Add client email"
+                value={emailInput}
+                onChange={(e) => setEmailInput(e.target.value)}
+                onKeyDown={addClientEmail}
+              />
+            </div>
+          </div>
         </Form.Group>
         <Form.Group className="mb-3">
           <Form.Control
@@ -149,23 +205,21 @@ function SalesDashboard({ token, onLogout }) {
         <thead>
           <tr>
             <th>Lead ID</th>
-            <th>Client Name</th>
-            <th>Client Email</th>
+            <th>Client Names</th>
+            <th>Client Emails</th>
             <th>Project Name</th>
             <th>Project Description</th>
             <th>Payment Status</th>
             <th>Delivery Date</th>
             <th>Actions</th>
-            <th>Send to Researcher</th>
-            <th>Done</th>
           </tr>
         </thead>
         <tbody>
           {leads.map((lead) => (
             <tr key={lead.leadId}>
               <td>{lead.leadId}</td>
-              <td>{lead.clientName}</td>
-              <td>{lead.clientEmail}</td>
+              <td>{Array.isArray(lead.clientName) ? lead.clientName.join(", ") : "No Names"}</td>
+              <td>{Array.isArray(lead.clientEmail) ? lead.clientEmail.join(", ") : "No Emails"}</td>
               <td>{lead.projectName}</td>
               <td>{lead.projectDescription}</td>
               <td>{lead.paymentStatus}</td>
@@ -182,16 +236,6 @@ function SalesDashboard({ token, onLogout }) {
                   Delete
                 </Button>
               </td>
-              <td>
-                <Button
-                  variant="primary"
-                  onClick={() => sendToResearcher(lead.leadId)}
-                  disabled={lead.sentToResearcher}
-                >
-                  {lead.sentToResearcher ? "Sent" : "Send to Researcher"}
-                </Button>
-              </td>
-              <td>{lead.done ? "Yes" : "No"}</td>
             </tr>
           ))}
         </tbody>
