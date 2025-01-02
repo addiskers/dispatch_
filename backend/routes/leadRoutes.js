@@ -1,5 +1,3 @@
-// routes/leadRoutes.js
-
 const express = require("express");
 const router = express.Router();
 const authMiddleware = require("../middleware/auth");
@@ -15,8 +13,7 @@ router.delete("/:leadId", authMiddleware, leadController.deleteLead);
 router.get("/uploader/list", authMiddleware, leadController.getLeadListForUploader);
 router.patch("/:leadId/done", authMiddleware, leadController.updateDoneStatus);
 
-
+// --- ACCOUNTS endpoints ---
 router.get("/accounts/all-leads", authMiddleware, leadController.getAllLeads);
-router.patch("/:leadId/send-to-researcher", authMiddleware, leadController.sendToResearcher);
 
 module.exports = router;

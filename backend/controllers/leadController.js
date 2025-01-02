@@ -5,7 +5,7 @@ const Lead = require("../models/Lead");
  */
 exports.createLead = async (req, res) => {
   try {
-    console.log("Request Body:", req.body); 
+    console.log("Request Body:", req.body);
     const { leadId, clientName, clientEmail, projectName, projectDescription, paymentStatus, deliveryDate } = req.body;
 
     const existingLead = await Lead.findOne({ leadId });
@@ -32,7 +32,6 @@ exports.createLead = async (req, res) => {
   }
 };
 
-
 /**
  * Get leads belonging to the logged-in sales user
  */
@@ -46,7 +45,6 @@ exports.getMyLeads = async (req, res) => {
   }
 };
 
-
 /**
  * Update payment status (accounts only)
  */
@@ -57,21 +55,36 @@ exports.updatePaymentStatus = async (req, res) => {
     }
 
     const { leadId } = req.params;
-    const { paymentStatus } = req.body;
+    const { paymentStatus, paymentRemark } = req.body;
 
-    if (!["yes", "no"].includes(paymentStatus)) {
+    if (!["full", "partial", "not_received"].includes(paymentStatus)) {
       return res.status(400).json({ message: "Invalid payment status value" });
     }
 
-    const lead = await Lead.findOneAndUpdate({ leadId }, { paymentStatus }, { new: true });
+    const lead = await Lead.findOne({ leadId });
     if (!lead) {
       return res.status(404).json({ message: "Lead not found" });
     }
 
-    res.status(200).json({ message: "Payment status updated", lead });
+    // Restrict payment status transitions
+    if (
+      (lead.paymentStatus === "full" && paymentStatus !== "full") ||
+      (lead.paymentStatus === "partial" && paymentStatus === "not_received")
+    ) {
+      return res.status(400).json({ message: "Invalid payment status transition" });
+    }
+
+    lead.paymentStatus = paymentStatus;
+    if (paymentRemark) {
+      lead.paymentRemark = paymentRemark; // Update payment remark
+    }
+
+    await lead.save();
+
+    return res.status(200).json({ message: "Payment status updated", lead });
   } catch (error) {
     console.error("Error updating payment status:", error);
-    res.status(500).json({ message: "Internal server error" });
+    return res.status(500).json({ message: "Internal server error" });
   }
 };
 
@@ -99,8 +112,7 @@ exports.deleteLead = async (req, res) => {
  */
 exports.getLeadListForUploader = async (req, res) => {
   try {
-    const leads = await Lead.find({ sentToResearcher: true });
-    console.log("Filtered Leads:", leads); 
+    const leads = await Lead.find(); // Fetch all leads
     return res.status(200).json(leads);
   } catch (error) {
     console.error("Error fetching leads for uploader:", error);
@@ -144,24 +156,5 @@ exports.getAllLeads = async (req, res) => {
   } catch (error) {
     console.error("Error fetching all leads:", error);
     res.status(500).json({ message: "Error fetching leads", error });
-  }
-};
-
-/**
- * Send lead to researcher (sales only)
- */
-exports.sendToResearcher = async (req, res) => {
-  try {
-    const { leadId } = req.params;
-
-    const lead = await Lead.findOneAndUpdate({ leadId, salesUser: req.user.userId }, { sentToResearcher: true }, { new: true });
-    if (!lead) {
-      return res.status(404).json({ message: "Lead not found or not owned by you" });
-    }
-
-    res.status(200).json({ message: "Lead sent to researcher", lead });
-  } catch (error) {
-    console.error("Error sending lead to researcher:", error);
-    res.status(500).json({ message: "Server error" });
   }
 };

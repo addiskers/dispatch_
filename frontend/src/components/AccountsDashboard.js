@@ -7,6 +7,7 @@ import "../styles/dashboard.css";
 
 function AccountsDashboard({ token, onLogout }) {
   const [leads, setLeads] = useState([]);
+  const [statusUpdates, setStatusUpdates] = useState({}); 
 
   useEffect(() => {
     fetchAllLeads();
@@ -19,23 +20,47 @@ function AccountsDashboard({ token, onLogout }) {
         headers: { Authorization: `Bearer ${token}` },
       });
       setLeads(res.data);
+
+      // Initialize statusUpdates for tracking changes
+      const initialStatus = {};
+      res.data.forEach((lead) => {
+        initialStatus[lead.leadId] = {
+          paymentStatus: lead.paymentStatus || "not_received",
+          paymentRemark: lead.paymentRemark || "",
+        };
+      });
+      setStatusUpdates(initialStatus);
     } catch (err) {
       console.error("Error fetching all leads:", err);
     }
   }
 
-  // Update payment status for a lead
-  async function updatePaymentStatus(leadId, paymentStatus) {
+  // Update payment status and remark for a lead
+  async function updatePaymentStatus(leadId) {
     try {
+      const { paymentStatus, paymentRemark } = statusUpdates[leadId];
       await axios.patch(
         `http://localhost:5000/api/leads/${leadId}/payment-status`,
-        { paymentStatus },
+        { paymentStatus, paymentRemark },
         { headers: { Authorization: `Bearer ${token}` } }
       );
+      alert("Payment status updated successfully!");
       fetchAllLeads(); // Refresh leads after updating
     } catch (err) {
       console.error("Error updating payment status:", err);
+      alert("Failed to update payment status.");
     }
+  }
+
+  // Handle changes to paymentStatus or paymentRemark
+  function handleInputChange(leadId, field, value) {
+    setStatusUpdates((prev) => ({
+      ...prev,
+      [leadId]: {
+        ...prev[leadId],
+        [field]: value,
+      },
+    }));
   }
 
   return (
@@ -49,11 +74,12 @@ function AccountsDashboard({ token, onLogout }) {
         <thead>
           <tr>
             <th>Lead ID</th>
+            <th>Created Date</th>
             <th>Client Name</th>
-            <th>Client Email</th>
             <th>Project Name</th>
-            <th>Project Description</th>
             <th>Payment Status</th>
+            <th>Payment Remark</th>
+            <th>Actions</th>
             <th>Done</th>
           </tr>
         </thead>
@@ -61,18 +87,41 @@ function AccountsDashboard({ token, onLogout }) {
           {leads.map((lead) => (
             <tr key={lead.leadId}>
               <td>{lead.leadId}</td>
+              <td>
+          {new Date(lead.createdAt).toLocaleDateString()} {/* Format the created date */}
+        </td>
               <td>{lead.clientName}</td>
-              <td>{lead.clientEmail}</td>
               <td>{lead.projectName}</td>
-              <td>{lead.projectDescription}</td>
+             
               <td>
                 <Form.Select
-                  value={lead.paymentStatus}
-                  onChange={(e) => updatePaymentStatus(lead.leadId, e.target.value)}
+                  value={statusUpdates[lead.leadId]?.paymentStatus || "not_received"}
+                  onChange={(e) =>
+                    handleInputChange(lead.leadId, "paymentStatus", e.target.value)
+                  }
                 >
-                  <option value="no">No</option>
-                  <option value="yes">Yes</option>
+                  <option value="not_received">Not Received</option>
+                  <option value="partial">Partial Received</option>
+                  <option value="full">Full</option>
                 </Form.Select>
+              </td>
+              <td>
+                <Form.Control
+                  as="textarea"
+                  placeholder="Add Payment Remark"
+                  value={statusUpdates[lead.leadId]?.paymentRemark || ""}
+                  onChange={(e) =>
+                    handleInputChange(lead.leadId, "paymentRemark", e.target.value)
+                  }
+                />
+              </td>
+              <td>
+                <Button
+                  variant="primary"
+                  onClick={() => updatePaymentStatus(lead.leadId)}
+                >
+                  Update Payment
+                </Button>
               </td>
               <td>{lead.done ? "Yes" : "No"}</td>
             </tr>

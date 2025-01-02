@@ -14,14 +14,14 @@ const LeadSchema = new mongoose.Schema(
     },
     paymentStatus: {
       type: String,
-      enum: ["yes", "no"],
-      default: "no",
+      enum: ["full", "partial", "not_received"],
+      default: "not_received",
+    },
+    paymentRemark: {
+      type: String,
+      default: "",
     },
     done: {
-      type: Boolean,
-      default: false,
-    },
-    sentToResearcher: {
       type: Boolean,
       default: false,
     },

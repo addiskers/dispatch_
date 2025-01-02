@@ -15,7 +15,7 @@ function SalesDashboard({ token, onLogout }) {
     clientEmail: [],
     projectName: "",
     projectDescription: "",
-    paymentStatus: "no",
+    paymentStatus: "not_received",
     deliveryDate: null,
   });
   const [nameInput, setNameInput] = useState("");
@@ -50,7 +50,7 @@ function SalesDashboard({ token, onLogout }) {
         clientEmail: [],
         projectName: "",
         projectDescription: "",
-        paymentStatus: "no",
+        paymentStatus: "not_received",
         deliveryDate: null,
       });
       fetchMyLeads();
@@ -83,6 +83,22 @@ function SalesDashboard({ token, onLogout }) {
     }
   }
 
+/*  async function sendToResearcher(leadId) {
+    try {
+      await axios.patch(
+        `http://localhost:5000/api/leads/${leadId}/send-to-researcher`,
+        {},
+        {
+          headers: { Authorization: `Bearer ${token}` },
+        }
+      );
+      alert("Lead sent to researcher!");
+      fetchMyLeads();
+    } catch (err) {
+      console.error("Error sending lead to researcher:", err);
+    }
+  }
+*/
   function addClientEmail(e) {
     if (e.key === "," && emailInput.trim()) {
       setForm((prevForm) => ({
@@ -205,24 +221,31 @@ function SalesDashboard({ token, onLogout }) {
         <thead>
           <tr>
             <th>Lead ID</th>
+            <th>Created Date</th>
             <th>Client Names</th>
             <th>Client Emails</th>
             <th>Project Name</th>
             <th>Project Description</th>
             <th>Payment Status</th>
+            <th>Payment Remark</th>
             <th>Delivery Date</th>
             <th>Actions</th>
+            <th>Done</th>
           </tr>
         </thead>
         <tbody>
           {leads.map((lead) => (
             <tr key={lead.leadId}>
               <td>{lead.leadId}</td>
+              <td>
+          {new Date(lead.createdAt).toLocaleDateString()} {/* Format the created date */}
+        </td>
               <td>{Array.isArray(lead.clientName) ? lead.clientName.join(", ") : "No Names"}</td>
               <td>{Array.isArray(lead.clientEmail) ? lead.clientEmail.join(", ") : "No Emails"}</td>
               <td>{lead.projectName}</td>
               <td>{lead.projectDescription}</td>
               <td>{lead.paymentStatus}</td>
+              <td>{lead.paymentRemark || "No Remarks"}</td>
               <td>
                 {lead.deliveryDate
                   ? new Date(lead.deliveryDate).toLocaleDateString()
@@ -236,6 +259,8 @@ function SalesDashboard({ token, onLogout }) {
                   Delete
                 </Button>
               </td>
+            
+              <td>{lead.done ? "Yes" : "No"}</td>
             </tr>
           ))}
         </tbody>

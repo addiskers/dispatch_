@@ -13,15 +13,13 @@ function UploaderDashboard({ token, onLogout }) {
     fetchLeads();
   }, []);
 
-  // Fetch leads sent to researcher
+  // Fetch all leads for uploader
   async function fetchLeads() {
     try {
       const res = await axios.get("http://localhost:5000/api/leads/uploader/list", {
         headers: { Authorization: `Bearer ${token}` },
       });
-      console.log("API Response:", res.data); // Debugging log
-      const filteredLeads = res.data.filter((lead) => lead.sentToResearcher);
-      setLeads(filteredLeads);
+      setLeads(res.data);
     } catch (err) {
       console.error("Error fetching leads for uploader:", err);
     }
@@ -60,8 +58,10 @@ function UploaderDashboard({ token, onLogout }) {
         <thead>
           <tr>
             <th>Lead ID</th>
+            <th>Created Date</th>
             <th>Project Name</th>
             <th>Description</th>
+            <th>Payment Status</th>
             <th>Delivery Date</th>
             <th>Done</th>
             <th>Action</th>
@@ -71,8 +71,12 @@ function UploaderDashboard({ token, onLogout }) {
           {leads.map((lead) => (
             <tr key={lead.leadId}>
               <td>{lead.leadId}</td>
+              <td>
+          {new Date(lead.createdAt).toLocaleDateString()} {/* Format the created date */}
+        </td>
               <td>{lead.projectName}</td>
               <td>{lead.projectDescription}</td>
+              <td>{lead.paymentStatus}</td>
               <td>
                 {lead.deliveryDate
                   ? new Date(lead.deliveryDate).toLocaleDateString()
