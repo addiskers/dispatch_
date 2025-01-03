@@ -6,21 +6,32 @@ const Lead = require("../models/Lead");
 exports.createLead = async (req, res) => {
   try {
     console.log("Request Body:", req.body);
-    const { leadId, clientName, clientEmail, projectName, projectDescription, paymentStatus, deliveryDate } = req.body;
+    const { leadId, clientName, clientEmail, projectName, projectDescription, paymentStatus, deliveryDate, sqcode } = req.body;
 
+    // Validation
+    if (!clientName || clientName.length === 0) {
+      return res.status(400).json({ message: "At least one client name is required." });
+    }
+    if (!clientEmail || clientEmail.length === 0) {
+      return res.status(400).json({ message: "At least one client email is required." });
+    }
+
+    // Check for duplicate leadId
     const existingLead = await Lead.findOne({ leadId });
     if (existingLead) {
       return res.status(400).json({ message: "Lead ID already exists" });
     }
 
+    // Create new lead
     const newLead = new Lead({
       leadId,
       clientName,
       clientEmail,
       projectName,
       projectDescription,
-      paymentStatus: paymentStatus || "no",
+      paymentStatus: paymentStatus || "not_received",
       deliveryDate: deliveryDate || null,
+      sqcode,
       salesUser: req.user.userId,
     });
 
@@ -31,6 +42,8 @@ exports.createLead = async (req, res) => {
     return res.status(500).json({ message: "Error creating lead", error });
   }
 };
+
+
 
 /**
  * Get leads belonging to the logged-in sales user
@@ -76,7 +89,7 @@ exports.updatePaymentStatus = async (req, res) => {
 
     lead.paymentStatus = paymentStatus;
     if (paymentRemark) {
-      lead.paymentRemark = paymentRemark; // Update payment remark
+      lead.paymentRemark = paymentRemark; 
     }
 
     await lead.save();

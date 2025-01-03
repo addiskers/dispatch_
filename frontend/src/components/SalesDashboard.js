@@ -11,15 +11,16 @@ function SalesDashboard({ token, onLogout }) {
   const [leads, setLeads] = useState([]);
   const [form, setForm] = useState({
     leadId: "",
-    clientName: [], 
+    clientName: [],
     clientEmail: [],
     projectName: "",
     projectDescription: "",
     paymentStatus: "not_received",
     deliveryDate: null,
+    sqcode: "", // Added sqcode
   });
   const [nameInput, setNameInput] = useState("");
-  const [emailInput, setEmailInput] = useState(""); 
+  const [emailInput, setEmailInput] = useState("");
 
   const fetchMyLeads = useCallback(async () => {
     try {
@@ -38,7 +39,6 @@ function SalesDashboard({ token, onLogout }) {
 
   async function handleCreateLead(e) {
     e.preventDefault();
-    console.log("Form submitted:", form); 
     try {
       await axios.post("http://localhost:5000/api/leads", form, {
         headers: { Authorization: `Bearer ${token}` },
@@ -52,13 +52,18 @@ function SalesDashboard({ token, onLogout }) {
         projectDescription: "",
         paymentStatus: "not_received",
         deliveryDate: null,
+        sqcode: "", // Reset sqcode
       });
       fetchMyLeads();
     } catch (err) {
-      console.error("Error creating lead:", err);
+      if (err.response && err.response.data && err.response.data.message) {
+        alert(err.response.data.message);
+      } else {
+        console.error("Error creating lead:", err);
+        alert("Failed to create lead. Please try again.");
+      }
     }
   }
-  
 
   async function handleDeleteLead(leadId) {
     if (!window.confirm("Are you sure?")) return;
@@ -74,38 +79,28 @@ function SalesDashboard({ token, onLogout }) {
   }
 
   function addClientName(e) {
-    if (e.key === "," && nameInput.trim()) {
-      setForm((prevForm) => ({
-        ...prevForm,
-        clientName: [...prevForm.clientName, nameInput.trim()],
-      }));
-      setNameInput("");
+    if (e.key === ",") {
+      e.preventDefault();
+      if (nameInput.trim()) {
+        setForm((prevForm) => ({
+          ...prevForm,
+          clientName: [...prevForm.clientName.filter(Boolean), nameInput.trim()],
+        }));
+        setNameInput("");
+      }
     }
   }
 
-/*  async function sendToResearcher(leadId) {
-    try {
-      await axios.patch(
-        `http://localhost:5000/api/leads/${leadId}/send-to-researcher`,
-        {},
-        {
-          headers: { Authorization: `Bearer ${token}` },
-        }
-      );
-      alert("Lead sent to researcher!");
-      fetchMyLeads();
-    } catch (err) {
-      console.error("Error sending lead to researcher:", err);
-    }
-  }
-*/
   function addClientEmail(e) {
-    if (e.key === "," && emailInput.trim()) {
-      setForm((prevForm) => ({
-        ...prevForm,
-        clientEmail: [...prevForm.clientEmail, emailInput.trim()],
-      }));
-      setEmailInput("");
+    if (e.key === ",") {
+      e.preventDefault();
+      if (emailInput.trim()) {
+        setForm((prevForm) => ({
+          ...prevForm,
+          clientEmail: [...prevForm.clientEmail.filter(Boolean), emailInput.trim()],
+        }));
+        setEmailInput("");
+      }
     }
   }
 
@@ -146,10 +141,7 @@ function SalesDashboard({ token, onLogout }) {
               {form.clientName.map((name, index) => (
                 <span key={index} className="tag">
                   {name}
-                  <Button
-                    variant="link"
-                    onClick={() => removeClientName(index)}
-                  >
+                  <Button variant="link" onClick={() => removeClientName(index)}>
                     &times;
                   </Button>
                 </span>
@@ -170,10 +162,7 @@ function SalesDashboard({ token, onLogout }) {
               {form.clientEmail.map((email, index) => (
                 <span key={index} className="tag">
                   {email}
-                  <Button
-                    variant="link"
-                    onClick={() => removeClientEmail(index)}
-                  >
+                  <Button variant="link" onClick={() => removeClientEmail(index)}>
                     &times;
                   </Button>
                 </span>
@@ -200,6 +189,13 @@ function SalesDashboard({ token, onLogout }) {
             placeholder="Project Description"
             value={form.projectDescription}
             onChange={(e) => setForm({ ...form, projectDescription: e.target.value })}
+          />
+        </Form.Group>
+        <Form.Group className="mb-3">
+          <Form.Control
+            placeholder="Sqcode"
+            value={form.sqcode} // Sqcode field
+            onChange={(e) => setForm({ ...form, sqcode: e.target.value })}
           />
         </Form.Group>
         <Form.Group className="mb-3">
@@ -237,9 +233,7 @@ function SalesDashboard({ token, onLogout }) {
           {leads.map((lead) => (
             <tr key={lead.leadId}>
               <td>{lead.leadId}</td>
-              <td>
-          {new Date(lead.createdAt).toLocaleDateString()} {/* Format the created date */}
-        </td>
+              <td>{new Date(lead.createdAt).toLocaleDateString()}</td>
               <td>{Array.isArray(lead.clientName) ? lead.clientName.join(", ") : "No Names"}</td>
               <td>{Array.isArray(lead.clientEmail) ? lead.clientEmail.join(", ") : "No Emails"}</td>
               <td>{lead.projectName}</td>
@@ -252,14 +246,10 @@ function SalesDashboard({ token, onLogout }) {
                   : "Not Set"}
               </td>
               <td>
-                <Button
-                  variant="danger"
-                  onClick={() => handleDeleteLead(lead.leadId)}
-                >
+                <Button variant="danger" onClick={() => handleDeleteLead(lead.leadId)}>
                   Delete
                 </Button>
               </td>
-            
               <td>{lead.done ? "Yes" : "No"}</td>
             </tr>
           ))}

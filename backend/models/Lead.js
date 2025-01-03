@@ -29,6 +29,10 @@ const LeadSchema = new mongoose.Schema(
       type: [String],
       default: [],
     },
+    sqcode: {
+      type: String,
+      default: "", 
+    },
     deleted: {
       type: Boolean,
       default: false,
