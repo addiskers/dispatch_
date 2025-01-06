@@ -13,11 +13,12 @@ function SalesDashboard({ token, onLogout }) {
     leadId: "",
     clientName: [],
     clientEmail: [],
+    clientCompany:"",
     projectName: "",
     projectDescription: "",
     paymentStatus: "not_received",
     deliveryDate: null,
-    sqcode: "", // Added sqcode
+    sqcode: "",
   });
   const [nameInput, setNameInput] = useState("");
   const [emailInput, setEmailInput] = useState("");
@@ -48,11 +49,12 @@ function SalesDashboard({ token, onLogout }) {
         leadId: "",
         clientName: [],
         clientEmail: [],
+        clientCompany:"",
         projectName: "",
         projectDescription: "",
         paymentStatus: "not_received",
         deliveryDate: null,
-        sqcode: "", // Reset sqcode
+        sqcode: "",
       });
       fetchMyLeads();
     } catch (err) {
@@ -177,6 +179,13 @@ function SalesDashboard({ token, onLogout }) {
           </div>
         </Form.Group>
         <Form.Group className="mb-3">
+        <Form.Control
+          placeholder="Client Company"
+          value={form.clientCompany}
+          onChange={(e) => setForm({ ...form, clientCompany: e.target.value })}
+        />
+      </Form.Group>
+        <Form.Group className="mb-3">
           <Form.Control
             placeholder="Project Name"
             value={form.projectName}
@@ -220,6 +229,7 @@ function SalesDashboard({ token, onLogout }) {
             <th>Created Date</th>
             <th>Client Names</th>
             <th>Client Emails</th>
+            <th>Client Company</th>
             <th>Project Name</th>
             <th>Project Description</th>
             <th>Payment Status</th>
@@ -236,6 +246,7 @@ function SalesDashboard({ token, onLogout }) {
               <td>{new Date(lead.createdAt).toLocaleDateString()}</td>
               <td>{Array.isArray(lead.clientName) ? lead.clientName.join(", ") : "No Names"}</td>
               <td>{Array.isArray(lead.clientEmail) ? lead.clientEmail.join(", ") : "No Emails"}</td>
+              <td>{lead.clientCompany}</td>
               <td>{lead.projectName}</td>
               <td>{lead.projectDescription}</td>
               <td>{lead.paymentStatus}</td>

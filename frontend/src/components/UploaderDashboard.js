@@ -58,10 +58,11 @@ function UploaderDashboard({ token, onLogout }) {
         <thead>
           <tr>
             <th>Lead ID</th>
-            <th>Created Date</th>
+            <th>Client Company</th>
             <th>Project Name</th>
             <th>Description</th>
             <th>Payment Status</th>
+            <th>Created Date</th>
             <th>Delivery Date</th>
             <th>Done</th>
             <th>Action</th>
@@ -71,12 +72,13 @@ function UploaderDashboard({ token, onLogout }) {
           {leads.map((lead) => (
             <tr key={lead.leadId}>
               <td>{lead.leadId}</td>
-              <td>
-          {new Date(lead.createdAt).toLocaleDateString()} {/* Format the created date */}
-        </td>
+              <td>{lead.clientCompany}</td>
               <td>{lead.projectName}</td>
               <td>{lead.projectDescription}</td>
               <td>{lead.paymentStatus}</td>
+              <td>
+               {new Date(lead.createdAt).toLocaleDateString()} {/* Format the created date */}
+              </td>
               <td>
                 {lead.deliveryDate
                   ? new Date(lead.deliveryDate).toLocaleDateString()

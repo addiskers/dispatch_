@@ -5,6 +5,7 @@ const LeadSchema = new mongoose.Schema(
     leadId: { type: String, required: true, unique: true },
     clientName: { type: [String], required: true },
     clientEmail: { type: [String], required: true },
+    clientCompany: { type: String, required: true },
     projectName: { type: String, required: true },
     projectDescription: { type: String, default: "" },
     salesUser: {

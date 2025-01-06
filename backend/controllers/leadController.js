@@ -6,7 +6,7 @@ const Lead = require("../models/Lead");
 exports.createLead = async (req, res) => {
   try {
     console.log("Request Body:", req.body);
-    const { leadId, clientName, clientEmail, projectName, projectDescription, paymentStatus, deliveryDate, sqcode } = req.body;
+    const { leadId, clientName, clientEmail,clientCompany,projectName, projectDescription, paymentStatus, deliveryDate, sqcode } = req.body;
 
     // Validation
     if (!clientName || clientName.length === 0) {
@@ -27,6 +27,7 @@ exports.createLead = async (req, res) => {
       leadId,
       clientName,
       clientEmail,
+      clientCompany,
       projectName,
       projectDescription,
       paymentStatus: paymentStatus || "not_received",

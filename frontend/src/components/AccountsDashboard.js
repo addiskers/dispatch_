@@ -76,6 +76,7 @@ function AccountsDashboard({ token, onLogout }) {
             <th>Lead ID</th>
             <th>Created Date</th>
             <th>Client Name</th>
+            <th>Client Company</th>
             <th>Project Name</th>
             <th>Payment Status</th>
             <th>Payment Remark</th>
@@ -91,6 +92,7 @@ function AccountsDashboard({ token, onLogout }) {
           {new Date(lead.createdAt).toLocaleDateString()} {/* Format the created date */}
         </td>
               <td>{lead.clientName}</td>
+              <td>{lead.clientCompany}</td>
               <td>{lead.projectName}</td>
              
               <td>
