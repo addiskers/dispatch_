@@ -2,25 +2,22 @@ const User = require("../models/User");
 const bcrypt = require("bcrypt");
 const jwt = require("jsonwebtoken");
 
-exports.register = async (req, res) => {
+exports.registerUser = async (req, res) => {
   try {
+    if (req.user.role !== "superadmin") {
+      return res.status(403).json({ message: "Access denied: Only superadmin can register users" });
+    }
+
     const { username, password, role } = req.body;
 
-    // Check if user exists
     const existingUser = await User.findOne({ username });
     if (existingUser) {
       return res.status(400).json({ message: "User already exists" });
     }
 
-    // Hash password
     const hashedPassword = await bcrypt.hash(password, 10);
 
-    // Create user
-    const newUser = new User({
-      username,
-      password: hashedPassword,
-      role,
-    });
+    const newUser = new User({ username, password: hashedPassword, role });
     await newUser.save();
 
     return res.status(201).json({ message: "User registered successfully" });
@@ -53,5 +50,26 @@ exports.login = async (req, res) => {
   } catch (err) {
     console.error("Error during login:", err);
     res.status(500).json({ message: "Server error" });
+  }
+};
+exports.updatePassword = async (req, res) => {
+  try {
+    if (req.user.role !== "superadmin") {
+      return res.status(403).json({ message: "Access denied: Only superadmin can update passwords" });
+    }
+
+    const { userId, newPassword } = req.body;
+
+    const user = await User.findById(userId);
+    if (!user) {
+      return res.status(404).json({ message: "User not found" });
+    }
+
+    user.password = await bcrypt.hash(newPassword, 10);
+    await user.save();
+
+    return res.status(200).json({ message: "Password updated successfully" });
+  } catch (error) {
+    return res.status(500).json({ message: "Error updating password", error });
   }
 };

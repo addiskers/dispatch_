@@ -1,5 +1,9 @@
 const Lead = require("../models/Lead");
-
+const logActivity = async (userId, action, details) => {
+  await User.findByIdAndUpdate(userId, {
+    $push: { activityLogs: { action, details } },
+  });
+};
 /**
  * Create a new lead
  */
@@ -37,6 +41,7 @@ exports.createLead = async (req, res) => {
     });
 
     await newLead.save();
+    logActivity(req.user.userId, " lead", { leadId, changes });
     return res.status(201).json({ message: "Lead created successfully", lead: newLead });
   } catch (error) {
     console.error("Error creating lead:", error);

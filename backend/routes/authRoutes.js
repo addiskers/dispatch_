@@ -1,11 +1,22 @@
+// authRoutes.js
 const express = require("express");
 const router = express.Router();
-const { register, login } = require("../controllers/authController");
+const {
+  login,
+  registerUser,
+  updatePassword,
+} = require("../controllers/authController");
+const { getActivityLogs } = require("../controllers/superAdminController");
+const authMiddleware = require("../middleware/auth");
+const { getAllUsers } = require("../controllers/superAdminController");
 
-// Register new user (for testing)
-router.post("/register", register);
-
-// Login
+// Auth Routes
 router.post("/login", login);
+
+// Super Admin Routes
+router.post("/register", authMiddleware, registerUser);
+router.patch("/update-password", authMiddleware, updatePassword);
+router.get("/activity-logs", authMiddleware, getActivityLogs);
+router.get("/users", authMiddleware, getAllUsers);
 
 module.exports = router;

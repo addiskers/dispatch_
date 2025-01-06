@@ -1,0 +1,43 @@
+.dashboard-container {
+    display: flex;
+    height: 100vh;
+  }
+  
+  .sidebar {
+    width: 200px;
+    background: #333;
+    color: #fff;
+    padding: 20px;
+    display: flex;
+    flex-direction: column;
+    justify-content: space-between;
+  }
+  
+  .sidebar ul {
+    list-style: none;
+    padding: 0;
+  }
+  
+  .sidebar li {
+    cursor: pointer;
+    padding: 10px 0;
+    border-bottom: 1px solid #444;
+  }
+  
+  .sidebar li.active {
+    background: #555;
+  }
+  
+  .content {
+    flex: 1;
+    padding: 20px;
+  }
+  
+  .logout-btn {
+    background: red;
+    color: #fff;
+    border: none;
+    padding: 10px;
+    cursor: pointer;
+  }
+  
