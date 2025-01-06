@@ -19,38 +19,31 @@ const upload = multer({
 });
 
 exports.uploadMultipleFiles = [
-  // This allows up to, say, 10 files at once
   upload.array("deliverables", 10),
   async (req, res) => {
     try {
-      const { leadId } = req.body;
+      const { leadId, projectName } = req.body;
 
-      // The uploaded files info is in req.files (an array)
-      // each req.files[i] has .key, .location, etc.
-      if (!req.files || req.files.length === 0) {
-        return res
-          .status(400)
-          .json({ message: "No files received for upload" });
-      }
-
-      // 2) Find the lead in MongoDB
-      const lead = await Lead.findOne({ leadId });
+      // Validate leadId and projectName (case-sensitive)
+      const lead = await Lead.findOne({ leadId, projectName });
       if (!lead) {
-        return res.status(404).json({ message: "Lead not found" });
+        return res.status(404).json({ message: "Lead ID and Project Name do not match" });
       }
 
-      // 3) For each uploaded file, push the S3 key into lead.deliverables
+      if (!req.files || req.files.length === 0) {
+        return res.status(400).json({ message: "No files received for upload" });
+      }
+
+      // Add uploaded files to lead deliverables
       req.files.forEach((file) => {
-        lead.deliverables.push(file.key); // file.key is "deliverables/12345-abc.pdf"
+        lead.deliverables.push(file.key);
       });
 
-      // 4) Save the lead
       await lead.save();
 
-      // 5) Respond with success
       return res.json({
         message: "Files uploaded successfully",
-        keys: req.files.map((f) => f.key), // or f.location
+        keys: req.files.map((f) => f.key),
       });
     } catch (error) {
       console.error("Error uploading multiple files:", error);
@@ -58,3 +51,4 @@ exports.uploadMultipleFiles = [
     }
   },
 ];
+

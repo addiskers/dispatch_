@@ -4,15 +4,15 @@ const Lead = require("../models/Lead");
 
 exports.sendAllDeliverables = async (req, res) => {
   try {
-    const { leadId } = req.body;
+    const { leadId, projectName } = req.body;
 
-    // 1) Find the lead
-    const lead = await Lead.findOne({ leadId });
+    // Validate leadId and projectName (case-sensitive)
+    const lead = await Lead.findOne({ leadId, projectName });
     if (!lead) {
-      return res.status(404).json({ message: "Lead not found" });
+      return res.status(404).json({ message: "Lead ID and Project Name do not match" });
     }
 
-    // 2) For each fileKey in lead.deliverables, generate a presigned URL
+    // Generate presigned URLs for deliverables
     const presignedUrls = [];
     for (const fileKey of lead.deliverables) {
       const url = await generatePresignedUrl(fileKey);

@@ -1,21 +1,21 @@
-// src/components/MultipleFileUpload.js
 import React, { useState } from "react";
 import axios from "axios";
 
 function MultipleFileUpload({ token }) {
   const [leadId, setLeadId] = useState("");
+  const [projectName, setProjectName] = useState(""); // Added projectName
   const [files, setFiles] = useState(null);
 
   async function handleUpload(e) {
     e.preventDefault();
-    if (!files || !leadId) {
-      alert("Please select files and enter a lead ID");
+    if (!files || !leadId || !projectName) {
+      alert("Please enter both Lead ID and Project Name, and select files.");
       return;
     }
 
-    // We can pass an array of files using FormData
     const formData = new FormData();
     formData.append("leadId", leadId);
+    formData.append("projectName", projectName); // Include projectName
     for (let i = 0; i < files.length; i++) {
       formData.append("deliverables", files[i]);
     }
@@ -36,21 +36,21 @@ function MultipleFileUpload({ token }) {
 
   async function handleSend(e) {
     e.preventDefault();
-    if (!leadId) {
-      alert("Enter a lead ID to send deliverables");
+    if (!leadId || !projectName) {
+      alert("Please enter both Lead ID and Project Name.");
       return;
     }
     try {
       const res = await axios.post(
         "http://localhost:5000/api/upload/send",
-        { leadId },
+        { leadId, projectName }, // Include projectName
         {
           headers: {
             Authorization: `Bearer ${token}`,
           },
         }
       );
-      alert(`Deliverables sent. FileCount: ${res.data.fileCount}`);
+      alert(`Deliverables sent. File Count: ${res.data.fileCount}`);
     } catch (error) {
       console.error("Send error:", error);
       alert("Error sending deliverables");
@@ -65,6 +65,11 @@ function MultipleFileUpload({ token }) {
           placeholder="Lead ID"
           value={leadId}
           onChange={(e) => setLeadId(e.target.value)}
+        />
+        <input
+          placeholder="Project Name"
+          value={projectName}
+          onChange={(e) => setProjectName(e.target.value)} // Added projectName input
         />
         <input
           type="file"
