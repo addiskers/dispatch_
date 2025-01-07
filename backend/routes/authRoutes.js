@@ -1,4 +1,3 @@
-// authRoutes.js
 const express = require("express");
 const router = express.Router();
 const {
@@ -6,9 +5,11 @@ const {
   registerUser,
   updatePassword,
 } = require("../controllers/authController");
-const { getActivityLogs } = require("../controllers/superAdminController");
 const authMiddleware = require("../middleware/auth");
-const { getAllUsers } = require("../controllers/superAdminController");
+const {
+  getAllUsers,
+  getActivityLogs, // Import the missing function
+} = require("../controllers/superAdminController");
 
 // Auth Routes
 router.post("/login", login);

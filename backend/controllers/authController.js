@@ -1,7 +1,7 @@
 const User = require("../models/User");
 const bcrypt = require("bcrypt");
 const jwt = require("jsonwebtoken");
-
+const logActivity = require("../utils/logger");
 exports.registerUser = async (req, res) => {
   try {
     if (req.user.role !== "superadmin") {
@@ -18,6 +18,9 @@ exports.registerUser = async (req, res) => {
     const hashedPassword = await bcrypt.hash(password, 10);
 
     const newUser = new User({ username, password: hashedPassword, role });
+    await logActivity(req.user.userId, "registered user", {
+      newValue: { username, role },
+    });
     await newUser.save();
 
     return res.status(201).json({ message: "User registered successfully" });
@@ -45,7 +48,7 @@ exports.login = async (req, res) => {
       process.env.JWT_SECRET,
       { expiresIn: "1d" }
     );
-
+    await logActivity(user._id, "login", {});
     res.status(200).json({ token, role: user.role });
   } catch (err) {
     console.error("Error during login:", err);
@@ -65,11 +68,21 @@ exports.updatePassword = async (req, res) => {
       return res.status(404).json({ message: "User not found" });
     }
 
+    const oldPasswordHash = user.password; // Capture the old password hash
+
     user.password = await bcrypt.hash(newPassword, 10);
     await user.save();
 
+    // Log the activity
+    await logActivity(req.user.userId, "updated password", {
+      userId,
+      oldValue: { password: oldPasswordHash },
+      newValue: { password: "hashed" }, // Never log raw passwords
+    });
+
     return res.status(200).json({ message: "Password updated successfully" });
   } catch (error) {
+    console.error("Error updating password:", error);
     return res.status(500).json({ message: "Error updating password", error });
   }
 };

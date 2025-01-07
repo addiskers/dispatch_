@@ -1,8 +1,19 @@
 const Lead = require("../models/Lead");
+const User = require("../models/User");
+const Log = require("../models/Log");
+
 const logActivity = async (userId, action, details) => {
-  await User.findByIdAndUpdate(userId, {
-    $push: { activityLogs: { action, details } },
-  });
+  try {
+    console.log("Logging activity:", { userId, action, details });
+    await Log.create({
+      user: userId,
+      action,
+      ...details,
+      timestamp: new Date(),
+    });
+  } catch (error) {
+    console.error("Error logging activity:", error);
+  }
 };
 /**
  * Create a new lead
@@ -70,40 +81,45 @@ exports.getMyLeads = async (req, res) => {
 exports.updatePaymentStatus = async (req, res) => {
   try {
     if (req.user.role !== "accounts") {
-      return res.status(403).json({ message: "Access denied: Only accounts can update payment status" });
+      return res.status(403).json({ message: "Access denied: Only accounts can update payment status." });
     }
 
     const { leadId } = req.params;
     const { paymentStatus, paymentRemark } = req.body;
 
-    if (!["full", "partial", "not_received"].includes(paymentStatus)) {
-      return res.status(400).json({ message: "Invalid payment status value" });
-    }
-
     const lead = await Lead.findOne({ leadId });
     if (!lead) {
-      return res.status(404).json({ message: "Lead not found" });
+      return res.status(404).json({ message: "Lead not found." });
     }
 
-    // Restrict payment status transitions
+    // Fetch the old payment status
+    const oldStatus = lead.paymentStatus;
+
+    // Restrict invalid payment status transitions
     if (
-      (lead.paymentStatus === "full" && paymentStatus !== "full") ||
-      (lead.paymentStatus === "partial" && paymentStatus === "not_received")
+      (oldStatus === "full" && paymentStatus !== "full") ||
+      (oldStatus === "partial" && paymentStatus === "not_received")
     ) {
-      return res.status(400).json({ message: "Invalid payment status transition" });
+      return res.status(400).json({ message: "Invalid payment status transition." });
     }
 
+    // Update payment status
     lead.paymentStatus = paymentStatus;
-    if (paymentRemark) {
-      lead.paymentRemark = paymentRemark; 
-    }
+    if (paymentRemark) lead.paymentRemark = paymentRemark;
 
     await lead.save();
 
-    return res.status(200).json({ message: "Payment status updated", lead });
+    // Log activity
+    await logActivity(req.user.userId, "updated payment status", {
+      leadId,
+      oldValue: { paymentStatus: oldStatus },
+      newValue: { paymentStatus },
+    });
+
+    return res.status(200).json({ message: "Payment status updated.", lead });
   } catch (error) {
     console.error("Error updating payment status:", error);
-    return res.status(500).json({ message: "Internal server error" });
+    return res.status(500).json({ message: "Error updating payment status.", error });
   }
 };
 
@@ -118,7 +134,7 @@ exports.deleteLead = async (req, res) => {
     if (!lead) {
       return res.status(404).json({ message: "Lead not found or not owned by you" });
     }
-
+    await logActivity(req.user.userId, "deleted lead", { leadId });
     res.status(200).json({ message: "Lead deleted successfully" });
   } catch (error) {
     console.error("Error deleting lead:", error);
@@ -157,7 +173,11 @@ exports.updateDoneStatus = async (req, res) => {
 
     lead.done = done;
     await lead.save();
-
+    await logActivity(req.user.userId, "updated done status", {
+      leadId,
+      oldValue: { done: oldDoneStatus },
+      newValue: { done },
+    });
     return res.json({ message: `Lead marked as ${done ? "Done" : "Undone"}`, lead });
   } catch (error) {
     console.error("Error updating done status:", error);
