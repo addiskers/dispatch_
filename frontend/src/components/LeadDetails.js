@@ -15,7 +15,49 @@ function LeadDetails({ token, leadId, onClose }) {
     fetchLeadLogs();
     fetchMessages();
   }, [leadId]);
-
+  const [nameInput, setNameInput] = useState("");
+  const [emailInput, setEmailInput] = useState("");
+  
+  function addClientName(e) {
+    if (e.key === ",") {
+      e.preventDefault();
+      if (nameInput.trim()) {
+        setEditedLead((prevLead) => ({
+          ...prevLead,
+          clientName: [...prevLead.clientName.filter(Boolean), nameInput.trim()],
+        }));
+        setNameInput("");
+      }
+    }
+  }
+  
+  function addClientEmail(e) {
+    if (e.key === ",") {
+      e.preventDefault();
+      if (emailInput.trim()) {
+        setEditedLead((prevLead) => ({
+          ...prevLead,
+          clientEmail: [...prevLead.clientEmail.filter(Boolean), emailInput.trim()],
+        }));
+        setEmailInput("");
+      }
+    }
+  }
+  
+  function removeClientName(index) {
+    setEditedLead((prevLead) => ({
+      ...prevLead,
+      clientName: prevLead.clientName.filter((_, i) => i !== index),
+    }));
+  }
+  
+  function removeClientEmail(index) {
+    setEditedLead((prevLead) => ({
+      ...prevLead,
+      clientEmail: prevLead.clientEmail.filter((_, i) => i !== index),
+    }));
+  }
+  
   // Fetch lead details
   async function fetchLeadDetails() {
     try {
@@ -101,147 +143,183 @@ function LeadDetails({ token, leadId, onClose }) {
           ✖
         </button>
       </div>
-
       {lead ? (
         <div className="popup-content">
-          {/* Section 1: Overview */}
-          <div className="section">
-            <h3>Overview</h3>
-            {isEditing ? (
-              <div className="edit-form">
-                <label>Client Name:</label>
-                <input
-                  type="text"
-                  value={editedLead.clientName}
-                  onChange={(e) =>
-                    setEditedLead({ ...editedLead, clientName: e.target.value })
-                  }
-                />
-                <label>Client Email:</label>
-                <input
-                  type="email"
-                  value={editedLead.clientEmail}
-                  onChange={(e) =>
-                    setEditedLead({ ...editedLead, clientEmail: e.target.value })
-                  }
-                />
-                <label>Client Company:</label>
-                <input
-                  type="text"
-                  value={editedLead.clientCompany}
-                  onChange={(e) =>
-                    setEditedLead({ ...editedLead, clientCompany: e.target.value })
-                  }
-                />
-                <label>Project Name:</label>
-                <input
-                  type="text"
-                  value={editedLead.projectName}
-                  onChange={(e) =>
-                    setEditedLead({ ...editedLead, projectName: e.target.value })
-                  }
-                />
-                <label>Project Description:</label>
-                <textarea
-                  value={editedLead.projectDescription}
-                  onChange={(e) =>
-                    setEditedLead({
-                      ...editedLead,
-                      projectDescription: e.target.value,
-                    })
-                  }
-                />
-                <label>Sqcode:</label>
-                <input
-                  type="text"
-                  value={editedLead.sqcode}
-                  onChange={(e) =>
-                    setEditedLead({ ...editedLead, sqcode: e.target.value })
-                  }
-                />
-                <button onClick={handleSaveChanges} className="save-btn">
-                  Save
+          <div className="left-column">
+          <div className="section overview-section">
+  <h3>Overview</h3>
+  {isEditing ? (
+    <div className="edit-form">
+      {/* Editable fields */}
+        <div>
+            <label>Client Names:</label>
+            <div className="tags-input">
+            {editedLead.clientName.map((name, index) => (
+                <span key={index} className="tag">
+                {name}
+                <button className="remove-tag" onClick={() => removeClientName(index)}>
+                    &times;
                 </button>
-                <button
-                  onClick={() => setIsEditing(false)}
-                  className="cancel-btn"
-                >
-                  Cancel
-                </button>
-              </div>
-            ) : (
-              <div className="details">
-                <p><strong>Lead ID:</strong> {lead.leadId}</p>
-                <p><strong>Client Name:</strong> {lead.clientName}</p>
-                <p><strong>Client Email:</strong> {lead.clientEmail}</p>
-                <p><strong>Client Company:</strong> {lead.clientCompany}</p>
-                <p><strong>Project Name:</strong> {lead.projectName}</p>
-                <p><strong>Project Description:</strong> {lead.projectDescription}</p>
-                <p><strong>Sqcode:</strong> {lead.sqcode}</p>
-                <button onClick={() => setIsEditing(true)} className="edit-btn">
-                  Edit
-                </button>
-              </div>
-            )}
-          </div>
-
-          {/* Section 2: Sales User */}
-          <div className="section">
-            <h3>Sales User</h3>
-            <p><strong>Name:</strong> {lead.salesUser?.username || "Unknown"}</p>
-            <p><strong>Created Date:</strong> {new Date(lead.createdAt).toLocaleDateString()}</p>
-            <p><strong>Delivery Date:</strong> {new Date(lead.deliveryDate).toLocaleDateString()}</p>
-          </div>
-
-          {/* Section 3: Chat */}
-          <div className="section chat-section">
-            <h3>Chat</h3>
-            <div className="chat-body">
-              {messages.length > 0 ? (
-                messages.map((msg) => (
-                  <div key={msg._id} className={`chat-message ${msg.sender.role}`}>
-                    <strong>{msg.sender.username}:</strong> {msg.message}
-                  </div>
-                ))
-              ) : (
-                <p className="no-messages">No messages yet for this lead.</p>
-              )}
-            </div>
-            <form onSubmit={sendMessage} className="chat-footer">
-              <input
+                </span>
+            ))}
+            <input
                 type="text"
-                value={newMessage}
-                onChange={(e) => setNewMessage(e.target.value)}
-                placeholder="Type your message"
-                className="chat-input"
-              />
-              <button type="submit" className="chat-send-btn">
-                Send
-              </button>
-            </form>
-          </div>
+                placeholder="Add client name (Press ',' to add)"
+                value={nameInput}
+                onChange={(e) => setNameInput(e.target.value)}
+                onKeyDown={addClientName}
+            />
+            </div>
+        </div>
+        <div>
+            <label>Client Emails:</label>
+            <div className="tags-input">
+            {editedLead.clientEmail.map((email, index) => (
+                <span key={index} className="tag">
+                {email}
+                <button className="remove-tag" onClick={() => removeClientEmail(index)}>
+                    &times;
+                </button>
+                </span>
+            ))}
+            <input
+                type="email"
+                placeholder="Add client email (Press ',' to add)"
+                value={emailInput}
+                onChange={(e) => setEmailInput(e.target.value)}
+                onKeyDown={addClientEmail}
+            />
+            </div>
+        </div>
+        <label>Client Company:</label>
+        <input
+            type="text"
+            
+            placeholder="Client Company"
+            value={editedLead.clientCompany}
+            onChange={(e) => setEditedLead({ ...editedLead, clientCompany: e.target.value })}
+        />
+        <label>Project Name:</label>
+        <input
+            type="text"
+            placeholder="Project Name"
+            value={editedLead.projectName}
+            onChange={(e) => setEditedLead({ ...editedLead, projectName: e.target.value })}
+        />
+        <label>Project Description:</label>
+        <textarea
+            placeholder="Project Description"
+            value={editedLead.projectDescription}
+            onChange={(e) =>
+            setEditedLead({ ...editedLead, projectDescription: e.target.value })
+            }
+        />
+        <label>Sqcode:</label>
+        <input
+            type="text"
+            placeholder="Sqcode"
+            value={editedLead.sqcode}
+            onChange={(e) => setEditedLead({ ...editedLead, sqcode: e.target.value })}
+        />
+        <div className="button-group">
+            <button className="save-btn" onClick={handleSaveChanges}>
+            Save
+            </button>
+            <button className="cancel-btn" onClick={() => setIsEditing(false)}>
+            Cancel
+            </button>
+        </div>
+        </div>
+    ) : (
+        <div className="details">
+        <p><strong>Lead ID:</strong> {lead.leadId}</p>
+        <p>
+    <strong>Lead ID:</strong> {lead.leadId}
+  </p>
+        <p>
+            <strong>Client Names:</strong>{" "}
+            {Array.isArray(lead.clientName) && lead.clientName.length > 0
+            ? lead.clientName.join(", ")
+            : "No Names"}
+        </p>
+        <p>
+            <strong>Client Emails:</strong>{" "}
+            {Array.isArray(lead.clientEmail) && lead.clientEmail.length > 0
+            ? lead.clientEmail.join(", ")
+            : "No Emails"}
+        </p>
+        <p><strong>Client Company:</strong> {lead.clientCompany}</p>
+        <p><strong>Project Name:</strong> {lead.projectName}</p>
+        <p><strong>Project Description:</strong> {lead.projectDescription}</p>
+        <p><strong>Sqcode:</strong> {lead.sqcode}</p>
+        <button className="edit-btn" onClick={() => setIsEditing(true)}>
+            Edit
+        </button>
+        </div>
+    )}
+    </div>
 
-         {/* Section 4: Activities */}
-          <div className="section">
-            <h3>Activities</h3>
-            {logs.length > 0 ? (
+            {/* Chat */}
+            <div className="section chat-section">
+              <h3>Chat</h3>
+              <div className="chat-messages">
+                {messages.length > 0 ? (
+                  messages.map((msg) => (
+                    <div key={msg._id} className="chat-message">
+                      <strong>{msg.sender.username}:</strong> {msg.message}
+                    </div>
+                  ))
+                ) : (
+                  <p>No messages yet for this lead.</p>
+                )}
+              </div>
+              <form className="chat-form" onSubmit={sendMessage}>
+                <input
+                  type="text"
+                  className="chat-input"
+                  placeholder="Type your message"
+                  value={newMessage}
+                  onChange={(e) => setNewMessage(e.target.value)}
+                />
+                <button className="chat-send-btn" type="submit">
+                  Send
+                </button>
+              </form>
+            </div>
+          </div>
+          {/* Right Column */}
+          <div className="right-column">
+            {/* Sales User */}
+            <div className="section">
+              <h3>Sales User</h3>
+              <p><strong>Name:</strong> {lead.salesUser?.username || "Unknown"}</p>
+              <p><strong>Created Date:</strong> {new Date(lead.createdAt).toLocaleDateString()}</p>
+              <p><strong>Delivery Date:</strong> {new Date(lead.deliveryDate).toLocaleDateString()}</p>
+            </div>
+            {/* Activities */}
+            <div className="section">
+              <h3>Activities</h3>
               <ul className="activity-log">
-                {logs.map((log) => (
-                  <li key={log._id}>
-                    <strong>{log.action}</strong> - {log.timestamp && new Date(log.timestamp).toLocaleString()}
-                  </li>
-                ))}
+                {logs.length > 0 ? (
+                  logs.map((log) => (
+                    <li key={log._id}>
+                      <strong>{log.action}</strong> -{" "}
+                      {new Date(log.timestamp).toLocaleString()}
+                    </li>
+                  ))
+                ) : (
+                  <p>No activities found for this lead.</p>
+                )}
               </ul>
-            ) : (
-              <p>No activity logs found for this lead.</p>
-            )}
+            </div>
           </div>
         </div>
       ) : (
-        <p>Loading...</p>
+        <p>Loading lead details...</p>
       )}
     </div>
   );
 }
+
 
 export default LeadDetails;
