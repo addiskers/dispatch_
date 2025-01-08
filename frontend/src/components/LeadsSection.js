@@ -1,9 +1,11 @@
 import React, { useState, useEffect } from "react";
 import axios from "axios";
 import Table from "react-bootstrap/Table";
+import LeadDetails from "./LeadDetails"; // Import the LeadDetails component
 
 function LeadsSection({ token }) {
   const [leads, setLeads] = useState([]);
+  const [selectedLeadId, setSelectedLeadId] = useState(null); // State for selected Lead ID
 
   useEffect(() => {
     fetchLeads();
@@ -36,7 +38,15 @@ function LeadsSection({ token }) {
         <tbody>
           {leads.map((lead) => (
             <tr key={lead.leadId}>
-              <td>{lead.leadId}</td>
+              <td>
+                {/* Make Lead ID clickable */}
+                <button
+                  className="btn btn-link"
+                  onClick={() => setSelectedLeadId(lead.leadId)}
+                >
+                  {lead.leadId}
+                </button>
+              </td>
               <td>{lead.clientCompany}</td>
               <td>{lead.projectName}</td>
               <td>{lead.paymentStatus}</td>
@@ -45,6 +55,15 @@ function LeadsSection({ token }) {
           ))}
         </tbody>
       </Table>
+
+      {/* Lead Details Modal */}
+      {selectedLeadId && (
+        <LeadDetails
+          token={token}
+          leadId={selectedLeadId}
+          onClose={() => setSelectedLeadId(null)} // Close modal
+        />
+      )}
     </div>
   );
 }

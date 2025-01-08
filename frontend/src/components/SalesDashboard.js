@@ -6,9 +6,12 @@ import Form from "react-bootstrap/Form";
 import "../styles/dashboard.css";
 import DatePicker from "react-datepicker";
 import "react-datepicker/dist/react-datepicker.css";
+import Chat from "./Chat";
+import "../styles/Chat.css";
 
 function SalesDashboard({ token, onLogout }) {
   const [leads, setLeads] = useState([]);
+  const [selectedLeadId, setSelectedLeadId] = useState(null);
   const [form, setForm] = useState({
     leadId: "",
     clientName: [],
@@ -126,7 +129,14 @@ function SalesDashboard({ token, onLogout }) {
         Logout
       </Button>
       <h2>Sales Dashboard</h2>
-
+      {/* Chat Popup */}
+  {selectedLeadId && (
+    <Chat
+      token={token}
+      leadId={selectedLeadId}
+      onClose={() => setSelectedLeadId(null)}
+    />
+  )}
       <Form className="mt-4" onSubmit={handleCreateLead}>
         <h3>Create Lead</h3>
         <Form.Group className="mb-3">
@@ -260,6 +270,14 @@ function SalesDashboard({ token, onLogout }) {
                 <Button variant="danger" onClick={() => handleDeleteLead(lead.leadId)}>
                   Delete
                 </Button>
+              </td>
+              <td>
+              <Button
+              variant="primary"
+              onClick={() => setSelectedLeadId(lead.leadId)}
+            >
+              Chat
+            </Button>
               </td>
               <td>{lead.done ? "Yes" : "No"}</td>
             </tr>

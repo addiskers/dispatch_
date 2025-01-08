@@ -52,7 +52,19 @@ exports.createLead = async (req, res) => {
     });
 
     await newLead.save();
-    logActivity(req.user.userId, " lead", { leadId, changes });
+    await logActivity(req.user.userId, "created lead", {
+      leadId,
+      newValue: {
+        clientName,
+        clientEmail,
+        clientCompany,
+        projectName,
+        projectDescription,
+        paymentStatus: paymentStatus || "not_received",
+        deliveryDate: deliveryDate || null,
+        sqcode,
+      },
+    });
     return res.status(201).json({ message: "Lead created successfully", lead: newLead });
   } catch (error) {
     console.error("Error creating lead:", error);
@@ -162,7 +174,7 @@ exports.updateDoneStatus = async (req, res) => {
   try {
     const { leadId } = req.params;
     const { done } = req.body;
-
+    
     const lead = await Lead.findOne({ leadId });
     if (!lead) {
       return res.status(404).json({ message: "Lead not found" });
@@ -170,7 +182,7 @@ exports.updateDoneStatus = async (req, res) => {
     if (lead.done && !done) {
       return res.status(400).json({ message: "Cannot mark as Undone once Done" });
     }
-
+    const oldDoneStatus = lead.done;
     lead.done = done;
     await lead.save();
     await logActivity(req.user.userId, "updated done status", {
@@ -195,5 +207,46 @@ exports.getAllLeads = async (req, res) => {
   } catch (error) {
     console.error("Error fetching all leads:", error);
     res.status(500).json({ message: "Error fetching leads", error });
+  }
+};
+exports.updateLeadById = async (req, res) => {
+  try {
+    const { leadId } = req.params;
+
+    // Ensure only super admins can update lead details
+    if (req.user.role !== "superadmin") {
+      return res.status(403).json({ message: "Access denied: Only super admins can update leads" });
+    }
+
+    // Update the lead details
+    const updatedLead = await Lead.findOneAndUpdate({ leadId }, req.body, {
+      new: true, // Return the updated document
+      runValidators: true, // Validate the fields before saving
+    });
+
+    if (!updatedLead) {
+      return res.status(404).json({ message: "Lead not found" });
+    }
+
+    res.status(200).json(updatedLead);
+  } catch (error) {
+    console.error("Error updating lead details:", error);
+    res.status(500).json({ message: "Error updating lead details" });
+  }
+};
+exports.getLeadById = async (req, res) => {
+  try {
+    const { leadId } = req.params;
+
+    // Find the lead by its leadId
+    const lead = await Lead.findOne({ leadId });
+    if (!lead) {
+      return res.status(404).json({ message: "Lead not found" });
+    }
+
+    res.status(200).json(lead);
+  } catch (error) {
+    console.error("Error fetching lead details:", error);
+    res.status(500).json({ message: "Error fetching lead details" });
   }
 };
