@@ -55,3 +55,19 @@ exports.getFilteredLogs = async (req, res) => {
       res.status(500).json({ message: "Error fetching activity logs", error });
     }
   };
+
+
+  exports.getSalesUsers = async (req, res) => {
+    try {
+      if (req.user.role !== "superadmin") {
+        return res.status(403).json({ message: "Access denied: Only superadmin can access this route" });
+      }
+  
+      const salesUsers = await User.find({ role: "sales" }, "username _id role");
+      res.status(200).json(salesUsers);
+    } catch (error) {
+      console.error("Error fetching sales users:", error);
+      res.status(500).json({ message: "Error fetching sales users", error });
+    }
+  };
+  

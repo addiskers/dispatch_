@@ -9,15 +9,29 @@ function LeadDetails({ token, leadId, onClose }) {
   const [logs, setLogs] = useState([]);
   const [messages, setMessages] = useState([]); // Chat messages
   const [newMessage, setNewMessage] = useState(""); // New chat message
-
+  const [isEditingSales, setIsEditingSales] = useState(false);
+  const [salesUsers, setSalesUsers] = useState([]);
   useEffect(() => {
     fetchLeadDetails();
     fetchLeadLogs();
     fetchMessages();
+    fetchSalesUsers();
+    
   }, [leadId]);
   const [nameInput, setNameInput] = useState("");
   const [emailInput, setEmailInput] = useState("");
-  
+
+ 
+ async function fetchSalesUsers() {
+  try {
+    const res = await axios.get("http://localhost:5000/api/auth/sales-users", {
+      headers: { Authorization: `Bearer ${token}` },
+    });
+    setSalesUsers(res.data);
+  } catch (err) {
+    console.error("Error fetching sales users:", err);
+  }
+}
   function addClientName(e) {
     if (e.key === ",") {
       e.preventDefault();
@@ -128,6 +142,7 @@ function LeadDetails({ token, leadId, onClose }) {
       );
       alert("Lead updated successfully!");
       setIsEditing(false);
+      setIsEditingSales(false);
       fetchLeadDetails();
     } catch (err) {
       console.error("Error updating lead:", err);
@@ -292,13 +307,94 @@ function LeadDetails({ token, leadId, onClose }) {
           </div>
           {/* Right Column */}
           <div className="right-column">
-            {/* Sales User */}
-            <div className="section">
-              <h3>Sales User</h3>
-              <p><strong>Name:</strong> {lead.salesUser?.username || "Unknown"}</p>
-              <p><strong>Created Date:</strong> {new Date(lead.createdAt).toLocaleDateString()}</p>
-              <p><strong>Delivery Date:</strong> {new Date(lead.deliveryDate).toLocaleDateString()}</p>
-            </div>
+          <div className="section sales-user-section">
+  <h3>Sales User</h3>
+  {isEditingSales ? (
+    <div className="edit-sales-user">
+      {/* Sales User Dropdown */}
+      <div className="form-group">
+        <label htmlFor="salesUser">Sales User:</label>
+        <select
+          id="salesUser"
+          value={editedLead.salesUser || ""}
+          onChange={(e) => setEditedLead({ ...editedLead, salesUser: e.target.value })}
+          className="form-control"
+        >
+          <option value="" disabled>
+            Select Sales User
+          </option>
+          {salesUsers.map((user) => (
+            <option key={user._id} value={user._id}>
+              {user.username}
+            </option>
+          ))}
+        </select>
+      </div>
+
+      {/* Delivery Date Input */}
+      <div className="form-group">
+        <label htmlFor="deliveryDate">Delivery Date:</label>
+        <input
+          id="deliveryDate"
+          type="date"
+          value={
+            editedLead.deliveryDate
+              ? new Date(editedLead.deliveryDate).toISOString().split("T")[0]
+              : ""
+          }
+          onChange={(e) => setEditedLead({ ...editedLead, deliveryDate: e.target.value })}
+          className="form-control"
+        />
+      </div>
+
+      {/* Payment Status Dropdown */}
+      <div className="form-group">
+        <label htmlFor="paymentStatus">Payment Status:</label>
+        <select
+          id="paymentStatus"
+          value={editedLead.paymentStatus}
+          onChange={(e) => setEditedLead({ ...editedLead, paymentStatus: e.target.value })}
+          className="form-control"
+        >
+          <option value="not_received">Not Received</option>
+          <option value="partial">Partial</option>
+          <option value="full">Full</option>
+        </select>
+      </div>
+
+      {/* Save and Cancel Buttons */}
+      <div className="button-group">
+        <button className="save-btn" onClick={handleSaveChanges}>
+          Save
+        </button>
+        <button className="cancel-btn" onClick={() => setIsEditingSales(false)}>
+          Cancel
+        </button>
+      </div>
+    </div>
+  ) : (
+    <div className="sales-user-details">
+      <p>
+        <strong>Sales User:</strong> {lead.salesUser?.username || "Unknown"}
+      </p>
+      <p>
+        <strong>Created Date:</strong> {new Date(lead.createdAt).toLocaleDateString()}
+      </p>
+      <p>
+        <strong>Delivery Date:</strong>{" "}
+        {lead.deliveryDate ? new Date(lead.deliveryDate).toLocaleDateString() : "Not Set"}
+      </p>
+      <p>
+        <strong>Payment Status:</strong> {lead.paymentStatus || "Not Set"}
+      </p>
+      {/* Edit Button */}
+      <button className="edit-btn" onClick={() => setIsEditingSales(true)}>
+        Edit Sales Section
+      </button>
+    </div>
+  )}
+</div>
+
             {/* Activities */}
             <div className="section">
               <h3>Activities</h3>

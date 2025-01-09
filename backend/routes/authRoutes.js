@@ -8,7 +8,7 @@ const {
 const authMiddleware = require("../middleware/auth");
 const {
   getAllUsers,
-  getActivityLogs, // Import the missing function
+  getActivityLogs, getSalesUsers,
 } = require("../controllers/superAdminController");
 
 // Auth Routes
@@ -19,5 +19,5 @@ router.post("/register", authMiddleware, registerUser);
 router.patch("/update-password", authMiddleware, updatePassword);
 router.get("/activity-logs", authMiddleware, getActivityLogs);
 router.get("/users", authMiddleware, getAllUsers);
-
+router.get("/sales-users", authMiddleware, getSalesUsers);
 module.exports = router;

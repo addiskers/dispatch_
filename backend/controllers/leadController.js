@@ -202,7 +202,7 @@ exports.updateDoneStatus = async (req, res) => {
  */
 exports.getAllLeads = async (req, res) => {
   try {
-    const leads = await Lead.find();
+    const leads = await Lead.find().sort({ createdAt: -1 }); 
     res.status(200).json(leads);
   } catch (error) {
     console.error("Error fetching all leads:", error);
@@ -250,8 +250,7 @@ exports.getLeadById = async (req, res) => {
   try {
     const { leadId } = req.params;
 
-    // Find the lead by its leadId
-    const lead = await Lead.findOne({ leadId });
+    const lead = await Lead.findOne({ leadId }).populate("salesUser", "username role");
     if (!lead) {
       return res.status(404).json({ message: "Lead not found" });
     }
@@ -262,3 +261,4 @@ exports.getLeadById = async (req, res) => {
     res.status(500).json({ message: "Error fetching lead details" });
   }
 };
+

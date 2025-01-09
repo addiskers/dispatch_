@@ -1,7 +1,8 @@
 const User = require("../models/User");
 const bcrypt = require("bcrypt");
 const jwt = require("jsonwebtoken");
-const logActivity = require("../utils/logger");
+const { logActivity } = require("../utils/logger");
+
 exports.registerUser = async (req, res) => {
   try {
     if (req.user.role !== "superadmin") {
