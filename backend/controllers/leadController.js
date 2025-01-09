@@ -213,9 +213,14 @@ exports.updateLeadById = async (req, res) => {
   try {
     const { leadId } = req.params;
 
-    // Ensure only super admins can update lead details
     if (req.user.role !== "superadmin") {
       return res.status(403).json({ message: "Access denied: Only super admins can update leads" });
+    }
+
+    // Find the lead before updating to log the old values
+    const oldLead = await Lead.findOne({ leadId });
+    if (!oldLead) {
+      return res.status(404).json({ message: "Lead not found" });
     }
 
     // Update the lead details
@@ -227,6 +232,13 @@ exports.updateLeadById = async (req, res) => {
     if (!updatedLead) {
       return res.status(404).json({ message: "Lead not found" });
     }
+
+    // Log the update
+    await logActivity(req.user.userId, "updated lead", {
+      leadId,
+      oldValue: oldLead,
+      newValue: updatedLead,
+    });
 
     res.status(200).json(updatedLead);
   } catch (error) {

@@ -65,7 +65,7 @@ function LeadDetails({ token, leadId, onClose }) {
         headers: { Authorization: `Bearer ${token}` },
       });
       setLead(res.data);
-      setEditedLead(res.data); // Pre-fill fields for editing
+      setEditedLead(res.data); 
     } catch (err) {
       console.error("Error fetching lead details:", err);
     }
@@ -233,9 +233,7 @@ function LeadDetails({ token, leadId, onClose }) {
     ) : (
         <div className="details">
         <p><strong>Lead ID:</strong> {lead.leadId}</p>
-        <p>
-    <strong>Lead ID:</strong> {lead.leadId}
-  </p>
+       
         <p>
             <strong>Client Names:</strong>{" "}
             {Array.isArray(lead.clientName) && lead.clientName.length > 0
@@ -261,31 +259,36 @@ function LeadDetails({ token, leadId, onClose }) {
 
             {/* Chat */}
             <div className="section chat-section">
-              <h3>Chat</h3>
-              <div className="chat-messages">
-                {messages.length > 0 ? (
-                  messages.map((msg) => (
-                    <div key={msg._id} className="chat-message">
-                      <strong>{msg.sender.username}:</strong> {msg.message}
-                    </div>
-                  ))
-                ) : (
-                  <p>No messages yet for this lead.</p>
-                )}
-              </div>
-              <form className="chat-form" onSubmit={sendMessage}>
-                <input
-                  type="text"
-                  className="chat-input"
-                  placeholder="Type your message"
-                  value={newMessage}
-                  onChange={(e) => setNewMessage(e.target.value)}
-                />
-                <button className="chat-send-btn" type="submit">
-                  Send
-                </button>
-              </form>
-            </div>
+                <h3>Chat</h3>
+                <div className="chat-messages">
+                    {messages.length > 0 ? (
+                    messages.map((msg) => (
+                        <div key={msg._id} className="chat-message">
+                        <div className="chat-content">
+                            <strong>{msg.sender.username}:</strong> {msg.message}
+                        </div>
+                        <div className="chat-timestamp">
+                            {new Date(msg.timestamp).toLocaleDateString()} {new Date(msg.timestamp).toLocaleTimeString()}
+                        </div>
+                        </div>
+                    ))
+                    ) : (
+                    <p>No messages yet for this lead.</p>
+                    )}
+                </div>
+                <form className="chat-form" onSubmit={sendMessage}>
+                    <input
+                    type="text"
+                    className="chat-input"
+                    placeholder="Type your message"
+                    value={newMessage}
+                    onChange={(e) => setNewMessage(e.target.value)}
+                    />
+                    <button className="chat-send-btn" type="submit">
+                    Send
+                    </button>
+                </form>
+                </div>
           </div>
           {/* Right Column */}
           <div className="right-column">

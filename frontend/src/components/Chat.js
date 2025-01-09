@@ -57,6 +57,9 @@ function Chat({ token, leadId, onClose }) {
           messages.map((msg) => (
             <div key={msg._id} className={`chat-message ${msg.sender.role}`}>
               <strong>{msg.sender.username}:</strong> {msg.message}
+              <div className="chat-timestamp">
+                {new Date(msg.timestamp).toLocaleString()}
+              </div>
             </div>
           ))
         ) : (

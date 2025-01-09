@@ -1,15 +1,16 @@
 const Log = require("../models/Log");
 
-async function logActivity(userId, action, details) {
+const logActivity = async (userId, action, details) => {
   try {
     await Log.create({
       user: userId,
       action,
       ...details,
+      timestamp: new Date(),
     });
   } catch (error) {
     console.error("Error logging activity:", error);
   }
-}
+};
 
-module.exports = logActivity;
+module.exports = { logActivity };

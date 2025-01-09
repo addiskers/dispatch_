@@ -1,4 +1,6 @@
 const Chat = require("../models/Chat");
+const { logActivity } = require("../utils/logger");
+
 
 exports.getChatsByLead = async (req, res) => {
   try {
@@ -25,13 +27,16 @@ exports.sendMessage = async (req, res) => {
         leadId,
         sender: req.user.userId,
         message,
+       
       });
-  
+      
       const savedChat = await newChat.save();
   
-      // Use `populate()` directly without `execPopulate`
       const populatedChat = await savedChat.populate("sender", "username role");
-  
+      await logActivity(req.user.userId, "sent message", {
+        leadId,
+        newValue: { message },
+      });
       res.status(201).json(populatedChat);
     } catch (error) {
       console.error("Error sending message:", error);

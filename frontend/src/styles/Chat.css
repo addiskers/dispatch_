@@ -37,7 +37,7 @@
   flex: 1;
   padding: 16px;
   overflow-y: auto;
-  background: #f8f9fa;
+  background: #c1d2e2;
   display: flex;
   flex-direction: column;
   gap: 10px;
@@ -53,19 +53,19 @@
 }
 
 .chat-message.superadmin {
-  background: #dc3545;
+  background: #f0a4ac;
   color: white;
   align-self: flex-end;
 }
 
 .chat-message.sales {
-  background: #007bff;
+  background: #a8c9ee;
   color: white;
   align-self: flex-start;
 }
 
 .chat-message.uploader {
-  background: #28a745;
+  background: #5fdf7d;
   color: white;
   align-self: flex-start;
 }
@@ -74,6 +74,12 @@
   background: #ffc107;
   color: black;
   align-self: flex-start;
+}
+.chat-timestamp {
+  font-size: 12px;
+  color: #6c757d;
+  margin-top: 4px;
+  text-align: right;
 }
 
 .no-messages {
