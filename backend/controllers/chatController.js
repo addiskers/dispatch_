@@ -1,6 +1,6 @@
 const Chat = require("../models/Chat");
 const { logActivity } = require("../utils/logger");
-
+const User = require("../models/User");
 
 exports.getChatsByLead = async (req, res) => {
   try {
@@ -31,9 +31,9 @@ exports.sendMessage = async (req, res) => {
       });
       
       const savedChat = await newChat.save();
-  
+      const sender = await User.findById(req.user.userId, "username");
       const populatedChat = await savedChat.populate("sender", "username role");
-      await logActivity(req.user.userId, "sent message", {
+      await logActivity(req.user.userId, `${sender.username} sent message`, {
         leadId,
         newValue: { message },
       });
