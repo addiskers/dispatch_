@@ -1,8 +1,7 @@
 import React, { useState, useEffect } from "react";
 import axios from "axios";
 import { Table, Button, Form } from "react-bootstrap";
-import LeadDetailsuploader from "./LeadDetailsuploader"; // Import the LeadDetailsuploader popup component
-
+import LeadDetailsuploader from "./LeadDetailsuploader"; 
 function LeadsTableuploader({ token }) {
   const [leads, setLeads] = useState([]);
   const [searchTerm, setSearchTerm] = useState("");

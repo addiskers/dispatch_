@@ -4,7 +4,7 @@ const Lead = require("../models/Lead");
 
 exports.sendAllDeliverables = async (req, res) => {
   try {
-    const { leadId, projectName } = req.body;
+    const { leadId, projectName, files } = req.body;
 
     // Validate leadId and projectName (case-sensitive)
     const lead = await Lead.findOne({ leadId, projectName });
@@ -12,25 +12,28 @@ exports.sendAllDeliverables = async (req, res) => {
       return res.status(404).json({ message: "Lead ID and Project Name do not match" });
     }
 
-    // Generate presigned URLs for deliverables
+    // Filter deliverables based on selected files if provided
+    const deliverablesToSend = files ? lead.deliverables.filter(d => files.includes(d)) : lead.deliverables;
+
+    // Generate presigned URLs for selected deliverables
     const presignedUrls = [];
-    for (const fileKey of lead.deliverables) {
+    for (const fileKey of deliverablesToSend) {
       const url = await generatePresignedUrl(fileKey);
-      presignedUrls.push(url);
+      presignedUrls.push({ name: fileKey.split('/').pop(), url });
     }
 
-    // 3) Build an email body with simplified clickable links
-    let linksHtml = `<p>Dear Sir/Ma’am,</p>`;
+    // Build email body with simplified clickable links
+    let linksHtml = `<p>Dear Sir/Ma'am,</p>`;
     linksHtml += `<p>I'm pleased to inform you that we've completed the ${lead.projectName}.</p>`;
     linksHtml += `<p>Attached is the report in links:</p>`;
-    presignedUrls.forEach((url, index) => {
-      linksHtml += `<p><a href="${url}" target="_blank">Download link #${index + 1}</a></p>`;
+    presignedUrls.forEach(({ name, url }) => {
+      linksHtml += `<p><a href="${url}" target="_blank">${name}</a></p>`;
     });
     linksHtml += `<p>Please review it at your convenience. If you have any questions or need clarification, feel free to reach out.</p>`;
     linksHtml += `<p>We value your feedback and are committed to ensuring the report meets your expectations.</p>`;
     linksHtml += `<p>Thank you for entrusting us with this project.</p>`;
 
-    // 4) Send email to the client using nodemailer
+    // Send email to the client using nodemailer
     const transporter = nodemailer.createTransport({
       service: "gmail",
       auth: {

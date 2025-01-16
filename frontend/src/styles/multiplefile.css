@@ -1,0 +1,94 @@
+.container {
+    padding: 20px;
+    max-width: 800px;
+    margin: auto;
+    font-family: Arial, sans-serif;
+  }
+  
+  .title {
+    font-size: 24px;
+    font-weight: bold;
+    margin-bottom: 20px;
+    text-align: center;
+  }
+  
+  .inputs {
+    display: flex;
+    gap: 10px;
+    margin-bottom: 20px;
+  }
+  
+  .input-field {
+    padding: 10px;
+    border: 1px solid #ccc;
+    border-radius: 5px;
+    flex: 1;
+  }
+  
+  .loading {
+    text-align: center;
+    margin: 20px 0;
+  }
+  
+  .file-section {
+    margin-bottom: 20px;
+  }
+  
+  .section-title {
+    font-size: 18px;
+    font-weight: bold;
+    margin-bottom: 10px;
+  }
+  
+  .file-item {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 10px;
+    border: 1px solid #ccc;
+    border-radius: 5px;
+    background-color: #f9f9f9;
+  }
+  
+  .file-item.selected {
+    border-color: #007bff;
+    background-color: #e7f3ff;
+  }
+  
+  .upload-section {
+    display: flex;
+    gap: 10px;
+    margin-bottom: 20px;
+  }
+  
+  .file-input {
+    flex: 1;
+    padding: 10px;
+    border: 1px solid #ccc;
+    border-radius: 5px;
+  }
+  
+  .upload-btn,
+  .send-btn {
+    padding: 10px 20px;
+    background-color: #007bff;
+    color: #fff;
+    border: none;
+    border-radius: 5px;
+    display: flex;
+    align-items: center;
+    gap: 5px;
+    cursor: pointer;
+  }
+  
+  .upload-btn:hover,
+  .send-btn:hover {
+    background-color: #0056b3;
+  }
+  
+  .upload-btn:disabled,
+  .send-btn:disabled {
+    background-color: #ccc;
+    cursor: not-allowed;
+  }
+  
