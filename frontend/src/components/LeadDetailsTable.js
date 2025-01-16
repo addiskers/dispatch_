@@ -2,7 +2,7 @@ import React, { useState, useEffect } from "react";
 import axios from "axios";
 import "../styles/LeadDetails.css";
 
-function LeadDetails({ token, leadId, onClose,userRole  }) {
+function LeadDetailsTable({ token, leadId, onClose,userRole  }) {
   const [lead, setLead] = useState(null);
   const [isEditing, setIsEditing] = useState(false);
   const [editedLead, setEditedLead] = useState({});
@@ -12,7 +12,7 @@ function LeadDetails({ token, leadId, onClose,userRole  }) {
   const [isEditingSales, setIsEditingSales] = useState(false);
   const [salesUsers, setSalesUsers] = useState([]);
   useEffect(() => {
-    fetchLeadDetails();
+    fetchLeadDetailsTable();
     fetchLeadLogs();
     fetchMessages();
     fetchSalesUsers();
@@ -73,7 +73,7 @@ function LeadDetails({ token, leadId, onClose,userRole  }) {
   }
   
   // Fetch lead details
-  async function fetchLeadDetails() {
+  async function fetchLeadDetailsTable() {
     try {
       const res = await axios.get(`http://localhost:5000/api/leads/${leadId}`, {
         headers: { Authorization: `Bearer ${token}` },
@@ -135,15 +135,21 @@ function LeadDetails({ token, leadId, onClose,userRole  }) {
   // Handle save changes for the lead
   async function handleSaveChanges() {
     try {
+      // Filter the fields to send only allowed updates
+      const allowedUpdates = {
+        clientName: editedLead.clientName,
+        clientEmail: editedLead.clientEmail,
+        deliveryDate: editedLead.deliveryDate,
+      };
+  
       await axios.put(
         `http://localhost:5000/api/leads/${leadId}`,
-        editedLead,
+        allowedUpdates,
         { headers: { Authorization: `Bearer ${token}` } }
       );
       alert("Lead updated successfully!");
       setIsEditing(false);
-      setIsEditingSales(false);
-      fetchLeadDetails();
+      fetchLeadDetailsTable(); // Refresh the data after saving
     } catch (err) {
       console.error("Error updating lead:", err);
       alert("Failed to update lead. Please try again.");
@@ -207,36 +213,8 @@ function LeadDetails({ token, leadId, onClose,userRole  }) {
             />
             </div>
         </div>
-        <label>Client Company:</label>
-        <input
-            type="text"
-            
-            placeholder="Client Company"
-            value={editedLead.clientCompany}
-            onChange={(e) => setEditedLead({ ...editedLead, clientCompany: e.target.value })}
-        />
-        <label>Project Name:</label>
-        <input
-            type="text"
-            placeholder="Project Name"
-            value={editedLead.projectName}
-            onChange={(e) => setEditedLead({ ...editedLead, projectName: e.target.value })}
-        />
-        <label>Project Description:</label>
-        <textarea
-            placeholder="Project Description"
-            value={editedLead.projectDescription}
-            onChange={(e) =>
-            setEditedLead({ ...editedLead, projectDescription: e.target.value })
-            }
-        />
-        <label>Sqcode:</label>
-        <input
-            type="text"
-            placeholder="Sqcode"
-            value={editedLead.sqcode}
-            onChange={(e) => setEditedLead({ ...editedLead, sqcode: e.target.value })}
-        />
+        
+        
         <div className="button-group">
             <button className="save-btn" onClick={handleSaveChanges}>
             Save
@@ -313,24 +291,7 @@ function LeadDetails({ token, leadId, onClose,userRole  }) {
   {isEditingSales ? (
     <div className="edit-sales-user">
       {/* Sales User Dropdown */}
-      <div className="form-group">
-        <label htmlFor="salesUser">Sales User:</label>
-        <select
-          id="salesUser"
-          value={editedLead.salesUser || ""}
-          onChange={(e) => setEditedLead({ ...editedLead, salesUser: e.target.value })}
-          className="form-control"
-        >
-          <option value="" disabled>
-            Select Sales User
-          </option>
-          {salesUsers.map((user) => (
-            <option key={user._id} value={user._id}>
-              {user.username}
-            </option>
-          ))}
-        </select>
-      </div>
+      
 
       {/* Delivery Date Input */}
       <div className="form-group">
@@ -348,20 +309,6 @@ function LeadDetails({ token, leadId, onClose,userRole  }) {
         />
       </div>
 
-      {/* Payment Status Dropdown */}
-      <div className="form-group">
-        <label htmlFor="paymentStatus">Payment Status:</label>
-        <select
-          id="paymentStatus"
-          value={editedLead.paymentStatus}
-          onChange={(e) => setEditedLead({ ...editedLead, paymentStatus: e.target.value })}
-          className="form-control"
-        >
-          <option value="not_received">Not Received</option>
-          <option value="partial">Partial</option>
-          <option value="full">Full</option>
-        </select>
-      </div>
 
       {/* Save and Cancel Buttons */}
       <div className="button-group">
@@ -421,4 +368,4 @@ function LeadDetails({ token, leadId, onClose,userRole  }) {
 }
 
 
-export default LeadDetails;
+export default LeadDetailsTable;

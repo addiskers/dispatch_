@@ -5,7 +5,8 @@ import UploaderDashboard from "./components/UploaderDashboard";
 import AccountsDashboard from "./components/AccountsDashboard";
 import SuperAdminDashboard from "./components/SuperAdminDashboard"; // Import your Super Admin dashboard
 import "bootstrap/dist/css/bootstrap.min.css";
-  
+import '@fortawesome/fontawesome-free/css/all.min.css';
+
 function App() {
   const [token, setToken] = useState(localStorage.getItem("token") || "");
   const [role, setRole] = useState(localStorage.getItem("role") || "");

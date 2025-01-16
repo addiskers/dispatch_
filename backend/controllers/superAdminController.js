@@ -2,32 +2,44 @@
 const User = require("../models/User");
 const Log = require("../models/Log");
 
-exports.getFilteredLogs = async (req, res) => {
-  try {
-    if (req.user.role !== "superadmin") {
-      return res.status(403).json({ message: "Access denied" });
+
+
+  exports.getFilteredLogs = async (req, res) => {
+    try {
+      const { leadId, userId, startDate, endDate, action } = req.query;
+
+      const filter = {};
+
+      if (req.user.role === "sales") {
+        filter.user = req.user.userId; 
+      } else if (req.user.role === "uploader") {
+        if (leadId) {
+          filter.leadId = leadId;
+        }
+      } else if (req.user.role !== "superadmin") {
+        return res.status(403).json({ message: "Access denied: Insufficient permissions" });
+      }
+
+      // Additional filters based on query parameters
+      if (leadId) filter.leadId = leadId;
+      if (userId) filter.user = userId;
+      if (action) filter.action = action;
+      if (startDate && endDate) {
+        filter.timestamp = {
+          $gte: new Date(startDate),
+          $lte: new Date(endDate),
+        };
+      }
+
+      // Fetch logs based on the filter
+      const logs = await Log.find(filter).populate("user", "username role");
+      res.status(200).json(logs);
+    } catch (error) {
+      console.error("Error fetching logs:", error);
+      res.status(500).json({ message: "Error fetching logs", error });
     }
+  };
 
-    const { leadId, userId, startDate, endDate, action } = req.query;
-
-    const filter = {};
-    if (leadId) filter.leadId = leadId;
-    if (userId) filter.user = userId;
-    if (action) filter.action = action;
-    if (startDate && endDate) {
-      filter.timestamp = {
-        $gte: new Date(startDate),
-        $lte: new Date(endDate),
-      };
-    }
-
-    const logs = await Log.find(filter).populate("user", "username role");
-    res.status(200).json(logs);
-  } catch (error) {
-    console.error("Error fetching logs:", error);
-    res.status(500).json({ message: "Error fetching logs", error });
-  }
-};
   
 
   exports.getAllUsers = async (req, res) => {

@@ -4,7 +4,7 @@ const ChatSchema = new mongoose.Schema(
   {
     leadId: {
       type: String,
-      required: true, // Link the chat to a specific lead
+      required: true, 
     },
     sender: {
       type: mongoose.Schema.Types.ObjectId,

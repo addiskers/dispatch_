@@ -3,7 +3,7 @@ import axios from "axios";
 import Table from "react-bootstrap/Table";
 import Button from "react-bootstrap/Button";
 import LeadDetails from "./LeadDetails";
-import "../styles/logsection.css"; // Import the CSS file
+import "../styles/logsection.css";
 
 function LeadsSection({ token }) {
   const [leads, setLeads] = useState([]); // All fetched leads
@@ -25,6 +25,21 @@ function LeadsSection({ token }) {
       console.error("Error fetching leads:", err);
     }
   }
+  // Handle delete lead action
+  const handleDeleteLead = async (leadId) => {
+    if (!window.confirm("Are you sure you want to delete this lead?")) return;
+
+    try {
+      await axios.delete(`http://localhost:5000/api/leads/${leadId}`, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      setLeads((prevLeads) => prevLeads.filter((lead) => lead.leadId !== leadId));
+      alert("Lead deleted successfully!");
+    } catch (error) {
+      console.error("Error deleting lead:", error);
+      alert("Failed to delete the lead.");
+    }
+  };
 
   // Pagination logic
   const indexOfLastLead = currentPage * leadsPerPage;
@@ -57,6 +72,7 @@ function LeadsSection({ token }) {
               <th>Project Name</th>
               <th>Payment Status</th>
               <th>Delivery Date</th>
+              <th>Actions</th>
             </tr>
           </thead>
           <tbody>
@@ -74,6 +90,15 @@ function LeadsSection({ token }) {
                 <td>{lead.projectName}</td>
                 <td>{lead.paymentStatus}</td>
                 <td>{new Date(lead.deliveryDate).toLocaleDateString()}</td>
+                <td>
+                    <Button
+                      variant="danger"
+                      size="sm"
+                      onClick={() => handleDeleteLead(lead.leadId)}
+                    >
+                      Delete
+                    </Button>
+                  </td>
               </tr>
             ))}
           </tbody>

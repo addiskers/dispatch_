@@ -76,7 +76,7 @@ function LogsSection({ token }) {
     }
 
     setFilteredLogs(filtered);
-    setCurrentPage(1); // Reset to the first page after applying filters
+    setCurrentPage(1); 
   }
 
   // Handle filter changes

@@ -3,10 +3,10 @@
   top: 50%;
   left: 60%;
   transform: translate(-50%, -50%);
-  width: 90%;
+  width: 80%;
   max-width: 1200px;
   height: 90vh;
-  background-color: #ffffff;
+  background-color: hwb(0 90% 10%);
   border-radius: 12px;
   box-shadow: 0 8px 24px rgba(0, 0, 0, 0.15);
   z-index: 1000;
@@ -20,13 +20,13 @@
   justify-content: space-between;
   align-items: center;
   padding: 20px;
-  background-color: #f8f9fa;
+  background-color: #333;
   border-bottom: 1px solid #e9ecef;
 }
 
 .popup-header h2 {
   margin: 0;
-  color: #2c3e50;
+  color: #f9fafb;
   font-size: 1.5rem;
 }
 
@@ -35,14 +35,13 @@
   border: none;
   font-size: 1.5rem;
   cursor: pointer;
-  color: #6c757d;
+  color: #f3f4f5 !important; /* Ensure the color is applied */
   padding: 5px;
 }
 
 .close-btn:hover {
-  color: #343a40;
+  color: #343a40 !important; /* Ensure the hover color is applied */
 }
-
 .popup-content {
   display: flex;
   gap: 20px;
@@ -70,7 +69,7 @@
 }
 
 .section {
-  background-color: #ffffff;
+  background-color: rgb(255, 255, 255);
   border-radius: 8px;
   border: 1px solid #e9ecef;
   padding: 20px;

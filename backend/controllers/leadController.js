@@ -79,7 +79,7 @@ exports.createLead = async (req, res) => {
  */
 exports.getMyLeads = async (req, res) => {
   try {
-    const leads = await Lead.find({ salesUser: req.user.userId });
+    const leads = await Lead.find({ salesUser: req.user.userId, deleted: false }).sort({ createdAt: -1 });
     return res.status(200).json(leads);
   } catch (error) {
     console.error("Error fetching leads:", error);
@@ -142,24 +142,39 @@ exports.deleteLead = async (req, res) => {
   try {
     const { leadId } = req.params;
 
-    const lead = await Lead.findOneAndDelete({ leadId, salesUser: req.user.userId });
-    if (!lead) {
-      return res.status(404).json({ message: "Lead not found or not owned by you" });
+    // Only superadmin can delete leads
+    if (req.user.role !== "superadmin") {
+      return res.status(403).json({ message: "Access denied: Only superadmin can delete leads." });
     }
+
+    // Perform a soft delete by setting `deleted` to true
+    const lead = await Lead.findOneAndUpdate(
+      { leadId },
+      { deleted: true },
+      { new: true } // Return the updated document
+    );
+
+    if (!lead) {
+      return res.status(404).json({ message: "Lead not found." });
+    }
+
+    // Log the delete activity
     await logActivity(req.user.userId, "deleted lead", { leadId });
-    res.status(200).json({ message: "Lead deleted successfully" });
+
+    res.status(200).json({ message: "Lead marked as deleted successfully.", lead });
   } catch (error) {
     console.error("Error deleting lead:", error);
-    res.status(500).json({ message: "Internal server error" });
+    res.status(500).json({ message: "Internal server error." });
   }
 };
+
 
 /**
  * Get lead list for uploaders
  */
 exports.getLeadListForUploader = async (req, res) => {
   try {
-    const leads = await Lead.find(); // Fetch all leads
+    const leads = await Lead.find({ deleted: false }).sort({ createdAt: -1 }); 
     return res.status(200).json(leads);
   } catch (error) {
     console.error("Error fetching leads for uploader:", error);
@@ -202,7 +217,7 @@ exports.updateDoneStatus = async (req, res) => {
  */
 exports.getAllLeads = async (req, res) => {
   try {
-    const leads = await Lead.find().sort({ createdAt: -1 }); 
+    const leads = await Lead.find({ deleted: false }).sort({ createdAt: -1 }); 
     res.status(200).json(leads);
   } catch (error) {
     console.error("Error fetching all leads:", error);
@@ -212,15 +227,25 @@ exports.getAllLeads = async (req, res) => {
 exports.updateLeadById = async (req, res) => {
   try {
     const { leadId } = req.params;
-
-    if (req.user.role !== "superadmin") {
-      return res.status(403).json({ message: "Access denied: Only super admins can update leads" });
-    }
+    const { role } = req.user;
 
     // Find the lead before updating to log the old values
     const oldLead = await Lead.findOne({ leadId });
     if (!oldLead) {
       return res.status(404).json({ message: "Lead not found" });
+    }
+
+    // Role-based restrictions
+    if (role === "sales") {
+      const allowedFields = ["clientName", "clientEmail", "deliveryDate"];
+      req.body = Object.keys(req.body)
+        .filter((key) => allowedFields.includes(key))
+        .reduce((obj, key) => {
+          obj[key] = req.body[key];
+          return obj;
+        }, {});
+    } else if (role !== "superadmin") {
+      return res.status(403).json({ message: "Access denied" });
     }
 
     // Update the lead details
@@ -246,13 +271,21 @@ exports.updateLeadById = async (req, res) => {
     res.status(500).json({ message: "Error updating lead details" });
   }
 };
+
 exports.getLeadById = async (req, res) => {
   try {
     const { leadId } = req.params;
 
+    // Fetch lead details from the database
     const lead = await Lead.findOne({ leadId }).populate("salesUser", "username role");
     if (!lead) {
       return res.status(404).json({ message: "Lead not found" });
+    }
+
+    // Remove clientEmail and clientName for users with the uploader role
+    if (req.user.role === "uploader") {
+      lead.clientEmail = undefined;
+      lead.clientName = undefined;
     }
 
     res.status(200).json(lead);
@@ -261,4 +294,5 @@ exports.getLeadById = async (req, res) => {
     res.status(500).json({ message: "Error fetching lead details" });
   }
 };
+
 
