@@ -56,6 +56,8 @@ exports.login = async (req, res) => {
     res.status(500).json({ message: "Server error" });
   }
 };
+
+
 exports.updatePassword = async (req, res) => {
   try {
     if (req.user.role !== "superadmin") {
@@ -69,16 +71,14 @@ exports.updatePassword = async (req, res) => {
       return res.status(404).json({ message: "User not found" });
     }
 
-    const oldPasswordHash = user.password; // Capture the old password hash
-
+    const oldPasswordHash = user.password; 
     user.password = await bcrypt.hash(newPassword, 10);
     await user.save();
 
-    // Log the activity
     await logActivity(req.user.userId, "updated password", {
       userId,
       oldValue: { password: oldPasswordHash },
-      newValue: { password: "hashed" }, // Never log raw passwords
+      newValue: { password: "hashed" }, 
     });
 
     return res.status(200).json({ message: "Password updated successfully" });

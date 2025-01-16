@@ -20,7 +20,6 @@ const Log = require("../models/Log");
         return res.status(403).json({ message: "Access denied: Insufficient permissions" });
       }
 
-      // Additional filters based on query parameters
       if (leadId) filter.leadId = leadId;
       if (userId) filter.user = userId;
       if (action) filter.action = action;
@@ -31,8 +30,7 @@ const Log = require("../models/Log");
         };
       }
 
-      // Fetch logs based on the filter
-      const logs = await Log.find(filter).populate("user", "username role");
+      const logs = await Log.find(filter).populate("user", "username role").sort({ timestamp: -1 });
       res.status(200).json(logs);
     } catch (error) {
       console.error("Error fetching logs:", error);
@@ -54,6 +52,7 @@ const Log = require("../models/Log");
       res.status(500).json({ message: "Error fetching users", error });
     }
   };
+
   exports.getActivityLogs = async (req, res) => {
     try {
       if (req.user.role !== "superadmin") {

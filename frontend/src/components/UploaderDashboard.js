@@ -17,7 +17,7 @@ function UploaderDashboard({ token, onLogout }) {
   return (
     <div className="dashboard-container">
       <div className="sidebar">
-        <h3>Uploader Dashboard</h3>
+        <h3>Researcher's Dashboard</h3>
         <ul>
           <li
             onClick={() => setSelectedSection("Leads Table")}

@@ -1,13 +1,12 @@
 import React, { useState } from "react";
-import LeadsSection from "./LeadsSection"; // Placeholder for the Leads section
-import ManageAccessSection from "./ManageAccessSection"; // Updated Manage Access section
-import LogsSection from "./LogsSection"; // Placeholder for Logs section
-import "../styles/superAdminDashboard.css"; // Style for layout
+import LeadsSection from "./LeadsSection"; 
+import ManageAccessSection from "./ManageAccessSection"; 
+import LogsSection from "./LogsSection"; 
+import "../styles/superAdminDashboard.css";
 
 function SuperAdminDashboard({ token, onLogout }) {
   const [selectedSection, setSelectedSection] = useState("Manage Access");
 
-  // Render appropriate section based on the current selection
   function renderSection() {
     if (selectedSection === "Leads") {
       return <LeadsSection token={token} />;

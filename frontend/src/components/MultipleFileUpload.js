@@ -12,7 +12,6 @@ const MultipleFileUpload = ({ token }) => {
   const [loading, setLoading] = useState(false);
   const [validLead, setValidLead] = useState(false);
 
-  // Fetch existing files when leadId and projectName are entered
   useEffect(() => {
     const fetchExistingFiles = async () => {
       if (leadId && projectName) {

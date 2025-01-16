@@ -10,7 +10,6 @@ function LeadsTable({ token }) {
   const [leadsPerPage] = useState(10);
   const [selectedLeadId, setSelectedLeadId] = useState(null);
 
-  // Fetch leads from the server
   useEffect(() => {
     async function fetchLeads() {
       try {
@@ -27,13 +26,10 @@ function LeadsTable({ token }) {
   }, [token]);
 
 
-
-  // Filtered leads based on search term
   const filteredLeads = leads.filter((lead) =>
     lead.clientCompany.toLowerCase().includes(searchTerm.toLowerCase())
   );
 
-  // Pagination logic
   const indexOfLastLead = currentPage * leadsPerPage;
   const indexOfFirstLead = indexOfLastLead - leadsPerPage;
   const currentLeads = filteredLeads.slice(indexOfFirstLead, indexOfLastLead);

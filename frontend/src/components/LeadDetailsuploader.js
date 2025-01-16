@@ -14,7 +14,6 @@ function LeadDetailsuploader({ token, leadId, onClose }) {
     fetchMessages();
   }, [leadId]);
 
-  // Fetch lead details
   async function fetchLeadDetailsuploader() {
     try {
       const res = await axios.get(`http://localhost:5000/api/leads/${leadId}`, {
@@ -26,7 +25,6 @@ function LeadDetailsuploader({ token, leadId, onClose }) {
     }
   }
 
-  // Fetch logs related to the lead
   async function fetchLeadLogs() {
     try {
       const res = await axios.get(`http://localhost:5000/api/logs?leadId=${leadId}`, {
@@ -38,7 +36,6 @@ function LeadDetailsuploader({ token, leadId, onClose }) {
     }
   }
 
-  // Fetch chat messages
   async function fetchMessages() {
     try {
       const res = await axios.get(`http://localhost:5000/api/chats/${leadId}`, {
@@ -50,7 +47,6 @@ function LeadDetailsuploader({ token, leadId, onClose }) {
     }
   }
 
-  // Handle sending a new chat message
   async function sendMessage(e) {
     e.preventDefault();
     if (!newMessage.trim()) {

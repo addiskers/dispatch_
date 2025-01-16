@@ -7,8 +7,8 @@ function LeadDetailsTable({ token, leadId, onClose,userRole  }) {
   const [isEditing, setIsEditing] = useState(false);
   const [editedLead, setEditedLead] = useState({});
   const [logs, setLogs] = useState([]);
-  const [messages, setMessages] = useState([]); // Chat messages
-  const [newMessage, setNewMessage] = useState(""); // New chat message
+  const [messages, setMessages] = useState([]);
+  const [newMessage, setNewMessage] = useState(""); 
   const [isEditingSales, setIsEditingSales] = useState(false);
   const [salesUsers, setSalesUsers] = useState([]);
   useEffect(() => {
@@ -72,7 +72,6 @@ function LeadDetailsTable({ token, leadId, onClose,userRole  }) {
     }));
   }
   
-  // Fetch lead details
   async function fetchLeadDetailsTable() {
     try {
       const res = await axios.get(`http://localhost:5000/api/leads/${leadId}`, {
@@ -85,7 +84,6 @@ function LeadDetailsTable({ token, leadId, onClose,userRole  }) {
     }
   }
 
-  // Fetch logs related to the lead
   async function fetchLeadLogs() {
     try {
       const res = await axios.get(`http://localhost:5000/api/logs?leadId=${leadId}`, {
@@ -97,7 +95,6 @@ function LeadDetailsTable({ token, leadId, onClose,userRole  }) {
     }
   }
 
-  // Fetch chat messages
   async function fetchMessages() {
     try {
       const res = await axios.get(`http://localhost:5000/api/chats/${leadId}`, {
@@ -109,7 +106,6 @@ function LeadDetailsTable({ token, leadId, onClose,userRole  }) {
     }
   }
 
-  // Handle sending a new chat message
   async function sendMessage(e) {
     e.preventDefault();
     if (!newMessage.trim()) {
@@ -132,10 +128,8 @@ function LeadDetailsTable({ token, leadId, onClose,userRole  }) {
     }
   }
 
-  // Handle save changes for the lead
   async function handleSaveChanges() {
     try {
-      // Filter the fields to send only allowed updates
       const allowedUpdates = {
         clientName: editedLead.clientName,
         clientEmail: editedLead.clientEmail,
@@ -149,7 +143,7 @@ function LeadDetailsTable({ token, leadId, onClose,userRole  }) {
       );
       alert("Lead updated successfully!");
       setIsEditing(false);
-      fetchLeadDetailsTable(); // Refresh the data after saving
+      fetchLeadDetailsTable(); 
     } catch (err) {
       console.error("Error updating lead:", err);
       alert("Failed to update lead. Please try again.");

@@ -11,16 +11,13 @@ function Login({ onLoginSuccess }) {
     e.preventDefault();
     setErrorMsg("");
     try {
-      // 1) Call the backend login endpoint
       const res = await axios.post("http://localhost:5000/api/auth/login", {
         username,
         password,
       });
 
-      // 2) The response should have { token, role }
       const { token, role } = res.data;
 
-      // 3) Notify parent (App) that login succeeded
       onLoginSuccess(token, role);
     } catch (err) {
       console.error("Login error:", err);

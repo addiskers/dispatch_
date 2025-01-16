@@ -10,7 +10,6 @@ function ManageAccessSection({ token }) {
   const [selectedUser, setSelectedUser] = useState(null);
   const [newPassword, setNewPassword] = useState("");
 
-  // Fetch users on component mount
   useEffect(() => {
     fetchUsers();
   }, []);

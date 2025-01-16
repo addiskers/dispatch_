@@ -97,7 +97,6 @@ function LeadDetails({ token, leadId, onClose,userRole  }) {
     }
   }
 
-  // Fetch chat messages
   async function fetchMessages() {
     try {
       const res = await axios.get(`http://localhost:5000/api/chats/${leadId}`, {
@@ -109,7 +108,6 @@ function LeadDetails({ token, leadId, onClose,userRole  }) {
     }
   }
 
-  // Handle sending a new chat message
   async function sendMessage(e) {
     e.preventDefault();
     if (!newMessage.trim()) {
@@ -132,7 +130,6 @@ function LeadDetails({ token, leadId, onClose,userRole  }) {
     }
   }
 
-  // Handle save changes for the lead
   async function handleSaveChanges() {
     try {
       await axios.put(

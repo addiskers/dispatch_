@@ -142,23 +142,20 @@ exports.deleteLead = async (req, res) => {
   try {
     const { leadId } = req.params;
 
-    // Only superadmin can delete leads
     if (req.user.role !== "superadmin") {
       return res.status(403).json({ message: "Access denied: Only superadmin can delete leads." });
     }
 
-    // Perform a soft delete by setting `deleted` to true
     const lead = await Lead.findOneAndUpdate(
       { leadId },
       { deleted: true },
-      { new: true } // Return the updated document
+      { new: true } 
     );
 
     if (!lead) {
       return res.status(404).json({ message: "Lead not found." });
     }
 
-    // Log the delete activity
     await logActivity(req.user.userId, "deleted lead", { leadId });
 
     res.status(200).json({ message: "Lead marked as deleted successfully.", lead });
@@ -224,18 +221,19 @@ exports.getAllLeads = async (req, res) => {
     res.status(500).json({ message: "Error fetching leads", error });
   }
 };
+
+
+
 exports.updateLeadById = async (req, res) => {
   try {
     const { leadId } = req.params;
     const { role } = req.user;
 
-    // Find the lead before updating to log the old values
     const oldLead = await Lead.findOne({ leadId });
     if (!oldLead) {
       return res.status(404).json({ message: "Lead not found" });
     }
 
-    // Role-based restrictions
     if (role === "sales") {
       const allowedFields = ["clientName", "clientEmail", "deliveryDate"];
       req.body = Object.keys(req.body)
@@ -248,17 +246,15 @@ exports.updateLeadById = async (req, res) => {
       return res.status(403).json({ message: "Access denied" });
     }
 
-    // Update the lead details
     const updatedLead = await Lead.findOneAndUpdate({ leadId }, req.body, {
-      new: true, // Return the updated document
-      runValidators: true, // Validate the fields before saving
+      new: true, 
+      runValidators: true, 
     });
 
     if (!updatedLead) {
       return res.status(404).json({ message: "Lead not found" });
     }
 
-    // Log the update
     await logActivity(req.user.userId, "updated lead", {
       leadId,
       oldValue: oldLead,
@@ -276,13 +272,11 @@ exports.getLeadById = async (req, res) => {
   try {
     const { leadId } = req.params;
 
-    // Fetch lead details from the database
     const lead = await Lead.findOne({ leadId }).populate("salesUser", "username role");
     if (!lead) {
       return res.status(404).json({ message: "Lead not found" });
     }
 
-    // Remove clientEmail and clientName for users with the uploader role
     if (req.user.role === "uploader") {
       lead.clientEmail = undefined;
       lead.clientName = undefined;

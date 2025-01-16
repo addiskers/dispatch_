@@ -5,9 +5,9 @@ import DatePicker from "react-datepicker";
 import "react-datepicker/dist/react-datepicker.css";
 import "../styles/logsection.css";
 function LogsSection({ token }) {
-  const [logs, setLogs] = useState([]); // All logs
-  const [filteredLogs, setFilteredLogs] = useState([]); // Filtered logs
-  const [users, setUsers] = useState([]); // List of users for the dropdown
+  const [logs, setLogs] = useState([]); 
+  const [filteredLogs, setFilteredLogs] = useState([]); 
+  const [users, setUsers] = useState([]); 
   const [filters, setFilters] = useState({
     userId: "",
     leadId: "",
@@ -16,17 +16,14 @@ function LogsSection({ token }) {
     endDate: null,
   });
 
-  // Pagination state
   const [currentPage, setCurrentPage] = useState(1);
-  const logsPerPage = 15; // Number of logs per page
+  const logsPerPage = 15; 
 
-  // Fetch all logs and users on component mount
   useEffect(() => {
     fetchUsers();
     fetchAllLogs();
   }, []);
 
-  // Fetch all users for the filter dropdown
   async function fetchUsers() {
     try {
       const res = await axios.get("http://localhost:5000/api/auth/users", {
@@ -38,20 +35,18 @@ function LogsSection({ token }) {
     }
   }
 
-  // Fetch all logs
   async function fetchAllLogs() {
     try {
       const res = await axios.get("http://localhost:5000/api/logs", {
         headers: { Authorization: `Bearer ${token}` },
       });
-      setLogs(res.data); // Set logs
-      setFilteredLogs(res.data); // Initially, show all logs
+      setLogs(res.data);
+      setFilteredLogs(res.data); 
     } catch (err) {
       console.error("Error fetching logs:", err);
     }
   }
 
-  // Apply filters
   function applyFilters() {
     let filtered = logs;
 
@@ -79,13 +74,11 @@ function LogsSection({ token }) {
     setCurrentPage(1); 
   }
 
-  // Handle filter changes
   function handleFilterChange(e) {
     const { name, value } = e.target;
     setFilters((prev) => ({ ...prev, [name]: value }));
   }
 
-  // Pagination logic
   const indexOfLastLog = currentPage * logsPerPage;
   const indexOfFirstLog = indexOfLastLog - logsPerPage;
   const currentLogs = filteredLogs.slice(indexOfFirstLog, indexOfLastLog);

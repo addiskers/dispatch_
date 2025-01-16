@@ -2,55 +2,63 @@ import React, { useState, useEffect } from "react";
 import axios from "axios";
 import { Table, Button, Form } from "react-bootstrap";
 import LeadDetailsuploader from "./LeadDetailsuploader"; 
-
-function LeadsTableuploader({ token }) {
+function LeadsTableAccounts({ token }) {
   const [leads, setLeads] = useState([]);
+  const [statusUpdates, setStatusUpdates] = useState({});
   const [searchTerm, setSearchTerm] = useState("");
   const [currentPage, setCurrentPage] = useState(1);
   const [leadsPerPage] = useState(10);
   const [selectedLeadId, setSelectedLeadId] = useState(null);
 
-  const fetchLeads = async () => {
+  useEffect(() => {
+    fetchAllLeads();
+  }, [token]);
+
+  async function fetchAllLeads() {
     try {
-      const res = await axios.get("http://localhost:5000/api/leads/uploader/list", {
+      const res = await axios.get("http://localhost:5000/api/leads/accounts/all-leads", {
         headers: { Authorization: `Bearer ${token}` },
       });
       setLeads(res.data);
-    } catch (error) {
-      console.error("Error fetching leads:", error);
-    }
-  };
 
-  useEffect(() => {
-    fetchLeads();
-  }, [token]);
-
-  async function handleUpdateDone(leadId, done) {
-    if (done) {
-      alert("You cannot mark a lead as undone once marked as done.");
-      return;
-    }
-
-    try {
-      await axios.patch(
-        `http://localhost:5000/api/leads/${leadId}/done`,
-        { done: true },
-        { headers: { Authorization: `Bearer ${token}` } }
-      );
-      alert("Lead marked as Done!");
-      fetchLeads();
+      const initialStatus = {};
+      res.data.forEach((lead) => {
+        initialStatus[lead.leadId] = lead.paymentStatus || "not_received";
+      });
+      setStatusUpdates(initialStatus);
     } catch (err) {
-      console.error("Error updating done status:", err);
-      alert("Failed to update status. Please try again.");
+      console.error("Error fetching all leads:", err);
     }
   }
+
+  async function updatePaymentStatus(leadId) {
+    try {
+      const paymentStatus = statusUpdates[leadId];
+      await axios.patch(
+        `http://localhost:5000/api/leads/${leadId}/payment-status`,
+        { paymentStatus },
+        { headers: { Authorization: `Bearer ${token}` } }
+      );
+      alert("Payment status updated successfully!");
+      fetchAllLeads();
+    } catch (err) {
+      console.error("Error updating payment status:", err);
+      alert("Failed to update payment status.");
+    }
+  }
+
+  const handleStatusChange = (leadId, value) => {
+    setStatusUpdates((prev) => ({
+      ...prev,
+      [leadId]: value,
+    }));
+  };
 
   const filteredLeads = leads.filter(
     (lead) =>
       lead.clientCompany &&
       lead.clientCompany.toLowerCase().includes(searchTerm.toLowerCase())
   );
-  
 
   const indexOfLastLead = currentPage * leadsPerPage;
   const indexOfFirstLead = indexOfLastLead - leadsPerPage;
@@ -67,7 +75,8 @@ function LeadsTableuploader({ token }) {
 
   return (
     <div>
-      <h3>My Leads</h3>
+      <h3>Leads Table</h3>
+
       {/* Search Box */}
       <Form.Group className="mb-3">
         <Form.Control
@@ -87,8 +96,8 @@ function LeadsTableuploader({ token }) {
               <th>Client Company</th>
               <th>Project Name</th>
               <th>Payment Status</th>
-              <th>Delivery Date</th>
               <th>Actions</th>
+              <th>Done</th>
             </tr>
           </thead>
           <tbody>
@@ -103,27 +112,25 @@ function LeadsTableuploader({ token }) {
                   </td>
                   <td>{lead.clientCompany}</td>
                   <td>{lead.projectName}</td>
-                  <td>{lead.paymentStatus}</td>
                   <td>
-                    {lead.deliveryDate
-                      ? new Date(lead.deliveryDate).toLocaleDateString()
-                      : "Not Set"}
+                    <Form.Select
+                      value={statusUpdates[lead.leadId] || "not_received"}
+                      onChange={(e) => handleStatusChange(lead.leadId, e.target.value)}
+                    >
+                      <option value="not_received">Not Received</option>
+                      <option value="partial">Partial Received</option>
+                      <option value="full">Full</option>
+                    </Form.Select>
                   </td>
                   <td>
-                {lead.done ? (
-                  <Button variant="secondary" disabled>
-                    Done
-                  </Button>
-                ) : (
-                  <Button
-                    variant="success"
-                    onClick={() => handleUpdateDone(lead.leadId, lead.done)}
-                  >
-                    Mark as Done
-                  </Button>
-                )}
-              </td>
-
+                    <Button
+                      variant="primary"
+                      onClick={() => updatePaymentStatus(lead.leadId)}
+                    >
+                      Update Payment
+                    </Button>
+                  </td>
+                  <td>{lead.done ? "Yes" : "No"}</td>
                 </tr>
               ))
             ) : (
@@ -170,4 +177,4 @@ function LeadsTableuploader({ token }) {
   );
 }
 
-export default LeadsTableuploader;
+export default LeadsTableAccounts;
