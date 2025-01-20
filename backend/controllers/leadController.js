@@ -34,7 +34,6 @@ exports.createLead = async (req, res) => {
       paymentDate,
     } = req.body;
 
-    // Ensure `clientName` and `clientEmail` are arrays
     const parsedClientName = Array.isArray(clientName)
       ? clientName.filter(Boolean)
       : [clientName].filter(Boolean);
@@ -43,7 +42,6 @@ exports.createLead = async (req, res) => {
       ? clientEmail.filter(Boolean)
       : [clientEmail].filter(Boolean);
 
-    // Validate required fields
     if (!leadId) return res.status(400).json({ message: "Lead ID is required." });
     if (!parsedClientName.length) return res.status(400).json({ message: "At least one client name is required." });
     if (!parsedClientEmail.length) return res.status(400).json({ message: "At least one client email is required." });
@@ -70,14 +68,34 @@ exports.createLead = async (req, res) => {
       contracts: req.file?.path || null,
       salesUser: req.user.userId,
     });
+
     console.log("Request Body:", req.body);
+
     await newLead.save();
+
+    // Add logging activity
+    await logActivity(req.user.userId, "created lead", {
+      leadId,
+      newValue: {
+        clientName: parsedClientName,
+        clientEmail: parsedClientEmail,
+        clientCompany,
+        projectName,
+        projectDescription,
+        paymentStatus: paymentStatus || "not_received",
+        deliveryDate: deliveryDate || null,
+        sqcode,
+        paymentDate: paymentDate || null,
+      },
+    });
+
     res.status(201).json({ message: "Lead created successfully.", lead: newLead });
   } catch (error) {
     console.error("Error creating lead:", error);
     res.status(500).json({ message: "Error creating lead.", error });
   }
 };
+
 
 
 
@@ -110,25 +128,18 @@ exports.updatePaymentStatus = async (req, res) => {
     if (!lead) {
       return res.status(404).json({ message: "Lead not found." });
     }
-
-    // Fetch the old payment status
     const oldStatus = lead.paymentStatus;
-
-    // Restrict invalid payment status transitions
     if (
       (oldStatus === "full" && paymentStatus !== "full") ||
       (oldStatus === "partial" && paymentStatus === "not_received")
     ) {
       return res.status(400).json({ message: "Invalid payment status transition." });
     }
-
-    // Update payment status
     lead.paymentStatus = paymentStatus;
     if (paymentRemark) lead.paymentRemark = paymentRemark;
 
     await lead.save();
 
-    // Log activity
     await logActivity(req.user.userId, "updated payment status", {
       leadId,
       oldValue: { paymentStatus: oldStatus },
@@ -318,8 +329,11 @@ exports.downloadContract = async (req, res) => {
       return res.status(404).json({ message: "Contract not found for the specified lead." });
     }
     const url = await generatePresignedUrl(key);
-
-    console.log("Generated presigned URL:", url);
+    await logActivity(req.user.userId, "downloaded contract", {
+      leadId,
+      contractKey: key,
+      actionDetails: `User downloaded the contract file with key: ${key}`,
+    });  
     return res.status(200).json({ url });
   } catch (error) {
     console.error("Error generating download URL:", error.message || error);
