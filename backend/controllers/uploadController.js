@@ -6,23 +6,18 @@ exports.sendAllDeliverables = async (req, res) => {
   try {
     const { leadId, projectName, files } = req.body;
 
-    // Validate leadId and projectName (case-sensitive)
     const lead = await Lead.findOne({ leadId, projectName });
     if (!lead) {
       return res.status(404).json({ message: "Lead ID and Project Name do not match" });
     }
-
-    // Filter deliverables based on selected files if provided
     const deliverablesToSend = files ? lead.deliverables.filter(d => files.includes(d)) : lead.deliverables;
 
-    // Generate presigned URLs for selected deliverables
     const presignedUrls = [];
     for (const fileKey of deliverablesToSend) {
       const url = await generatePresignedUrl(fileKey);
       presignedUrls.push({ name: fileKey.split('/').pop(), url });
     }
 
-    // Build email body with simplified clickable links
     let linksHtml = `<p>Dear Sir/Ma'am,</p>`;
     linksHtml += `<p>I'm pleased to inform you that we've completed the ${lead.projectName}.</p>`;
     linksHtml += `<p>Attached is the report in links:</p>`;
@@ -33,7 +28,6 @@ exports.sendAllDeliverables = async (req, res) => {
     linksHtml += `<p>We value your feedback and are committed to ensuring the report meets your expectations.</p>`;
     linksHtml += `<p>Thank you for entrusting us with this project.</p>`;
 
-    // Send email to the client using nodemailer
     const transporter = nodemailer.createTransport({
       service: "gmail",
       auth: {

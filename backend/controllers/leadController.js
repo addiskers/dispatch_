@@ -306,7 +306,6 @@ exports.downloadContract = async (req, res) => {
     const leadId = key.split("/")[1];
     console.log("Extracted leadId:", leadId);
 
-    // Find the lead
     const lead = await Lead.findOne({ leadId });
     console.log("Lead query result:", lead);
 

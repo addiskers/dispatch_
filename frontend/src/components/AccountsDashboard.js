@@ -1,6 +1,7 @@
 import React, { useState } from "react";
 import LeadsTableAccounts from "./LeadsTableAccounts";
 import "../styles/dashboard.css";
+import ContractPage from "./ContractPage"; 
 
 function AccountsDashboard({ token, onLogout }) {
   const [selectedSection, setSelectedSection] = useState("Leads Table");
@@ -8,6 +9,8 @@ function AccountsDashboard({ token, onLogout }) {
   const renderSection = () => {
     if (selectedSection === "Leads Table") {
       return <LeadsTableAccounts token={token} userRole="accounts" />;
+    } else if (selectedSection === "Contracts") {
+      return <ContractPage token={token} />;
     } 
   };
 
@@ -22,7 +25,12 @@ function AccountsDashboard({ token, onLogout }) {
           >
             Leads Table
           </li>
-         
+          <li
+            onClick={() => setSelectedSection("Contracts")}
+            className={selectedSection === "Contracts" ? "active" : ""}
+          >
+            Contracts
+          </li>
         </ul>
         <button onClick={onLogout} className="logout-btn">Logout</button>
       </div>

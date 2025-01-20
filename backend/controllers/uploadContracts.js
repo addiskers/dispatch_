@@ -19,25 +19,20 @@ const upload = multer({
     upload,
     async (req, res) => {
       try {
-        // Authorization check
         if (!["sales", "superadmin"].includes(req.user.role)) {
           return res.status(403).json({ message: "Access denied: Only sales and superadmin can upload contracts." });
         }
   
         const { leadId } = req.body;
-  
-        // Find the lead
         const lead = await Lead.findOne({ leadId });
         if (!lead) {
           return res.status(404).json({ message: "Lead not found." });
         }
   
-        // Ensure `contracts` is an array
         if (!Array.isArray(lead.contracts)) {
           lead.contracts = [];
         }
   
-        // Add uploaded file keys to the contracts array
         if (req.files?.contracts) {
           req.files.contracts.forEach((file) => {
             lead.contracts.push(file.key);

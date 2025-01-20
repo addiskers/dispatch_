@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from "react";
 import axios from "axios";
-import { Loader2, FileIcon, Upload, Download } from "lucide-react";
+import { Loader2, FileIcon, Upload,  } from "lucide-react";
 import "../styles/multiplefile.css";
 
 const ContractPage = ({ token }) => {
