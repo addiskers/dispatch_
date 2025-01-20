@@ -14,27 +14,60 @@ function CreateLeadForm({ token, onLeadCreated }) {
     projectDescription: "",
     paymentStatus: "not_received",
     deliveryDate: null,
+    paymentDate: null,
     sqcode: "",
   });
+  const [contracts, setContracts] = useState([]);
   const [nameInput, setNameInput] = useState("");
   const [emailInput, setEmailInput] = useState("");
   const [error, setError] = useState("");
+  const [uploadProgress, setUploadProgress] = useState(0);
 
   const handleCreateLead = async (e) => {
     e.preventDefault();
     setError("");
+    setUploadProgress(0);
 
-    // Frontend Validation
     if (!form.leadId || !form.clientName.length || !form.clientEmail.length) {
       setError("Lead ID, Client Name(s), and Client Email(s) are required.");
       return;
     }
 
     try {
-      // Send lead data to backend
-      await axios.post("http://localhost:5000/api/leads", form, {
-        headers: { Authorization: `Bearer ${token}` },
-      });
+      // First create the lead
+      const leadResponse = await axios.post(
+        "http://localhost:5000/api/leads",
+        form,
+        {
+          headers: { Authorization: `Bearer ${token}` },
+        }
+      );
+
+      // If there are contracts to upload, handle them
+      if (contracts.length > 0) {
+        const formData = new FormData();
+        formData.append("leadId", form.leadId);
+        contracts.forEach((file) => {
+          formData.append("contracts", file);
+        });
+
+        await axios.post(
+          "http://localhost:5000/api/leads/upload-contracts",
+          formData,
+          {
+            headers: {
+              Authorization: `Bearer ${token}`,
+              "Content-Type": "multipart/form-data",
+            },
+            onUploadProgress: (progressEvent) => {
+              const percentCompleted = Math.round(
+                (progressEvent.loaded * 100) / progressEvent.total
+              );
+              setUploadProgress(percentCompleted);
+            },
+          }
+        );
+      }
 
       alert("Lead created successfully!");
       setForm({
@@ -46,16 +79,32 @@ function CreateLeadForm({ token, onLeadCreated }) {
         projectDescription: "",
         paymentStatus: "not_received",
         deliveryDate: null,
+        paymentDate: null,
         sqcode: "",
       });
-      onLeadCreated(); // Notify parent to refresh leads table
+      setContracts([]);
+      setUploadProgress(0);
+      onLeadCreated();
     } catch (error) {
-      if (error.response && error.response.data && error.response.data.message) {
-        setError(error.response.data.message); // Show backend error
+      if (error.response?.data?.message) {
+        setError(error.response.data.message);
       } else {
         setError("Error creating lead. Please try again.");
       }
     }
+  };
+
+  const handleFileChange = (e) => {
+    const files = Array.from(e.target.files);
+    if (files.length > 5) {
+      setError("Maximum 5 files can be uploaded at once");
+      return;
+    }
+    setContracts(files);
+  };
+
+  const removeFile = (index) => {
+    setContracts(contracts.filter((_, i) => i !== index));
   };
 
   const addClientName = (e) => {
@@ -83,8 +132,26 @@ function CreateLeadForm({ token, onLeadCreated }) {
   return (
     <div className="container mt-4">
       <h3>Create Lead</h3>
-      {error && <p style={{ color: "red" }}>{error}</p>}
+      {error && <p className="text-danger">{error}</p>}
+      {uploadProgress > 0 && (
+        <div className="mb-3">
+          <div className="progress">
+            <div
+              className="progress-bar"
+              role="progressbar"
+              style={{ width: `${uploadProgress}%` }}
+              aria-valuenow={uploadProgress}
+              aria-valuemin="0"
+              aria-valuemax="100"
+            >
+              {uploadProgress}%
+            </div>
+          </div>
+        </div>
+      )}
       <Form onSubmit={handleCreateLead}>
+        {/* Existing form groups remain the same until the contracts section */}
+        
         <Row>
           <Col md={6}>
             <Form.Group className="mb-3">
@@ -110,6 +177,7 @@ function CreateLeadForm({ token, onLeadCreated }) {
           </Col>
         </Row>
 
+        {/* Client Names and Emails section */}
         <Row>
           <Col md={6}>
             <Form.Group className="mb-3">
@@ -129,7 +197,7 @@ function CreateLeadForm({ token, onLeadCreated }) {
                         }))
                       }
                     >
-                      &times;
+                      ×
                     </Button>
                   </span>
                 ))}
@@ -160,7 +228,7 @@ function CreateLeadForm({ token, onLeadCreated }) {
                         }))
                       }
                     >
-                      &times;
+                      ×
                     </Button>
                   </span>
                 ))}
@@ -175,6 +243,7 @@ function CreateLeadForm({ token, onLeadCreated }) {
           </Col>
         </Row>
 
+        {/* Project Details */}
         <Row>
           <Col md={6}>
             <Form.Group className="mb-3">
@@ -214,17 +283,64 @@ function CreateLeadForm({ token, onLeadCreated }) {
           />
         </Form.Group>
 
+        {/* Dates */}
+        <Row>
+          <Col md={6}>
+            <Form.Group className="mb-3">
+              <Form.Label>Delivery Date</Form.Label>
+              <DatePicker
+                selected={form.deliveryDate}
+                onChange={(date) =>
+                  setForm({ ...form, deliveryDate: date })
+                }
+                dateFormat="yyyy-MM-dd"
+                placeholderText="Select Delivery Date"
+                className="form-control"
+              />
+            </Form.Group>
+          </Col>
+          <Col md={6}>
+            <Form.Group className="mb-3">
+              <Form.Label>Payment Date</Form.Label>
+              <DatePicker
+                selected={form.paymentDate}
+                onChange={(date) => setForm({ ...form, paymentDate: date })}
+                dateFormat="yyyy-MM-dd"
+                placeholderText="Select Payment Date"
+                className="form-control"
+              />
+            </Form.Group>
+          </Col>
+        </Row>
+
+        {/* Updated Contracts Section */}
         <Form.Group className="mb-3">
-          <Form.Label>Delivery Date</Form.Label>
-          <DatePicker
-            selected={form.deliveryDate}
-            onChange={(date) =>
-              setForm({ ...form, deliveryDate: date })
-            }
-            dateFormat="yyyy-MM-dd"
-            placeholderText="Select Delivery Date"
-            className="form-control"
+          <Form.Label>Upload Contracts (Max 5 files)</Form.Label>
+          <Form.Control
+            type="file"
+            multiple
+            onChange={handleFileChange}
+            accept=".pdf,.doc,.docx"
           />
+          {contracts.length > 0 && (
+            <div className="mt-2">
+              <h6>Selected Files:</h6>
+              <ul className="list-unstyled">
+                {contracts.map((file, index) => (
+                  <li key={index} className="mb-1">
+                    {file.name}
+                    <Button
+                      variant="link"
+                      className="text-danger p-0 ms-2"
+                      onClick={() => removeFile(index)}
+                    >
+                      Remove
+                    </Button>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          )}
         </Form.Group>
 
         <Button type="submit" variant="primary">

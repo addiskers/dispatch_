@@ -3,6 +3,8 @@ import LeadsSection from "./LeadsSection";
 import ManageAccessSection from "./ManageAccessSection"; 
 import LogsSection from "./LogsSection"; 
 import "../styles/superAdminDashboard.css";
+import ContractPage from "./ContractPage"; 
+import MultipleFileUpload from "./MultipleFileUpload";
 
 function SuperAdminDashboard({ token, onLogout }) {
   const [selectedSection, setSelectedSection] = useState("Manage Access");
@@ -14,6 +16,10 @@ function SuperAdminDashboard({ token, onLogout }) {
       return <ManageAccessSection token={token} />;
     } else if (selectedSection === "Logs") {
       return <LogsSection token={token} />;
+    }else if (selectedSection === "Contracts") {
+      return <ContractPage token={token} />; 
+    }else if (selectedSection === "Uploads") {
+      return <MultipleFileUpload token={token} />;
     }
   }
 
@@ -39,6 +45,18 @@ function SuperAdminDashboard({ token, onLogout }) {
             className={selectedSection === "Logs" ? "active" : ""}
           >
             Logs
+          </li>
+          <li
+            onClick={() => setSelectedSection("Contracts")}
+            className={selectedSection === "Contracts" ? "active" : ""}
+          >
+            Contracts
+          </li>
+          <li
+            onClick={() => setSelectedSection("Uploads")}
+            className={selectedSection === "Uploads" ? "active" : ""}
+          >
+            Upload
           </li>
         </ul>
         <button onClick={onLogout} className="logout-btn">Logout</button>

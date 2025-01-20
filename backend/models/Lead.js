@@ -42,6 +42,8 @@ const LeadSchema = new mongoose.Schema(
       type: Date,
       required: false,
     },
+    paymentDate: { type: Date, default: null }, 
+    contracts: { type: [String], default: [] },
   },
   { timestamps: true } 
 );

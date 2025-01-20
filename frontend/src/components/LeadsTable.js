@@ -26,10 +26,11 @@ function LeadsTable({ token }) {
   }, [token]);
 
 
-  const filteredLeads = leads.filter((lead) =>
-    lead.clientCompany.toLowerCase().includes(searchTerm.toLowerCase())
+  const filteredLeads = leads.filter(
+    (lead) =>
+      lead.clientCompany &&
+      lead.clientCompany.toLowerCase().includes(searchTerm.toLowerCase())
   );
-
   const indexOfLastLead = currentPage * leadsPerPage;
   const indexOfFirstLead = indexOfLastLead - leadsPerPage;
   const currentLeads = filteredLeads.slice(indexOfFirstLead, indexOfLastLead);

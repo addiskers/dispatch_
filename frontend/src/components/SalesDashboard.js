@@ -1,6 +1,7 @@
 import React, { useState } from "react";
 import CreateLeadForm from "./CreateLeadForm";
 import LeadsTable from "./LeadsTable";
+import ContractPage from "./ContractPage"; 
 import "../styles/superAdminDashboard.css";
 
 function SalesDashboard({ token, onLogout, userRole }) {
@@ -17,6 +18,8 @@ function SalesDashboard({ token, onLogout, userRole }) {
       return <CreateLeadForm token={token} onLeadCreated={handleLeadCreated} userRole={userRole} />;
     } else if (selectedSection === "Leads Table") {
       return <LeadsTable token={token} refresh={refreshLeads} userRole={userRole} />;
+    } else if (selectedSection === "Contracts") {
+      return <ContractPage token={token} />; 
     }
   }
 
@@ -40,6 +43,12 @@ function SalesDashboard({ token, onLogout, userRole }) {
             className={selectedSection === "Leads Table" ? "active" : ""}
           >
             Leads Table
+          </li>
+          <li
+            onClick={() => setSelectedSection("Contracts")}
+            className={selectedSection === "Contracts" ? "active" : ""}
+          >
+            Contracts
           </li>
         </ul>
         <button onClick={onLogout} className="logout-btn">Logout</button>

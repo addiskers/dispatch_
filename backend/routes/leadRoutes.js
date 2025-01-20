@@ -2,7 +2,12 @@ const express = require("express");
 const router = express.Router();
 const authMiddleware = require("../middleware/auth");
 const leadController = require("../controllers/leadController");
-const { getLeadById, updateLeadById } = require("../controllers/leadController");
+const { getLeadById, updateLeadById, downloadContract } = require("../controllers/leadController");
+const { uploadContracts } = require("../controllers/uploadContracts");
+
+// Move the download-contract route to the top of the routes list
+router.get("/download-contract", authMiddleware, downloadContract);
+
 // --- SALES endpoints ---
 router.post("/", authMiddleware, leadController.createLead);
 router.get("/my-leads", authMiddleware, leadController.getMyLeads);
@@ -17,5 +22,6 @@ router.patch("/:leadId/done", authMiddleware, leadController.updateDoneStatus);
 router.get("/accounts/all-leads", authMiddleware, leadController.getAllLeads);
 router.get("/:leadId", authMiddleware, getLeadById);
 router.put("/:leadId", authMiddleware, updateLeadById);
+router.post("/upload-contracts", authMiddleware, uploadContracts);
 
 module.exports = router;

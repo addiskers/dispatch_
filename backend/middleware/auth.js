@@ -8,14 +8,16 @@ module.exports = (req, res, next) => {
 
   try {
     const decoded = jwt.verify(token, process.env.JWT_SECRET);
-    req.user = decoded; 
+    req.user = decoded;
 
     if (["/register", "/update-password", "/activity-logs"].includes(req.path) && req.user.role !== "superadmin") {
+      console.log("Access denied: Restricted to superadmin");
       return res.status(403).json({ message: "Access denied: Only superadmin can access this route" });
     }
 
     next();
   } catch (err) {
+    console.log("Invalid token:", err.message);
     res.status(400).json({ message: "Invalid token" });
   }
 };

@@ -1,6 +1,7 @@
 const Lead = require("../models/Lead");
 const User = require("../models/User");
 const Log = require("../models/Log");
+const { generatePresignedUrl } = require("../controllers/generatePresignedUrlFile");
 
 const logActivity = async (userId, action, details) => {
   try {
@@ -20,55 +21,61 @@ const logActivity = async (userId, action, details) => {
  */
 exports.createLead = async (req, res) => {
   try {
-    console.log("Request Body:", req.body);
-    const { leadId, clientName, clientEmail,clientCompany,projectName, projectDescription, paymentStatus, deliveryDate, sqcode } = req.body;
-
-    // Validation
-    if (!clientName || clientName.length === 0) {
-      return res.status(400).json({ message: "At least one client name is required." });
-    }
-    if (!clientEmail || clientEmail.length === 0) {
-      return res.status(400).json({ message: "At least one client email is required." });
-    }
-
-    // Check for duplicate leadId
-    const existingLead = await Lead.findOne({ leadId });
-    if (existingLead) {
-      return res.status(400).json({ message: "Lead ID already exists" });
-    }
-
-    // Create new lead
-    const newLead = new Lead({
+    const {
       leadId,
       clientName,
       clientEmail,
       clientCompany,
       projectName,
       projectDescription,
+      paymentStatus,
+      deliveryDate,
+      sqcode,
+      paymentDate,
+    } = req.body;
+
+    // Ensure `clientName` and `clientEmail` are arrays
+    const parsedClientName = Array.isArray(clientName)
+      ? clientName.filter(Boolean)
+      : [clientName].filter(Boolean);
+
+    const parsedClientEmail = Array.isArray(clientEmail)
+      ? clientEmail.filter(Boolean)
+      : [clientEmail].filter(Boolean);
+
+    // Validate required fields
+    if (!leadId) return res.status(400).json({ message: "Lead ID is required." });
+    if (!parsedClientName.length) return res.status(400).json({ message: "At least one client name is required." });
+    if (!parsedClientEmail.length) return res.status(400).json({ message: "At least one client email is required." });
+    if (!projectName || projectName.trim() === "") {
+      return res.status(400).json({ message: "Project name is required." });
+    }
+
+    const existingLead = await Lead.findOne({ leadId });
+    if (existingLead) {
+      return res.status(400).json({ message: "Lead ID already exists." });
+    }
+
+    const newLead = new Lead({
+      leadId,
+      clientName: parsedClientName,
+      clientEmail: parsedClientEmail,
+      clientCompany,
+      projectName,
+      projectDescription,
       paymentStatus: paymentStatus || "not_received",
       deliveryDate: deliveryDate || null,
       sqcode,
+      paymentDate: paymentDate || null,
+      contracts: req.file?.path || null,
       salesUser: req.user.userId,
     });
-
+    console.log("Request Body:", req.body);
     await newLead.save();
-    await logActivity(req.user.userId, "created lead", {
-      leadId,
-      newValue: {
-        clientName,
-        clientEmail,
-        clientCompany,
-        projectName,
-        projectDescription,
-        paymentStatus: paymentStatus || "not_received",
-        deliveryDate: deliveryDate || null,
-        sqcode,
-      },
-    });
-    return res.status(201).json({ message: "Lead created successfully", lead: newLead });
+    res.status(201).json({ message: "Lead created successfully.", lead: newLead });
   } catch (error) {
     console.error("Error creating lead:", error);
-    return res.status(500).json({ message: "Error creating lead", error });
+    res.status(500).json({ message: "Error creating lead.", error });
   }
 };
 
@@ -289,4 +296,34 @@ exports.getLeadById = async (req, res) => {
   }
 };
 
+exports.downloadContract = async (req, res) => {
+    try {
+    const { key } = req.query;
 
+    if (!key) {
+      return res.status(400).json({ message: "File key is required." });
+    }
+    const leadId = key.split("/")[1];
+    console.log("Extracted leadId:", leadId);
+
+    // Find the lead
+    const lead = await Lead.findOne({ leadId });
+    console.log("Lead query result:", lead);
+
+    if (!lead) {
+      return res.status(404).json({ message: "Lead not found." });
+    }
+
+    if (!lead.contracts.includes(key)) {
+      console.log("Key not found in contracts:", key);
+      return res.status(404).json({ message: "Contract not found for the specified lead." });
+    }
+    const url = await generatePresignedUrl(key);
+
+    console.log("Generated presigned URL:", url);
+    return res.status(200).json({ url });
+  } catch (error) {
+    console.error("Error generating download URL:", error.message || error);
+    res.status(500).json({ message: "Error generating download URL.", error: error.message || error });
+  }
+};
