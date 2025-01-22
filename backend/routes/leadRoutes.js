@@ -13,6 +13,7 @@ router.post("/", authMiddleware, leadController.createLead);
 router.get("/my-leads", authMiddleware, leadController.getMyLeads);
 router.patch("/:leadId/payment-status", authMiddleware, leadController.updatePaymentStatus);
 router.delete("/:leadId", authMiddleware, leadController.deleteLead);
+router.get("/:leadId/paymentstatus", authMiddleware, leadController.getPaymentStatus); 
 
 // --- UPLOADER endpoints ---
 router.get("/uploader/list", authMiddleware, leadController.getLeadListForUploader);

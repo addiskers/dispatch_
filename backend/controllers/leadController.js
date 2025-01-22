@@ -2,6 +2,7 @@ const Lead = require("../models/Lead");
 const User = require("../models/User");
 const Log = require("../models/Log");
 const { generatePresignedUrl } = require("../controllers/generatePresignedUrlFile");
+const { sendNotificationEmail } = require("../utils/emailService");
 
 const logActivity = async (userId, action, details) => {
   try {
@@ -72,8 +73,26 @@ exports.createLead = async (req, res) => {
     console.log("Request Body:", req.body);
 
     await newLead.save();
+    const uploaderEmails = await User.find({ role: "uploader" }).select("email");
+    const accountsEmails = await User.find({ role: "accounts" }).select("email");
+    const salesUser = await User.findById(req.user.userId);
+    const superadminEmails = await User.find({ role: "superadmin" }).select("email");
 
-    // Add logging activity
+    const recipients = [...uploaderEmails, ...accountsEmails, salesUser.email,...superadminEmails];
+    const subject = `New Lead Created: ${projectName}`;
+    const html = `
+      <p>A new lead has been created:</p>
+      <ul>
+        <li><strong>Lead ID:</strong> ${leadId}</li>
+        <li><strong>Project Name:</strong> ${projectName}</li>
+        <li><strong>Delivery Date:</strong> ${deliveryDate ? new Date(deliveryDate).toLocaleDateString() : "Not specified"}</li>
+        <li>Created By ${salesUser.username}</li>
+      </ul>
+      <p>Best regards,<br><strong>In-House Notification System</strong></p> 
+        `;
+
+    await sendNotificationEmail(recipients, subject, html);
+
     await logActivity(req.user.userId, "created lead", {
       leadId,
       newValue: {
@@ -139,7 +158,24 @@ exports.updatePaymentStatus = async (req, res) => {
     if (paymentRemark) lead.paymentRemark = paymentRemark;
 
     await lead.save();
+    const uploaderEmails = await User.find({ role: "uploader" }).select("email");
+    const accountsEmails = await User.find({ role: "accounts" }).select("email");
+    const salesUser = await User.findById(req.user.userId);
+    const superadminEmails = await User.find({ role: "superadmin" }).select("email");
 
+    const recipients = [...uploaderEmails, ...accountsEmails, salesUser.email,...superadminEmails];
+    const subject = `Payment Status Updated: ${lead.projectName}`;
+    const html = `
+      <p>Dear Team,</p>
+      <p>The payment status for the project <strong>${lead.projectName}</strong> has been updated:</p>
+      <ul>
+        <li> <strong>Lead id: </strong> ${lead.leadId}</li>
+        <li><strong>Old Status:</strong> ${oldStatus}</li>
+        <li><strong>New Status:</strong> ${paymentStatus}</li>
+      </ul>
+      <p>Best regards,<br><strong>In-House Notification System</strong></p>
+    `;
+    await sendNotificationEmail(recipients, subject, html);
     await logActivity(req.user.userId, "updated payment status", {
       leadId,
       oldValue: { paymentStatus: oldStatus },
@@ -329,14 +365,25 @@ exports.downloadContract = async (req, res) => {
       return res.status(404).json({ message: "Contract not found for the specified lead." });
     }
     const url = await generatePresignedUrl(key);
-    await logActivity(req.user.userId, "downloaded contract", {
-      leadId,
-      contractKey: key,
-      actionDetails: `User downloaded the contract file with key: ${key}`,
-    });  
+      
     return res.status(200).json({ url });
   } catch (error) {
     console.error("Error generating download URL:", error.message || error);
     res.status(500).json({ message: "Error generating download URL.", error: error.message || error });
+  }
+};
+exports.getPaymentStatus = async (req, res) => {
+  try {
+    const { leadId } = req.params;
+
+    const lead = await Lead.findOne({ leadId });
+    if (!lead) {
+      return res.status(404).json({ message: "Lead not found" });
+    }
+
+    res.status(200).json({ paymentStatus: lead.paymentStatus });
+  } catch (error) {
+    console.error("Error fetching payment status:", error);
+    res.status(500).json({ message: "Error fetching payment status", error });
   }
 };

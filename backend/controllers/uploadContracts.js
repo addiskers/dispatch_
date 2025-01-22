@@ -1,6 +1,6 @@
 const multer = require("multer");
 const multerS3 = require("multer-s3-v3");
-const s3 = require("../config/s3"); // AWS S3 configuration
+const s3 = require("../config/s3"); 
 const Lead = require("../models/Lead");
 
 const upload = multer({

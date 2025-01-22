@@ -91,10 +91,31 @@ const MultipleFileUpload = ({ token }) => {
       alert("Please select files to send");
       return;
     }
-
-    setLoading(true);
+  
     try {
-      const res = await axios.post(
+      const paymentStatusRes = await axios.get(
+        `http://localhost:5000/api/leads/${leadId}/paymentstatus`,
+        {
+          headers: {
+            Authorization: `Bearer ${token}`,
+          },
+        }
+      );
+  
+      const paymentStatus = paymentStatusRes.data.paymentStatus;
+  
+      if (paymentStatus !== "full") {
+        const confirm = window.confirm(
+          `The payment status is '${paymentStatus}'. Are you sure you want to send the deliverables?`
+        );
+  
+        if (!confirm) {
+          return;
+        }
+      }
+  
+      setLoading(true);
+        const res = await axios.post(
         "http://localhost:5000/api/upload/send",
         {
           leadId,
@@ -107,14 +128,17 @@ const MultipleFileUpload = ({ token }) => {
           },
         }
       );
+  
       alert(`Deliverables sent. File Count: ${res.data.fileCount}`);
       setSelectedFiles([]);
     } catch (error) {
-      console.error("Send error:", error);
-      alert("Error sending deliverables.");
+      console.error("Error checking payment status or sending files:", error);
+      alert("Error processing your request.");
+    } finally {
+      setLoading(false);
     }
-    setLoading(false);
   };
+  
 
   const toggleFileSelection = (fileKey) => {
     setSelectedFiles((prev) =>

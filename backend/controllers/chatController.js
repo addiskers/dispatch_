@@ -1,6 +1,7 @@
 const Chat = require("../models/Chat");
 const { logActivity } = require("../utils/logger");
 const User = require("../models/User");
+const { sendNotificationEmail } = require("../utils/emailService");
 
 exports.getChatsByLead = async (req, res) => {
   try {
@@ -37,9 +38,32 @@ exports.sendMessage = async (req, res) => {
         leadId,
         newValue: { message },
       });
-      res.status(201).json(populatedChat);
-    } catch (error) {
-      console.error("Error sending message:", error);
-      res.status(500).json({ message: "Error sending message", error });
-    }
-  };
+      const uploaderEmails = await User.find({ role: "uploader" }).select("email");
+      const accountsEmails = await User.find({ role: "accounts" }).select("email");
+      const salesUser = await User.findById(populatedChat.sender._id); 
+
+      const recipients = [
+        ...uploaderEmails.map(user => user.email),
+        ...accountsEmails.map(user => user.email),
+        ...superadminEmails.map(user => user.email),
+        salesUser.email,
+      ];
+
+      const subject = `New Chat Message for Lead ID: ${leadId}`;
+      const html = `
+        <p>Dear Team,</p>
+        <p>A new chat message has been sent for Lead ID: <strong>${leadId}</strong>.</p>
+        <ul>
+          <li><strong>Sender:</strong> ${sender.username}</li>
+          <li><strong>Message:</strong> ${message}</li>
+        </ul>
+        <p>Best regards,<br><strong>In-House Notification System</strong></p>
+      `;
+
+      await sendNotificationEmail(recipients, subject, html);
+        res.status(201).json(populatedChat);
+      } catch (error) {
+        console.error("Error sending message:", error);
+        res.status(500).json({ message: "Error sending message", error });
+      }
+    };
