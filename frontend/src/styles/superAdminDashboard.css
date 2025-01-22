@@ -31,7 +31,7 @@
 .content {
   flex: 1;
   padding: 20px;
-  overflow: hidden; /* Prevent content overflow */
+  overflow: auto; /* Prevent content overflow */
 }
 
 .logout-btn {

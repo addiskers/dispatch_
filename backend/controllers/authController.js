@@ -8,27 +8,40 @@ exports.registerUser = async (req, res) => {
     if (req.user.role !== "superadmin") {
       return res.status(403).json({ message: "Access denied: Only superadmin can register users" });
     }
+    const { username, password, email, role } = req.body;
 
-    const { username, password, role } = req.body;
-
-    const existingUser = await User.findOne({ username });
+    if (!username || !password || !email || !role) {
+      return res.status(400).json({ message: "All fields (username, password, email, role) are required" });
+    }
+    const existingUser = await User.findOne({ $or: [{ username }, { email }] });
     if (existingUser) {
-      return res.status(400).json({ message: "User already exists" });
+      return res.status(400).json({
+        message: existingUser.username === username
+          ? "Username already exists"
+          : "Email already exists",
+      });
     }
 
     const hashedPassword = await bcrypt.hash(password, 10);
-
-    const newUser = new User({ username, password: hashedPassword, role });
-    await logActivity(req.user.userId, "registered user", {
-      newValue: { username, role },
+    const newUser = new User({
+      username,
+      password: hashedPassword,
+      email,
+      role,
     });
+
     await newUser.save();
 
+    await logActivity(req.user.userId, "registered user", {
+      newValue: { username, email, role },
+    });
     return res.status(201).json({ message: "User registered successfully" });
   } catch (error) {
+    console.error("Error registering user:", error);
     return res.status(500).json({ message: "Error registering user", error });
   }
 };
+
 
 exports.login = async (req, res) => {
   try {

@@ -3,10 +3,11 @@ import axios from "axios";
 import Table from "react-bootstrap/Table";
 import Button from "react-bootstrap/Button";
 import Form from "react-bootstrap/Form";
+import "../styles/ManageAccessSection.css";
 
 function ManageAccessSection({ token }) {
   const [users, setUsers] = useState([]);
-  const [newUser, setNewUser] = useState({ username: "", password: "", role: "sales" });
+  const [newUser, setNewUser] = useState({ username: "", email: "", password: "", role: "sales" });
   const [selectedUser, setSelectedUser] = useState(null);
   const [newPassword, setNewPassword] = useState("");
 
@@ -22,12 +23,18 @@ function ManageAccessSection({ token }) {
       setUsers(res.data);
     } catch (err) {
       console.error("Error fetching users:", err);
+      alert("Failed to fetch users.");
     }
   }
 
   async function handleRegisterUser(e) {
     e.preventDefault();
     try {
+      if (!newUser.username || !newUser.email || !newUser.password) {
+        alert("All fields are required!");
+        return;
+      }
+
       await axios.post(
         "http://localhost:5000/api/auth/register",
         newUser,
@@ -35,10 +42,10 @@ function ManageAccessSection({ token }) {
       );
       alert("User registered successfully!");
       fetchUsers();
-      setNewUser({ username: "", password: "", role: "sales" });
+      setNewUser({ username: "", email: "", password: "", role: "sales" });
     } catch (err) {
       console.error("Error registering user:", err);
-      alert("Failed to register user.");
+      alert(err.response?.data?.message || "Failed to register user.");
     }
   }
 
@@ -59,24 +66,34 @@ function ManageAccessSection({ token }) {
       setNewPassword("");
     } catch (err) {
       console.error("Error updating password:", err);
-      alert("Failed to update password.");
+      alert(err.response?.data?.message || "Failed to update password.");
     }
   }
 
   return (
-    <div>
-      <h2>Manage Access</h2>
-      <div className="mt-4">
-        <h3>Register User</h3>
+    <div className="manage-access-container">
+      <h2 className="section-heading">Manage Access</h2>
+  
+      {/* Register User Section */}
+      <div className="manage-access-form">
+        <h3 className="subsection-heading">Register User</h3>
         <Form onSubmit={handleRegisterUser}>
-          <Form.Group>
+          <Form.Group className="form-group-responsive">
             <Form.Control
               placeholder="Username"
               value={newUser.username}
               onChange={(e) => setNewUser({ ...newUser, username: e.target.value })}
             />
           </Form.Group>
-          <Form.Group>
+          <Form.Group className="form-group-responsive">
+            <Form.Control
+              placeholder="Email"
+              type="email"
+              value={newUser.email}
+              onChange={(e) => setNewUser({ ...newUser, email: e.target.value })}
+            />
+          </Form.Group>
+          <Form.Group className="form-group-responsive">
             <Form.Control
               placeholder="Password"
               type="password"
@@ -84,7 +101,7 @@ function ManageAccessSection({ token }) {
               onChange={(e) => setNewUser({ ...newUser, password: e.target.value })}
             />
           </Form.Group>
-          <Form.Group>
+          <Form.Group className="form-group-responsive">
             <Form.Select
               value={newUser.role}
               onChange={(e) => setNewUser({ ...newUser, role: e.target.value })}
@@ -94,15 +111,17 @@ function ManageAccessSection({ token }) {
               <option value="accounts">Accounts</option>
             </Form.Select>
           </Form.Group>
-          <Button type="submit" variant="primary" className="mt-2">
+          <Button type="submit" variant="primary" className="btn-responsive">
             Register User
           </Button>
         </Form>
       </div>
-      <div className="mt-4">
-        <h3>Update Password</h3>
+  
+      {/* Update Password Section */}
+      <div className="manage-access-form">
+        <h3 className="subsection-heading">Update Password</h3>
         <Form onSubmit={handleUpdatePassword}>
-          <Form.Group>
+          <Form.Group className="form-group-responsive">
             <Form.Select
               value={selectedUser || ""}
               onChange={(e) => setSelectedUser(e.target.value)}
@@ -117,7 +136,7 @@ function ManageAccessSection({ token }) {
               ))}
             </Form.Select>
           </Form.Group>
-          <Form.Group>
+          <Form.Group className="form-group-responsive">
             <Form.Control
               placeholder="New Password"
               type="password"
@@ -125,13 +144,35 @@ function ManageAccessSection({ token }) {
               onChange={(e) => setNewPassword(e.target.value)}
             />
           </Form.Group>
-          <Button type="submit" variant="primary" className="mt-2">
+          <Button type="submit" variant="primary" className="btn-responsive">
             Update Password
           </Button>
         </Form>
       </div>
+  
+      {/* Display Users Table */}
+      <div className="table-responsive-wrapper">
+        <h3 className="subsection-heading">Existing Users</h3>
+        <Table striped bordered hover>
+          <thead>
+            <tr>
+              <th>Username</th>
+              <th>Email</th>
+              <th>Role</th>
+            </tr>
+          </thead>
+          <tbody>
+            {users.map((user) => (
+              <tr key={user._id}>
+                <td>{user.username}</td>
+                <td>{user.email}</td>
+                <td>{user.role}</td>
+              </tr>
+            ))}
+          </tbody>
+        </Table>
+      </div>
     </div>
   );
-}
-
+}  
 export default ManageAccessSection;

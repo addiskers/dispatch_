@@ -46,8 +46,7 @@ const Log = require("../models/Log");
         return res.status(403).json({ message: "Access denied: Only superadmin can access this route" });
       }
   
-      const users = await User.find({}, "username role _id");
-      res.status(200).json(users);
+      const users = await User.find({}, "username email role _id");      res.status(200).json(users);
     } catch (error) {
       res.status(500).json({ message: "Error fetching users", error });
     }
