@@ -25,7 +25,9 @@ const allowedOrigins = [
   "http://localhost:5001",
   "http://64.227.130.93:3001",
   "https://theskyquestt.org",
-  "http://theskyquestt.org"
+  "http://theskyquestt.org",
+  "https://www.theskyquestt.org",
+  "http://www.theskyquestt.org"
 ]
 app.use(cors({
   origin: (origin, callback) => {
