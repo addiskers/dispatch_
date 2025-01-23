@@ -13,7 +13,7 @@ function Chat({ token, leadId, onClose }) {
 
   async function fetchMessages(leadId) {
     try {
-      const res = await axios.get(`http://localhost:5000/api/chats/${leadId}`, {
+      const res = await axios.get(`${process.env.REACT_APP_API_BASE_URL}/api/chats/${leadId}`, {
         headers: { Authorization: `Bearer ${token}` },
       });
       setMessages(res.data);
@@ -31,7 +31,7 @@ function Chat({ token, leadId, onClose }) {
 
     try {
       const res = await axios.post(
-        `http://localhost:5000/api/chats/${leadId}`,
+        `${process.env.REACT_APP_API_BASE_URL}/api/chats/${leadId}`,
         { message: newMessage },
         {
           headers: { Authorization: `Bearer ${token}` },

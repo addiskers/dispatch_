@@ -16,7 +16,7 @@ function LeadDetailsuploader({ token, leadId, onClose }) {
 
   async function fetchLeadDetailsuploader() {
     try {
-      const res = await axios.get(`http://localhost:5000/api/leads/${leadId}`, {
+      const res = await axios.get(`${process.env.REACT_APP_API_BASE_URL}/api/leads/${leadId}`, {
         headers: { Authorization: `Bearer ${token}` },
       });
       setLead(res.data);
@@ -27,7 +27,7 @@ function LeadDetailsuploader({ token, leadId, onClose }) {
 
   async function fetchLeadLogs() {
     try {
-      const res = await axios.get(`http://localhost:5000/api/logs?leadId=${leadId}`, {
+      const res = await axios.get(`${process.env.REACT_APP_API_BASE_URL}/api/logs?leadId=${leadId}`, {
         headers: { Authorization: `Bearer ${token}` },
       });
       setLogs(res.data);
@@ -38,7 +38,7 @@ function LeadDetailsuploader({ token, leadId, onClose }) {
 
   async function fetchMessages() {
     try {
-      const res = await axios.get(`http://localhost:5000/api/chats/${leadId}`, {
+      const res = await axios.get(`${process.env.REACT_APP_API_BASE_URL}/api/chats/${leadId}`, {
         headers: { Authorization: `Bearer ${token}` },
       });
       setMessages(res.data);
@@ -56,7 +56,7 @@ function LeadDetailsuploader({ token, leadId, onClose }) {
 
     try {
       const res = await axios.post(
-        `http://localhost:5000/api/chats/${leadId}`,
+        `${process.env.REACT_APP_API_BASE_URL}/api/chats/${leadId}`,
         { message: newMessage },
         {
           headers: { Authorization: `Bearer ${token}` },

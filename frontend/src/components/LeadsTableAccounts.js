@@ -16,7 +16,7 @@ function LeadsTableAccounts({ token }) {
 
   async function fetchAllLeads() {
     try {
-      const res = await axios.get("http://localhost:5000/api/leads/accounts/all-leads", {
+      const res = await axios.get(`${process.env.REACT_APP_API_BASE_URL}/api/leads/accounts/all-leads`, {
         headers: { Authorization: `Bearer ${token}` },
       });
       setLeads(res.data);
@@ -35,7 +35,7 @@ function LeadsTableAccounts({ token }) {
     try {
       const paymentStatus = statusUpdates[leadId];
       await axios.patch(
-        `http://localhost:5000/api/leads/${leadId}/payment-status`,
+        `${process.env.REACT_APP_API_BASE_URL}/api/leads/${leadId}/payment-status`,
         { paymentStatus },
         { headers: { Authorization: `Bearer ${token}` } }
       );

@@ -17,7 +17,7 @@ function ManageAccessSection({ token }) {
 
   async function fetchUsers() {
     try {
-      const res = await axios.get("http://localhost:5000/api/auth/users", {
+      const res = await axios.get(`${process.env.REACT_APP_API_BASE_URL}/api/auth/users`, {
         headers: { Authorization: `Bearer ${token}` },
       });
       setUsers(res.data);
@@ -36,7 +36,7 @@ function ManageAccessSection({ token }) {
       }
 
       await axios.post(
-        "http://localhost:5000/api/auth/register",
+        `${process.env.REACT_APP_API_BASE_URL}/api/auth/register`,
         newUser,
         { headers: { Authorization: `Bearer ${token}` } }
       );
@@ -57,7 +57,7 @@ function ManageAccessSection({ token }) {
     }
     try {
       await axios.patch(
-        "http://localhost:5000/api/auth/update-password",
+        `${process.env.REACT_APP_API_BASE_URL}/api/auth/update-password`,
         { userId: selectedUser, newPassword },
         { headers: { Authorization: `Bearer ${token}` } }
       );

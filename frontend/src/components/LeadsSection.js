@@ -17,7 +17,7 @@ function LeadsSection({ token }) {
 
   async function fetchLeads() {
     try {
-      const res = await axios.get("http://localhost:5000/api/leads/accounts/all-leads", {
+      const res = await axios.get(`${process.env.REACT_APP_API_BASE_URL}/api/leads/accounts/all-leads`, {
         headers: { Authorization: `Bearer ${token}` },
       });
       setLeads(res.data);
@@ -29,7 +29,7 @@ function LeadsSection({ token }) {
     if (!window.confirm("Are you sure you want to delete this lead?")) return;
 
     try {
-      await axios.delete(`http://localhost:5000/api/leads/${leadId}`, {
+      await axios.delete(`${process.env.REACT_APP_API_BASE_URL}/api/leads/${leadId}`, {
         headers: { Authorization: `Bearer ${token}` },
       });
       setLeads((prevLeads) => prevLeads.filter((lead) => lead.leadId !== leadId));

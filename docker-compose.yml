@@ -5,7 +5,7 @@ services:
     build:
       context: ./backend
     ports:
-      - "5002:5000" # Maps port 5002 on the host to port 5000 in the container
+      - "5002:5000" 
     environment:
       NODE_ENV: production
       JWT_SECRET: ${JWT_SECRET}

@@ -35,7 +35,7 @@ function CreateLeadForm({ token, onLeadCreated }) {
 
     try {
       const leadResponse = await axios.post(
-        "http://localhost:5000/api/leads",
+        `${process.env.REACT_APP_API_BASE_URL}/api/leads`,
         form,
         {
           headers: { Authorization: `Bearer ${token}` },
@@ -50,7 +50,7 @@ function CreateLeadForm({ token, onLeadCreated }) {
         });
 
         await axios.post(
-          "http://localhost:5000/api/leads/upload-contracts",
+          `${process.env.REACT_APP_API_BASE_URL}/api/leads/upload-contracts`,
           formData,
           {
             headers: {

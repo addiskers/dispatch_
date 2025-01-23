@@ -24,7 +24,7 @@ function LeadDetailsTable({ token, leadId, onClose,userRole  }) {
  
  async function fetchSalesUsers() {
   try {
-    const res = await axios.get("http://localhost:5000/api/auth/sales-users", {
+    const res = await axios.get(`${process.env.REACT_APP_API_BASE_URL}/api/auth/sales-users`, {
       headers: { Authorization: `Bearer ${token}` },
     });
     setSalesUsers(res.data);
@@ -74,7 +74,7 @@ function LeadDetailsTable({ token, leadId, onClose,userRole  }) {
   
   async function fetchLeadDetailsTable() {
     try {
-      const res = await axios.get(`http://localhost:5000/api/leads/${leadId}`, {
+      const res = await axios.get(`${process.env.REACT_APP_API_BASE_URL}/api/leads/${leadId}`, {
         headers: { Authorization: `Bearer ${token}` },
       });
       setLead(res.data);
@@ -86,7 +86,7 @@ function LeadDetailsTable({ token, leadId, onClose,userRole  }) {
 
   async function fetchLeadLogs() {
     try {
-      const res = await axios.get(`http://localhost:5000/api/logs?leadId=${leadId}`, {
+      const res = await axios.get(`${process.env.REACT_APP_API_BASE_URL}/api/logs?leadId=${leadId}`, {
         headers: { Authorization: `Bearer ${token}` },
       });
       setLogs(res.data);
@@ -97,7 +97,7 @@ function LeadDetailsTable({ token, leadId, onClose,userRole  }) {
 
   async function fetchMessages() {
     try {
-      const res = await axios.get(`http://localhost:5000/api/chats/${leadId}`, {
+      const res = await axios.get(`${process.env.REACT_APP_API_BASE_URL}/api/chats/${leadId}`, {
         headers: { Authorization: `Bearer ${token}` },
       });
       setMessages(res.data);
@@ -115,7 +115,7 @@ function LeadDetailsTable({ token, leadId, onClose,userRole  }) {
 
     try {
       const res = await axios.post(
-        `http://localhost:5000/api/chats/${leadId}`,
+        `${process.env.REACT_APP_API_BASE_URL}/api/chats/${leadId}`,
         { message: newMessage },
         {
           headers: { Authorization: `Bearer ${token}` },
@@ -137,7 +137,7 @@ function LeadDetailsTable({ token, leadId, onClose,userRole  }) {
       };
   
       await axios.put(
-        `http://localhost:5000/api/leads/${leadId}`,
+        `${process.env.REACT_APP_API_BASE_URL}/api/leads/${leadId}`,
         allowedUpdates,
         { headers: { Authorization: `Bearer ${token}` } }
       );
