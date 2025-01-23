@@ -23,7 +23,7 @@ const app = express();
 app.use(cors());
 app.use(express.json());
 app.use(cors({
-    origin: "http://localhost:3000", 
+    origin: "http://64.227.130.93:3001", 
     methods: ["GET", "POST", "PATCH", "DELETE"],
     allowedHeaders: ["Content-Type", "Authorization"]
   }));
