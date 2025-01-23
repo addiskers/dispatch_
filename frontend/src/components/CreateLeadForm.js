@@ -34,7 +34,6 @@ function CreateLeadForm({ token, onLeadCreated }) {
     }
 
     try {
-      // First create the lead
       const leadResponse = await axios.post(
         "http://localhost:5000/api/leads",
         form,
@@ -43,7 +42,6 @@ function CreateLeadForm({ token, onLeadCreated }) {
         }
       );
 
-      // If there are contracts to upload, handle them
       if (contracts.length > 0) {
         const formData = new FormData();
         formData.append("leadId", form.leadId);

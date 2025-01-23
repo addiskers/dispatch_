@@ -3,7 +3,7 @@ import Login from "./components/Login";
 import SalesDashboard from "./components/SalesDashboard";
 import UploaderDashboard from "./components/UploaderDashboard";
 import AccountsDashboard from "./components/AccountsDashboard";
-import SuperAdminDashboard from "./components/SuperAdminDashboard"; // Import your Super Admin dashboard
+import SuperAdminDashboard from "./components/SuperAdminDashboard"; 
 import "bootstrap/dist/css/bootstrap.min.css";
 import '@fortawesome/fontawesome-free/css/all.min.css';
 
@@ -36,7 +36,7 @@ function App() {
   } else if (role === "accounts") {
     return <AccountsDashboard token={token} onLogout={handleLogout} />;
   } else if (role === "superadmin") {
-    return <SuperAdminDashboard token={token} onLogout={handleLogout} />; // Render Super Admin Dashboard
+    return <SuperAdminDashboard token={token} onLogout={handleLogout} />; 
   }
 
   return (

@@ -8,8 +8,7 @@ async function generatePresignedUrl(fileKey) {
     Bucket: process.env.S3_BUCKET_NAME,
     Key: fileKey,
   });
-  // 1 hour = 3600 seconds
-  return getSignedUrl(s3, command, { expiresIn: 3600 });
+  return getSignedUrl(s3, command, { expiresIn: 1209600 });
 }
 
 module.exports = { generatePresignedUrl };

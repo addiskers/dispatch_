@@ -14,6 +14,8 @@ const logRoutes = require("./routes/logRoutes");
 // Connect to Mongo
 
 connectDB(process.env.MONGO_URI);
+const helmet = require("helmet");
+app.use(helmet());
 
 const app = express();
 

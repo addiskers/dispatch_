@@ -40,7 +40,7 @@
 }
 
 .close-btn:hover {
-  color: #343a40 !important; /* Ensure the hover color is applied */
+  color: #343a40 !important; 
 }
 .popup-content {
   display: flex;

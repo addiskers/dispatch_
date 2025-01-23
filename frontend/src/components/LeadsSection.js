@@ -6,10 +6,10 @@ import LeadDetails from "./LeadDetails";
 import "../styles/logsection.css";
 
 function LeadsSection({ token }) {
-  const [leads, setLeads] = useState([]); // All fetched leads
-  const [currentPage, setCurrentPage] = useState(1); // Current page
-  const [selectedLeadId, setSelectedLeadId] = useState(null); // Selected lead for modal
-  const leadsPerPage = 10; // Number of leads per page
+  const [leads, setLeads] = useState([]);
+  const [currentPage, setCurrentPage] = useState(1); 
+  const [selectedLeadId, setSelectedLeadId] = useState(null);
+  const leadsPerPage = 10; 
 
   useEffect(() => {
     fetchLeads();
@@ -25,7 +25,6 @@ function LeadsSection({ token }) {
       console.error("Error fetching leads:", err);
     }
   }
-  // Handle delete lead action
   const handleDeleteLead = async (leadId) => {
     if (!window.confirm("Are you sure you want to delete this lead?")) return;
 
