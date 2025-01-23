@@ -15,7 +15,7 @@ const logRoutes = require("./routes/logRoutes");
 
 connectDB(process.env.MONGO_URI);
 const helmet = require("helmet");
-app.use(helmet());
+
 
 const app = express();
 
@@ -27,7 +27,7 @@ app.use(cors({
     methods: ["GET", "POST", "PATCH", "DELETE"],
     allowedHeaders: ["Content-Type", "Authorization"]
   }));
-  
+app.use(helmet());  
 // Routes
 app.use("/api/auth", authRoutes);
 app.use("/api/leads", leadRoutes);
