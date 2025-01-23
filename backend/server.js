@@ -23,8 +23,10 @@ const app = express();
 app.use(express.json());
 const allowedOrigins = [
   "http://localhost:5001",
-  "http://64.227.130.93:3001", ]
-
+  "http://64.227.130.93:3001",
+  "https://theskyquestt.org",
+  "http://theskyquestt.org"
+]
 app.use(cors({
   origin: (origin, callback) => {
     if (!origin || allowedOrigins.includes(origin)) {
