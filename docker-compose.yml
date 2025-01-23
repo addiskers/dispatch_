@@ -5,7 +5,7 @@ services:
     build:
       context: ./backend
     ports:
-      - "5002:5000" 
+      - "5002:5000"
     environment:
       NODE_ENV: production
       JWT_SECRET: ${JWT_SECRET}
@@ -19,18 +19,18 @@ services:
       OUTLOOK_USER: ${OUTLOOK_USER}
       OUTLOOK_PASS: ${OUTLOOK_PASS}
     volumes:
-      - ./backend:/app 
-      - ./backend/.env:/app/.env 
-    working_dir: /app 
-    command: ["node", "server.js"] 
+      - ./backend:/app
+      - ./backend/.env:/app/.env
+    working_dir: /app
+    command: ["node", "server.js"]
 
   frontend:
     build:
       context: ./frontend
+      args:
+        REACT_APP_API_BASE_URL: ${REACT_APP_API_BASE_URL}
     ports:
-      - "3001:80" 
-    environment:
-      REACT_APP_API_BASE_URL: ${REACT_APP_API_BASE_URL}
+      - "3001:80"
     volumes:
       - ./frontend:/app
-    working_dir: /app 
+    working_dir: /app
