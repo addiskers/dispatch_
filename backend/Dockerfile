@@ -1,14 +1,17 @@
+# Backend Dockerfile
 FROM node:20-alpine
 WORKDIR /app
 
-# Explicitly copy package files first
+# Copy only package.json and package-lock.json to leverage Docker caching
 COPY package*.json ./
 
-# Clear npm cache and install dependencies
-RUN npm ci
+# Install dependencies inside the container
+RUN npm install
 
-# Copy application code after dependencies
+# Copy the rest of the application files
 COPY . .
 
+# Expose the backend port
 EXPOSE 5000
+
 CMD ["node", "server.js"]
