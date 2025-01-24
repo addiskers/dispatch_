@@ -18,7 +18,7 @@ const MultipleFileUpload = ({ token }) => {
         setLoading(true);
         try {
           const response = await axios.get(
-            `http://localhost:5000/api/leads/${leadId}`,
+            `${process.env.REACT_APP_API_BASE_URL}/api/leads/${leadId}`,
             {
               headers: {
                 Authorization: `Bearer ${token}`,
@@ -62,7 +62,7 @@ const MultipleFileUpload = ({ token }) => {
 
     try {
       const res = await axios.post(
-        "http://localhost:5000/api/upload/multiple",
+        `${process.env.REACT_APP_API_BASE_URL}/api/upload/multiple`,
         formData,
         {
           headers: {
@@ -94,7 +94,7 @@ const MultipleFileUpload = ({ token }) => {
   
     try {
       const paymentStatusRes = await axios.get(
-        `http://localhost:5000/api/leads/${leadId}/paymentstatus`,
+        `${process.env.REACT_APP_API_BASE_URL}/api/leads/${leadId}/paymentstatus`,
         {
           headers: {
             Authorization: `Bearer ${token}`,
@@ -116,7 +116,7 @@ const MultipleFileUpload = ({ token }) => {
   
       setLoading(true);
         const res = await axios.post(
-        "http://localhost:5000/api/upload/send",
+        `${process.env.REACT_APP_API_BASE_URL}/api/upload/send`,
         {
           leadId,
           projectName,

@@ -12,7 +12,7 @@ function LeadsTableuploader({ token }) {
 
   const fetchLeads = async () => {
     try {
-      const res = await axios.get("http://localhost:5000/api/leads/uploader/list", {
+      const res = await axios.get(`${process.env.REACT_APP_API_BASE_URL}/api/leads/uploader/list`, {
         headers: { Authorization: `Bearer ${token}` },
       });
       setLeads(res.data);
@@ -33,7 +33,7 @@ function LeadsTableuploader({ token }) {
 
     try {
       await axios.patch(
-        `http://localhost:5000/api/leads/${leadId}/done`,
+        `${process.env.REACT_APP_API_BASE_URL}/api/leads/${leadId}/done`,
         { done: true },
         { headers: { Authorization: `Bearer ${token}` } }
       );

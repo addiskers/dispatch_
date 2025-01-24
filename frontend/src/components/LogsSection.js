@@ -26,7 +26,7 @@ function LogsSection({ token }) {
 
   async function fetchUsers() {
     try {
-      const res = await axios.get("http://localhost:5000/api/auth/users", {
+      const res = await axios.get(`${process.env.REACT_APP_API_BASE_URL}/api/auth/users`, {
         headers: { Authorization: `Bearer ${token}` },
       });
       setUsers(res.data);
@@ -37,7 +37,7 @@ function LogsSection({ token }) {
 
   async function fetchAllLogs() {
     try {
-      const res = await axios.get("http://localhost:5000/api/logs", {
+      const res = await axios.get(`${process.env.REACT_APP_API_BASE_URL}/api/logs`, {
         headers: { Authorization: `Bearer ${token}` },
       });
       setLogs(res.data);

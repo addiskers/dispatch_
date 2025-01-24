@@ -19,7 +19,7 @@ const ContractPage = ({ token }) => {
         setLoading(true);
         try {
           const response = await axios.get(
-            `http://localhost:5000/api/leads/${leadId}`,
+            `${process.env.REACT_APP_API_BASE_URL}/api/leads/${leadId}`,
             {
               headers: { Authorization: `Bearer ${token}` },
             }
@@ -58,7 +58,7 @@ const ContractPage = ({ token }) => {
 
     try {
       const response = await axios.post(
-        "http://localhost:5000/api/leads/upload-contracts",
+        `${process.env.REACT_APP_API_BASE_URL}/api/leads/upload-contracts`,
         formData,
         {
           headers: {
@@ -88,7 +88,7 @@ const ContractPage = ({ token }) => {
     try {
       setDownloadLoading(prev => ({ ...prev, [contractKey]: true }));
       const response = await axios.get(
-        `http://localhost:5000/api/leads/download-contract`,
+        `${process.env.REACT_APP_API_BASE_URL}/api/leads/download-contract`,
         {
           headers: { Authorization: `Bearer ${token}` },
           params: { key: contractKey }  

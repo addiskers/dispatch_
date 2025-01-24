@@ -1,20 +1,20 @@
-# Use an official Node.js image with Alpine Linux for lightweight builds
-FROM node:20-alpine
+# Use Node.js as the base image
+FROM node:20
 
-# Set the working directory
+# Set the working directory inside the container
 WORKDIR /app
 
-# Copy only package.json and package-lock.json to leverage Docker caching
-COPY package.json package-lock.json ./
+# Copy package.json and package-lock.json
+COPY package*.json ./
 
-# Install only production dependencies
-RUN npm install --production
+# Install backend dependencies
+RUN npm install
 
-# Copy the rest of the application files
+# Copy the rest of the backend code
 COPY . .
 
-# Expose the backend port
+# Expose the port your backend listens on
 EXPOSE 5000
 
-# Run the server
+# Start the backend server
 CMD ["node", "server.js"]

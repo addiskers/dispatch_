@@ -16,7 +16,13 @@ const Log = require("../models/Log");
         if (leadId) {
           filter.leadId = leadId;
         }
-      } else if (req.user.role !== "superadmin") {
+      
+      } else if (req.user.role === "accounts") {
+        if (leadId) {
+          filter.leadId = leadId;
+        }
+      }
+      else if (req.user.role !== "superadmin") {
         return res.status(403).json({ message: "Access denied: Insufficient permissions" });
       }
 

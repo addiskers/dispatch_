@@ -7,23 +7,30 @@ services:
     ports:
       - "5002:5000"
     environment:
-      - NODE_ENV=production
-      - JWT_SECRET=${JWT_SECRET}
-      - MONGO_URI=${MONGO_URI}
-      - AWS_ACCESS_KEY_ID=${AWS_ACCESS_KEY_ID}
-      - AWS_SECRET_ACCESS_KEY=${AWS_SECRET_ACCESS_KEY}
-      - AWS_REGION=${AWS_REGION}
-      - S3_BUCKET_NAME=${S3_BUCKET_NAME}
-      - OUTLOOK_DISUSER=${OUTLOOK_DISUSER}
-      - OUTLOOK_DISPASS=${OUTLOOK_DISPASS}
-      - OUTLOOK_USER=${OUTLOOK_USER}
-      - OUTLOOK_PASS=${OUTLOOK_PASS}
+      NODE_ENV: production
+      JWT_SECRET: ${JWT_SECRET}
+      MONGO_URI: ${MONGO_URI}
+      AWS_ACCESS_KEY_ID: ${AWS_ACCESS_KEY_ID}
+      AWS_SECRET_ACCESS_KEY: ${AWS_SECRET_ACCESS_KEY}
+      AWS_REGION: ${AWS_REGION}
+      S3_BUCKET_NAME: ${S3_BUCKET_NAME}
+      OUTLOOK_DISUSER: ${OUTLOOK_DISUSER}
+      OUTLOOK_DISPASS: ${OUTLOOK_DISPASS}
+      OUTLOOK_USER: ${OUTLOOK_USER}
+      OUTLOOK_PASS: ${OUTLOOK_PASS}
     volumes:
       - ./backend:/app
       - ./backend/.env:/app/.env
+    working_dir: /app
+    command: ["node", "server.js"]
 
   frontend:
     build:
       context: ./frontend
+      args:
+        REACT_APP_API_BASE_URL: ${REACT_APP_API_BASE_URL}
     ports:
       - "3001:80"
+    volumes:
+      - ./frontend:/app
+    working_dir: /app
