@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useCallback } from "react";
 import axios from "axios";
 import Table from "react-bootstrap/Table";
 import Button from "react-bootstrap/Button";
@@ -11,11 +11,7 @@ function ManageAccessSection({ token }) {
   const [selectedUser, setSelectedUser] = useState(null);
   const [newPassword, setNewPassword] = useState("");
 
-  useEffect(() => {
-    fetchUsers();
-  }, []);
-
-  async function fetchUsers() {
+  const fetchUsers = useCallback(async () => {
     try {
       const res = await axios.get(`${process.env.REACT_APP_API_BASE_URL}/api/auth/users`, {
         headers: { Authorization: `Bearer ${token}` },
@@ -25,9 +21,13 @@ function ManageAccessSection({ token }) {
       console.error("Error fetching users:", err);
       alert("Failed to fetch users.");
     }
-  }
+  }, [token]);
 
-  async function handleRegisterUser(e) {
+  useEffect(() => {
+    fetchUsers();
+  }, [fetchUsers]);
+
+  const handleRegisterUser = async (e) => {
     e.preventDefault();
     try {
       if (!newUser.username || !newUser.email || !newUser.password) {
@@ -47,9 +47,9 @@ function ManageAccessSection({ token }) {
       console.error("Error registering user:", err);
       alert(err.response?.data?.message || "Failed to register user.");
     }
-  }
+  };
 
-  async function handleUpdatePassword(e) {
+  const handleUpdatePassword = async (e) => {
     e.preventDefault();
     if (!selectedUser || !newPassword) {
       alert("Select a user and enter a new password.");
@@ -68,7 +68,13 @@ function ManageAccessSection({ token }) {
       console.error("Error updating password:", err);
       alert(err.response?.data?.message || "Failed to update password.");
     }
-  }
+  };
+
+  const ROLE_OPTIONS = [
+    { value: "sales", label: "Sales" },
+    { value: "uploader", label: "Uploader" },
+    { value: "accounts", label: "Accounts" }
+  ];
 
   return (
     <div className="manage-access-container">
@@ -83,6 +89,7 @@ function ManageAccessSection({ token }) {
               placeholder="Username"
               value={newUser.username}
               onChange={(e) => setNewUser({ ...newUser, username: e.target.value })}
+              required
             />
           </Form.Group>
           <Form.Group className="form-group-responsive">
@@ -91,6 +98,7 @@ function ManageAccessSection({ token }) {
               type="email"
               value={newUser.email}
               onChange={(e) => setNewUser({ ...newUser, email: e.target.value })}
+              required
             />
           </Form.Group>
           <Form.Group className="form-group-responsive">
@@ -99,6 +107,8 @@ function ManageAccessSection({ token }) {
               type="password"
               value={newUser.password}
               onChange={(e) => setNewUser({ ...newUser, password: e.target.value })}
+              required
+              minLength={8}
             />
           </Form.Group>
           <Form.Group className="form-group-responsive">
@@ -106,9 +116,9 @@ function ManageAccessSection({ token }) {
               value={newUser.role}
               onChange={(e) => setNewUser({ ...newUser, role: e.target.value })}
             >
-              <option value="sales">Sales</option>
-              <option value="uploader">Uploader</option>
-              <option value="accounts">Accounts</option>
+              {ROLE_OPTIONS.map(({ value, label }) => (
+                <option key={value} value={value}>{label}</option>
+              ))}
             </Form.Select>
           </Form.Group>
           <Button type="submit" variant="primary" className="btn-responsive">
@@ -125,6 +135,7 @@ function ManageAccessSection({ token }) {
             <Form.Select
               value={selectedUser || ""}
               onChange={(e) => setSelectedUser(e.target.value)}
+              required
             >
               <option value="" disabled>
                 Select User
@@ -142,6 +153,8 @@ function ManageAccessSection({ token }) {
               type="password"
               value={newPassword}
               onChange={(e) => setNewPassword(e.target.value)}
+              required
+              minLength={8}
             />
           </Form.Group>
           <Button type="submit" variant="primary" className="btn-responsive">
@@ -174,5 +187,6 @@ function ManageAccessSection({ token }) {
       </div>
     </div>
   );
-}  
+}
+
 export default ManageAccessSection;

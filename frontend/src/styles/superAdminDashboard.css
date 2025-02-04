@@ -1,16 +1,48 @@
+:root {
+  --sidebar-width: 200px;
+  --sidebar-width-mobile: 250px;
+  --primary-bg-color: #333;
+  --active-bg-color: #555;
+  --text-color: #fff;
+}
+
 .dashboard-container {
   display: flex;
   height: 100vh;
+  position: relative;
+}
+
+.hamburger-menu {
+  display: none;
+  position: fixed;
+  top: 15px;
+  left: 15px;
+  z-index: 1001;
+  background: none;
+  border: none;
+  cursor: pointer;
+  flex-direction: column;
+  justify-content: space-around;
+  width: 30px;
+  height: 25px;
+}
+
+.hamburger-menu span {
+  width: 100%;
+  height: 3px;
+  background-color: #333;
+  transition: all 0.3s ease;
 }
 
 .sidebar {
-  width: 200px;
-  background: #333;
-  color: #fff;
+  width: var(--sidebar-width);
+  background: var(--primary-bg-color);
+  color: var(--text-color);
   padding: 20px;
   display: flex;
   flex-direction: column;
   justify-content: space-between;
+  transition: transform 0.3s ease;
 }
 
 .sidebar ul {
@@ -22,16 +54,21 @@
   cursor: pointer;
   padding: 10px 0;
   border-bottom: 1px solid #444;
+  transition: background 0.2s ease;
+}
+
+.sidebar li:hover {
+  background: rgba(255, 255, 255, 0.1);
 }
 
 .sidebar li.active {
-  background: #555;
+  background: var(--active-bg-color);
 }
 
 .content {
   flex: 1;
   padding: 20px;
-  overflow: auto; /* Prevent content overflow */
+  overflow: auto;
 }
 
 .logout-btn {
@@ -40,9 +77,11 @@
   border: none;
   padding: 10px;
   cursor: pointer;
+  width: 100%;
+  margin-top: 20px;
 }
 
-/* Table container for scroll handling */
+/* Table Container Styles (from previous code) */
 .table-container {
   overflow-x: auto;
   max-width: 100%;
@@ -55,7 +94,7 @@
 .table {
   width: 100%;
   border-collapse: collapse;
-  table-layout: auto; /* Enable responsive column sizing */
+  table-layout: auto;
 }
 
 .table th,
@@ -63,38 +102,7 @@
   text-align: left;
   padding: 10px;
   border: 1px solid #ddd;
-  white-space: nowrap; /* Prevent text from wrapping */
-}
-
-.table th {
-  background-color: #f1f1f1;
-  color: #333;
-}
-
-.table tbody tr:nth-child(odd) {
-  background-color: #f9f9f9;
-}
-
-.table tbody tr:nth-child(even) {
-  background-color: #fff;
-}
-
-/* Scrollbar customization */
-.table-container::-webkit-scrollbar {
-  height: 8px;
-}
-
-.table-container::-webkit-scrollbar-thumb {
-  background: #888;
-  border-radius: 4px;
-}
-
-.table-container::-webkit-scrollbar-thumb:hover {
-  background: #555;
-}
-
-.table-container::-webkit-scrollbar-track {
-  background: #f1f1f1;
+  white-space: nowrap;
 }
 
 .pagination-controls {
@@ -104,46 +112,57 @@
   margin-top: 10px;
 }
 
-.pagination-controls button {
-  background-color: #007bff;
-  color: #fff;
-  border: none;
-  padding: 8px 12px;
-  border-radius: 4px;
-  cursor: pointer;
-}
-
-.pagination-controls button:hover {
-  background-color: #0056b3;
-}
-
-.pagination-controls button:disabled {
-  background-color: #ccc;
-  cursor: not-allowed;
-}
-
-.pagination-controls span {
-  font-size: 14px;
-  color: #333;
-}
-
-/* Responsive adjustments */
+/* Responsive Design */
 @media (max-width: 768px) {
+  .hamburger-menu {
+    display: flex;
+  }
+
   .sidebar {
-    width: 150px;
-    padding: 15px;
+    position: fixed;
+    top: 0;
+    left: 0;
+    height: 100vh;
+    width: var(--sidebar-width-mobile);
+    transform: translateX(-100%);
+    z-index: 1000;
+    box-shadow: 2px 0 10px rgba(0,0,0,0.1);
+  }
+
+  .sidebar.open {
+    transform: translateX(0);
   }
 
   .content {
+    width: 100%;
     padding: 15px;
+    margin-left: 0;
   }
 
-  .table-container {
-    padding: 5px;
+  /* Hamburger Menu Animation */
+  .hamburger-menu.open span:nth-child(1) {
+    transform: rotate(45deg) translate(5px, 5px);
   }
 
-  .pagination-controls button {
-    font-size: 12px;
-    padding: 5px 10px;
+  .hamburger-menu.open span:nth-child(2) {
+    opacity: 0;
   }
+
+  .hamburger-menu.open span:nth-child(3) {
+    transform: rotate(-45deg) translate(5px, -5px);
+  }
+}
+
+/* Scrollbar Customization */
+.content::-webkit-scrollbar {
+  width: 8px;
+}
+
+.content::-webkit-scrollbar-thumb {
+  background: #888;
+  border-radius: 4px;
+}
+
+.content::-webkit-scrollbar-track {
+  background: #f1f1f1;
 }

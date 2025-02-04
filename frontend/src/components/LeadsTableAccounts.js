@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from "react";
 import axios from "axios";
 import { Table, Button, Form } from "react-bootstrap";
+
 import LeadDetailsuploader from "./LeadDetailsuploader"; 
 function LeadsTableAccounts({ token }) {
   const [leads, setLeads] = useState([]);
