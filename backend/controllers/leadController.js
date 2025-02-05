@@ -23,7 +23,7 @@ const logActivity = async (userId, action, details) => {
 exports.createLead = async (req, res) => {
   try {
     const {
-      leadId,
+      leadType, 
       clientName,
       clientEmail,
       clientCompany,
@@ -35,6 +35,10 @@ exports.createLead = async (req, res) => {
       paymentDate,
     } = req.body;
 
+    if (!["SQ", "GII", "MK"].includes(leadType)) {
+      return res.status(400).json({ message: "Invalid lead type" });
+    }
+
     const parsedClientName = Array.isArray(clientName)
       ? clientName.filter(Boolean)
       : [clientName].filter(Boolean);
@@ -43,20 +47,18 @@ exports.createLead = async (req, res) => {
       ? clientEmail.filter(Boolean)
       : [clientEmail].filter(Boolean);
 
-    if (!leadId) return res.status(400).json({ message: "Lead ID is required." });
     if (!parsedClientName.length) return res.status(400).json({ message: "At least one client name is required." });
     if (!parsedClientEmail.length) return res.status(400).json({ message: "At least one client email is required." });
     if (!projectName || projectName.trim() === "") {
       return res.status(400).json({ message: "Project name is required." });
     }
 
-    const existingLead = await Lead.findOne({ leadId });
-    if (existingLead) {
-      return res.status(400).json({ message: "Lead ID already exists." });
-    }
+    const leadCount = await Lead.countDocuments({});
+    const newLeadId = `${leadType}-${leadCount + 1}`;
 
     const newLead = new Lead({
-      leadId,
+      leadId: newLeadId,
+      leadType,
       clientName: parsedClientName,
       clientEmail: parsedClientEmail,
       clientCompany,
@@ -66,35 +68,33 @@ exports.createLead = async (req, res) => {
       deliveryDate: deliveryDate || null,
       sqcode,
       paymentDate: paymentDate || null,
-      contracts: req.file?.path || null,
       salesUser: req.user.userId,
     });
 
-    console.log("Request Body:", req.body);
-
     await newLead.save();
+
     const uploaderEmails = await User.find({ role: "uploader" }).select("email");
     const accountsEmails = await User.find({ role: "accounts" }).select("email");
     const salesUser = await User.findById(req.user.userId);
     const superadminEmails = await User.find({ role: "superadmin" }).select("email");
 
-    const recipients = [...uploaderEmails, ...accountsEmails, salesUser.email,...superadminEmails];
+    const recipients = [...uploaderEmails, ...accountsEmails, salesUser.email, ...superadminEmails];
     const subject = `New Lead Created: ${projectName}`;
     const html = `
       <p>A new lead has been created:</p>
       <ul>
-        <li><strong>Lead ID:</strong> ${leadId}</li>
+        <li><strong>Lead ID:</strong> ${newLeadId}</li>
         <li><strong>Project Name:</strong> ${projectName}</li>
         <li><strong>Delivery Date:</strong> ${deliveryDate ? new Date(deliveryDate).toLocaleDateString() : "Not specified"}</li>
         <li>Created By ${salesUser.username}</li>
       </ul>
       <p>Best regards,<br><strong>In-House Notification System</strong></p> 
-        `;
+    `;
 
     await sendNotificationEmail(recipients, subject, html);
 
     await logActivity(req.user.userId, "created lead", {
-      leadId,
+      leadId: newLeadId,
       newValue: {
         clientName: parsedClientName,
         clientEmail: parsedClientEmail,
@@ -385,5 +385,21 @@ exports.getPaymentStatus = async (req, res) => {
   } catch (error) {
     console.error("Error fetching payment status:", error);
     res.status(500).json({ message: "Error fetching payment status", error });
+  }
+};
+
+exports.getNextLeadId = async (req, res) => {
+  try {
+    const { leadType } = req.query;
+
+    if (!["SQ", "GII", "MK"].includes(leadType)) {
+      return res.status(400).json({ message: "Invalid lead type" });
+    }
+    const leadCount = await Lead.countDocuments({});
+    const nextLeadId = `${leadType}-${leadCount + 1}`;
+    res.json({ nextLeadId });
+  } catch (error) {
+    console.error("Error fetching next Lead ID:", error);
+    res.status(500).json({ message: "Error fetching next Lead ID" });
   }
 };

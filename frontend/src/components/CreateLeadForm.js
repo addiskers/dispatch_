@@ -6,6 +6,7 @@ import "react-datepicker/dist/react-datepicker.css";
 
 function CreateLeadForm({ token, onLeadCreated }) {
   const [form, setForm] = useState({
+    leadType: "",
     leadId: "",
     clientName: [],
     clientEmail: [],
@@ -23,6 +24,24 @@ function CreateLeadForm({ token, onLeadCreated }) {
   const [error, setError] = useState("");
   const [uploadProgress, setUploadProgress] = useState(0);
 
+  const fetchNextLeadId = async (leadType) => {
+    if (!leadType) return;
+    try {
+      const response = await axios.get(
+        `${process.env.REACT_APP_API_BASE_URL}/api/leads/next-lead-id?leadType=${leadType}`,
+        {
+          headers: { Authorization: `Bearer ${token}` },
+        }
+      );
+      setForm((prevForm) => ({
+        ...prevForm,
+        leadId: response.data.nextLeadId,
+        leadType,
+      }));
+    } catch (error) {
+      console.error("Error fetching next lead ID:", error);
+    }
+  };
   const handleCreateLead = async (e) => {
     e.preventDefault();
     setError("");
@@ -69,6 +88,7 @@ function CreateLeadForm({ token, onLeadCreated }) {
 
       alert("Lead created successfully!");
       setForm({
+        leadType: "",
         leadId: "",
         clientName: [],
         clientEmail: [],
@@ -151,14 +171,25 @@ function CreateLeadForm({ token, onLeadCreated }) {
         {/* Existing form groups remain the same until the contracts section */}
         
         <Row>
-          <Col md={6}>
+        <Col md={1}>
             <Form.Group className="mb-3">
-              <Form.Label>Lead ID</Form.Label>
-              <Form.Control
-                placeholder="Enter Lead ID"
-                value={form.leadId}
-                onChange={(e) => setForm({ ...form, leadId: e.target.value })}
-              />
+              <Form.Label>Lead Type</Form.Label>
+              <Form.Select
+                value={form.leadType}
+                onChange={(e) => fetchNextLeadId(e.target.value)}
+              >
+                <option value="">Select Lead Type</option>
+                <option value="SQ">SQ</option>
+                <option value="GII">GII</option>
+                <option value="MK">MK</option>
+              </Form.Select>
+            </Form.Group>
+          </Col>
+
+          <Col md={5}>
+            <Form.Group className="mb-3">
+              <Form.Label>Generated Lead ID</Form.Label>
+              <Form.Control type="text" value={form.leadId} readOnly />
             </Form.Group>
           </Col>
           <Col md={6}>

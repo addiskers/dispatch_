@@ -3,6 +3,7 @@ const mongoose = require("mongoose");
 const LeadSchema = new mongoose.Schema(
   {
     leadId: { type: String, required: true, unique: true },
+    leadType: { type: String, enum: ["SQ", "GII", "MK"], required: true },
     clientName: { type: [String], required: true },
     clientEmail: { type: [String], required: true },
     clientCompany: { type: String, required: true },
