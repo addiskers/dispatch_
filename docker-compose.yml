@@ -16,6 +16,10 @@ services:
       OUTLOOK_DISPASS: ${OUTLOOK_DISPASS}
       OUTLOOK_USER: ${OUTLOOK_USER}
       OUTLOOK_PASS: ${OUTLOOK_PASS}
+      OUTLOOK_CLIENT_ID: ${OUTLOOK_CLIENT_ID} 
+      OUTLOOK_CLIENT_SECRET: ${OUTLOOK_CLIENT_SECRET} 
+      OUTLOOK_TENANT_ID: ${OUTLOOK_TENANT_ID}
+      OUTLOOK_USER_EMAIL: ${OUTLOOK_USER_EMAIL} 
     volumes:
       - ./backend:/app
       - ./backend/.env:/app/.env
