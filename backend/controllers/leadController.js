@@ -101,7 +101,7 @@ exports.createLead = async (req, res) => {
       const deliveryISO = new Date(deliveryDate).toISOString(); 
       await createOutlookEvent(
         `Delivery Reminder: ${projectName}`,
-        `The delivery for project <strong>${projectName}</strong> is scheduled today.`,
+        `The delivery for project <strong>${projectName}</strong> is scheduled ${deliveryDate}.`,
         deliveryISO,
         eventAttendees
       );
@@ -111,7 +111,7 @@ exports.createLead = async (req, res) => {
       const paymentISO = new Date(paymentDate).toISOString(); 
       await createOutlookEvent(
         `Payment Reminder: ${projectName}`,
-        `Payment for project <strong>${projectName}</strong> is due today.`,
+        `Payment for project <strong>${projectName}</strong> is due  ${paymentDate}.`,
         paymentISO,
         eventAttendeesPay
       );
