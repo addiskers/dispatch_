@@ -3,6 +3,8 @@ const User = require("../models/User");
 const Log = require("../models/Log");
 const { generatePresignedUrl } = require("../controllers/generatePresignedUrlFile");
 const { sendNotificationEmail } = require("../utils/emailService");
+const { createOutlookEvent } = require("../utils/outlookService");
+
 
 const logActivity = async (userId, action, details) => {
   try {
@@ -79,6 +81,8 @@ exports.createLead = async (req, res) => {
     const superadminEmails = await User.find({ role: "superadmin" }).select("email");
 
     const recipients = [...uploaderEmails, ...accountsEmails, salesUser.email, ...superadminEmails];
+    const eventAttendees = [salesUser.email, ...accountsEmails.map(e => e.email), ...superadminEmails.map(e => e.email), ...uploaderEmails.map(e => e.email)];
+    const eventAttendeesPay = [salesUser.email, ...accountsEmails.map(e => e.email), ...superadminEmails.map(e => e.email)];
     const subject = `New Lead Created: ${projectName}`;
     const html = `
       <p>A new lead has been created:</p>
@@ -93,6 +97,25 @@ exports.createLead = async (req, res) => {
 
     await sendNotificationEmail(recipients, subject, html);
 
+    if (deliveryDate) {
+      const deliveryISO = new Date(deliveryDate).toISOString(); 
+      await createOutlookEvent(
+        `Delivery Reminder: ${projectName}`,
+        `The delivery for project <strong>${projectName}</strong> is scheduled today.`,
+        deliveryISO,
+        eventAttendees
+      );
+    }
+
+    if (paymentDate) {
+      const paymentISO = new Date(paymentDate).toISOString(); 
+      await createOutlookEvent(
+        `Payment Reminder: ${projectName}`,
+        `Payment for project <strong>${projectName}</strong> is due today.`,
+        paymentISO,
+        eventAttendeesPay
+      );
+    }
     await logActivity(req.user.userId, "created lead", {
       leadId: newLeadId,
       newValue: {
