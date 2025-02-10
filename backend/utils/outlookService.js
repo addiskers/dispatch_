@@ -46,13 +46,11 @@ const createOutlookEvent = async (subject, body, dateTime, attendees) => {
     const graphClient = await getGraphClient();
     const calendarUser = process.env.OUTLOOK_USER_EMAIL;
     
-    // Parse the input date
     const date = new Date(dateTime);
     
-    // Set to 9:30 AM IST (UTC+5:30)
-    date.setUTCHours(4, 0, 0, 0); // 4:00 UTC = 9:30 IST
+    date.setUTCHours(4, 0, 0, 0); 
     const endDate = new Date(date);
-    endDate.setUTCHours(5, 0, 0, 0); // 5:00 UTC = 10:30 IST
+    endDate.setUTCHours(5, 0, 0, 0);
 
     const event = {
       subject,

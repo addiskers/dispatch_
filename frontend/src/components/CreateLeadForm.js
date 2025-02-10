@@ -320,7 +320,7 @@ function CreateLeadForm({ token, onLeadCreated }) {
               <DatePicker
                 selected={form.deliveryDate}
                 onChange={(date) =>
-                  setForm({ ...form, deliveryDate: date })
+                  setForm({ ...form, deliveryDate: new Date(date.setHours(0, 0, 0, 0)) })
                 }
                 dateFormat="yyyy-MM-dd"
                 placeholderText="Select Delivery Date"
@@ -333,7 +333,7 @@ function CreateLeadForm({ token, onLeadCreated }) {
               <Form.Label>Payment Date</Form.Label>
               <DatePicker
                 selected={form.paymentDate}
-                onChange={(date) => setForm({ ...form, paymentDate: date })}
+                onChange={(date) =>  setForm({ ...form, paymentDate: new Date(date.setHours(0, 0, 0, 0)) })}
                 dateFormat="yyyy-MM-dd"
                 placeholderText="Select Payment Date"
                 className="form-control"
