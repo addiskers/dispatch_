@@ -18,7 +18,6 @@ const getAccessToken = async () => {
         },
       }
     );
-
     return response.data.access_token;
   } catch (error) {
     console.error("Token error:", error.response?.data);
@@ -39,44 +38,48 @@ const getGraphClient = async () => {
  * Create Outlook Event
  * @param {string} subject - Event title
  * @param {string} body - Event description
- * @param {string} date - Date of the event 
+ * @param {string} dateTime - Date of the event (format: YYYY-MM-DD)
  * @param {string[]} attendees - List of attendee email addresses
  */
 const createOutlookEvent = async (subject, body, dateTime, attendees) => {
-    try {
-      const graphClient = await getGraphClient();
-      const calendarUser = process.env.OUTLOOK_USER_EMAIL;
-  
-      const eventDate = new Date(dateTime);
-      eventDate.setHours(9, 30, 0);
-  
-      const event = {
-        subject,
-        body: {
-          contentType: "HTML",
-          content: body,
-        },
-        start: {
-          dateTime: eventDate.toISOString(),
-          timeZone: "Asia/Kolkata",
-        },
-        end: {
-          dateTime: new Date(eventDate.getTime() + 3600000).toISOString(),
-          timeZone: "Asia/Kolkata",
-        },
-        attendees: attendees.map((email) => ({
-          emailAddress: { address: email },
-          type: "required",
-        })),
-      };
-  
-      return await graphClient
-        .api(`/users/${calendarUser}/events`)
-        .post(event);
-    } catch (error) {
-      console.error("Error creating Outlook event:", error);
-      throw new Error("Failed to create Outlook event.");
-    }
-  };
+  try {
+    const graphClient = await getGraphClient();
+    const calendarUser = process.env.OUTLOOK_USER_EMAIL;
+    
+    const [year, month, day] = dateTime.split('-');
+    
+    const startDateTime = `${year}-${month.padStart(2, '0')}-${day.padStart(2, '0')}T09:30:00.000`;
+    const endDateTime = `${year}-${month.padStart(2, '0')}-${day.padStart(2, '0')}T10:30:00.000`;
 
-module.exports = { createOutlookEvent };
+    const event = {
+      subject,
+      body: {
+        contentType: "HTML",
+        content: body,
+      },
+      start: {
+        dateTime: startDateTime,
+        timeZone: "Asia/Kolkata",
+      },
+      end: {
+        dateTime: endDateTime,
+        timeZone: "Asia/Kolkata",
+      },
+      attendees: attendees.map((email) => ({
+        emailAddress: { address: email },
+        type: "required",
+      })),
+    };
+
+    return await graphClient
+      .api(`/users/${calendarUser}/events`)
+      .post(event);
+  } catch (error) {
+    console.error("Error creating Outlook event:", error);
+    throw new Error("Failed to create Outlook event.");
+  }
+};
+
+module.exports = {
+  createOutlookEvent,
+};
