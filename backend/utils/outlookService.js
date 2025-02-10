@@ -38,7 +38,7 @@ const getGraphClient = async () => {
  * Create Outlook Event
  * @param {string} subject - Event title
  * @param {string} body - Event description
- * @param {string} dateTime - Date of the event (format: YYYY-MM-DD)
+ * @param {string} dateTime - Date of the event (format: YYYY-MM-DDTHH:mm:ss.sssZ)
  * @param {string[]} attendees - List of attendee email addresses
  */
 const createOutlookEvent = async (subject, body, dateTime, attendees) => {
@@ -46,10 +46,13 @@ const createOutlookEvent = async (subject, body, dateTime, attendees) => {
     const graphClient = await getGraphClient();
     const calendarUser = process.env.OUTLOOK_USER_EMAIL;
     
-    const [year, month, day] = dateTime.split('-');
+    // Parse the input date
+    const date = new Date(dateTime);
     
-    const startDateTime = `${year}-${month.padStart(2, '0')}-${day.padStart(2, '0')}T09:30:00.000`;
-    const endDateTime = `${year}-${month.padStart(2, '0')}-${day.padStart(2, '0')}T10:30:00.000`;
+    // Set to 9:30 AM IST (UTC+5:30)
+    date.setUTCHours(4, 0, 0, 0); // 4:00 UTC = 9:30 IST
+    const endDate = new Date(date);
+    endDate.setUTCHours(5, 0, 0, 0); // 5:00 UTC = 10:30 IST
 
     const event = {
       subject,
@@ -58,11 +61,11 @@ const createOutlookEvent = async (subject, body, dateTime, attendees) => {
         content: body,
       },
       start: {
-        dateTime: startDateTime,
+        dateTime: date.toISOString(),
         timeZone: "Asia/Kolkata",
       },
       end: {
-        dateTime: endDateTime,
+        dateTime: endDate.toISOString(),
         timeZone: "Asia/Kolkata",
       },
       attendees: attendees.map((email) => ({
