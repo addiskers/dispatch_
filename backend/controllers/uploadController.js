@@ -87,7 +87,7 @@ exports.sendAllDeliverables = async (req, res) => {
     const mailOptions = {
       from: process.env.OUTLOOK_DISUSER,
       to: lead.clientEmail,
-      cc: "aditya.agrawal@skyquestt.com",
+      cc: "sd@skyquestt.com",
       subject: `Final Report_${lead.projectName}`,
       html: linksHtml,
     };

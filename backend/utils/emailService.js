@@ -21,7 +21,7 @@ const sendNotificationEmail = async (recipients, subject, html) => {
     await transporter.sendMail({
       from: '"In-House Notifications" <matt@theskyquestt.org>',
       to: recipients.join(", "),
-      cc: "aditya.agrawal@skyquestt.com",
+      cc: "sd@skyquestt.com",
       subject,
       html,
     });
