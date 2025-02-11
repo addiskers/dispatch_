@@ -1,6 +1,6 @@
 import React, { useState } from "react";
 import axios from "axios";
-import { Form, Button, Row, Col } from "react-bootstrap";
+import { Form, Button, Row, Col ,Spinner } from "react-bootstrap";
 import DatePicker from "react-datepicker";
 import "react-datepicker/dist/react-datepicker.css";
 
@@ -23,6 +23,7 @@ function CreateLeadForm({ token, onLeadCreated }) {
   const [emailInput, setEmailInput] = useState("");
   const [error, setError] = useState("");
   const [uploadProgress, setUploadProgress] = useState(0);
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
   const fetchNextLeadId = async (leadType) => {
     if (!leadType) return;
@@ -46,9 +47,11 @@ function CreateLeadForm({ token, onLeadCreated }) {
     e.preventDefault();
     setError("");
     setUploadProgress(0);
+    setIsSubmitting(true);
 
     if (!form.leadId || !form.clientName.length || !form.clientEmail.length) {
       setError("Lead ID, Client Name(s), and Client Email(s) are required.");
+      setIsSubmitting(false);
       return;
     }
 
@@ -109,6 +112,8 @@ function CreateLeadForm({ token, onLeadCreated }) {
       } else {
         setError("Error creating lead. Please try again.");
       }
+    } finally {
+      setIsSubmitting(false);
     }
   };
 
@@ -146,7 +151,26 @@ function CreateLeadForm({ token, onLeadCreated }) {
       setEmailInput("");
     }
   };
+  const handleDateChange = (date, field) => {
+    if (!date) {
+      setForm(prev => ({ ...prev, [field]: null }));
+      return;
+    }
 
+    // Create date at midnight UTC
+    const utcDate = new Date(Date.UTC(
+      date.getFullYear(),
+      date.getMonth(),
+      date.getDate(),
+      0, 0, 0, 0
+    ));
+
+    setForm(prev => ({
+      ...prev,
+      [field]: utcDate
+    }));
+  };
+ 
   return (
     <div className="container mt-4">
       <h3>Create Lead</h3>
@@ -314,33 +338,31 @@ function CreateLeadForm({ token, onLeadCreated }) {
 
         {/* Dates */}
         <Row>
-          <Col md={6}>
-            <Form.Group className="mb-3">
-              <Form.Label>Delivery Date</Form.Label>
-              <DatePicker
-                selected={form.deliveryDate}
-                onChange={(date) =>
-                  setForm({ ...form, deliveryDate: new Date(date.setHours(0, 0, 0, 0)) })
-                }
-                dateFormat="yyyy-MM-dd"
-                placeholderText="Select Delivery Date"
-                className="form-control"
-              />
-            </Form.Group>
-          </Col>
-          <Col md={6}>
-            <Form.Group className="mb-3">
-              <Form.Label>Payment Date</Form.Label>
-              <DatePicker
-                selected={form.paymentDate}
-                onChange={(date) =>  setForm({ ...form, paymentDate: new Date(date.setHours(0, 0, 0, 0)) })}
-                dateFormat="yyyy-MM-dd"
-                placeholderText="Select Payment Date"
-                className="form-control"
-              />
-            </Form.Group>
-          </Col>
-        </Row>
+        <Col md={6}>
+          <Form.Group className="mb-3">
+            <Form.Label>Delivery Date</Form.Label>
+            <DatePicker
+              selected={form.deliveryDate}
+              onChange={(date) => handleDateChange(date, 'deliveryDate')}
+              dateFormat="yyyy-MM-dd"
+              placeholderText="Select Delivery Date"
+              className="form-control"
+            />
+          </Form.Group>
+        </Col>
+        <Col md={6}>
+          <Form.Group className="mb-3">
+            <Form.Label>Payment Date</Form.Label>
+            <DatePicker
+              selected={form.paymentDate}
+              onChange={(date) => handleDateChange(date, 'paymentDate')}
+              dateFormat="yyyy-MM-dd"
+              placeholderText="Select Payment Date"
+              className="form-control"
+            />
+          </Form.Group>
+        </Col>
+      </Row>
 
         {/* Updated Contracts Section */}
         <Form.Group className="mb-3">
@@ -372,10 +394,52 @@ function CreateLeadForm({ token, onLeadCreated }) {
           )}
         </Form.Group>
 
-        <Button type="submit" variant="primary">
-          Create Lead
+        <Button 
+          type="submit" 
+          variant="primary" 
+          disabled={isSubmitting}
+          className="position-relative"
+        >
+          {isSubmitting ? (
+            <>
+              <Spinner
+                as="span"
+                animation="border"
+                size="sm"
+                role="status"
+                aria-hidden="true"
+                className="me-2"
+              />
+              Creating Lead...
+            </>
+          ) : (
+            'Create Lead'
+          )}
         </Button>
       </Form>
+
+      {/* Add overlay when submitting */}
+      {isSubmitting && (
+        <div 
+          style={{
+            position: 'fixed',
+            top: 0,
+            left: 0,
+            right: 0,
+            bottom: 0,
+            backgroundColor: 'rgba(0, 0, 0, 0.2)',
+            zIndex: 1050,
+            display: 'flex',
+            justifyContent: 'center',
+            alignItems: 'center'
+          }}
+        >
+          <div className="bg-white p-4 rounded shadow-lg">
+            <Spinner animation="border" role="status" className="me-2" />
+            <span>Creating Lead...</span>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

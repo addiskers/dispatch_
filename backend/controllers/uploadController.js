@@ -20,16 +20,57 @@ exports.sendAllDeliverables = async (req, res) => {
       const url = await generatePresignedUrl(fileKey);
       presignedUrls.push({ name: fileKey.split('/').pop(), url });
     }
+    let linksHtml = `
+    <p>Hello ${lead.clientName || "Client"},</p>
+    <p>Greetings from team SkyQuest!!!</p>
+    <p>We are glad to be associated with you, please allow me to deliver the final report as agreed.</p>
+    <p><strong>Download Link(s):</strong></p>
+  `;
+  presignedUrls.forEach(({ url }, index) => {
+    linksHtml += `<p><a href="${url}" target="_blank">Download Link ${index + 1}</a></p>`;
+  });
 
-    let linksHtml = `<p>Dear Sir/Ma'am,</p>`;
-    linksHtml += `<p>I'm pleased to inform you that we've completed the ${lead.projectName}.</p>`;
-    linksHtml += `<p>Attached is the report in links:</p>`;
-    presignedUrls.forEach(({ name, url }) => {
-      linksHtml += `<p><a href="${url}" target="_blank">${name}</a></p>`;
-    });
-    linksHtml += `<p>Please review it at your convenience. If you have any questions or need clarification, feel free to reach out.</p>`;
-    linksHtml += `<p>We value your feedback and are committed to ensuring the report meets your expectations.</p>`;
-    linksHtml += `<p>Thank you for entrusting us with this project.</p>`;
+  linksHtml += `
+      <p>Please feel free to contact us at <a href="mailto:sales@skyquestt.com">sales@skyquestt.com</a> for any post-delivery feedback.</p>
+      <p>Looking forward to our prolonged business association.</p>
+      <p>Thank you for choosing SkyQuest!!!</p>
+   <div style="font-family: Calibri, Helvetica, sans-serif; font-size: 12pt; color: rgb(0,0,0);">
+    <div>Thanks & Regards,</div>
+    <div>Skyquest Technology Group</div>
+    <div style="color: rgb(17,85,204);">
+        <a href="mailto:dispatch@skyquestt.com" style="color: rgb(17,85,204); text-decoration: underline;">dispatch@skyquestt.com</a>
+    </div>
+    <div style="text-align: left; line-height: 12.5pt; margin: 0;">
+        --------------------------------------------------
+    </div>
+    <div>SkyQuest Technology Group</div>
+    <div style="margin: 10px 0;">
+        <img src="https://mcusercontent.com/ff1acdbf609e7dc63da1b9d84/images/f92390a9-810a-0e42-f6c7-4f366cfcf555.png" alt="SkyQuest Logo" style="width: 168px; height: 24px;">
+    </div>
+    <div style="line-height: 19.669px;">Global Commercialization Experts</div>
+    <div style="line-height: 19.669px; margin-top: 6pt;">
+        Healthcare| Energy & Infra | Water & Sanitation | Agriculture | Engineering, Info Tech, Nanotech & New Materials
+    </div>
+    <div style="line-height: 19.669px; margin-top: 6pt;">
+        <b>US Office:</b> 1, Apache way, West ford, MA 01886, USA | <b>IN Office:</b> Swati Clover, Shilaj Circle, D 1001-1005, Sardar Patel Ring Rd, Thaltej, Ahmedabad, Gujarat 380054, INDIA
+    </div>
+    <div style="line-height: 19.669px; margin-top: 6pt;">
+        <b>W:</b> <a href="http://www.skyquestt.com/" style="color: rgb(17,85,204); text-decoration: underline;">www.skyquestt.com</a>
+    </div>
+    <div style="line-height: 19.669px; margin-top: 6pt;">
+        <b>Skyquest Technology Group | </b><i>Globally local</i>
+    </div>
+    <div style="line-height: 19.669px; margin-top: 6pt; font-style: italic;">
+        Game Changers, Entrepreneurs, Believers, Innovation Ecosystem Architects, Global Innovation Policy & IP Commercialization Advisory
+    </div>
+    <div style="line-height: 19.669px; margin-top: 6pt;">
+        <span style="font-size: 11pt;">Confidentiality Statement: This message is intended only for the individual or entity to which it is addressed. It may contain privileged, confidential information which is exempt from disclosure under applicable laws. If you are not the intended recipient, please note that you are strictly prohibited from disseminating or distributing this information (other than to the intended recipient) or copying this information. If you have received this communication in error, please notify us immediately by return email</span>
+    </div>
+    <div style="margin-top: 6pt;">
+        <b><i>"The trouble is, you think you have time - Buddha"</i></b>
+    </div>
+</div>
+  `
 
     const transporter = nodemailer.createTransport({
       host: "smtp-mail.outlook.com",
