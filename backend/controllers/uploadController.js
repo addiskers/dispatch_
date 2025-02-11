@@ -13,6 +13,9 @@ exports.sendAllDeliverables = async (req, res) => {
     if (!lead) {
       return res.status(404).json({ message: "Lead ID and Project Name do not match" });
     }
+    if (lead.done !== "Done") {
+      return res.status(400).json({ message: "Lead is not ready for dispatch." });
+    }
     const deliverablesToSend = files ? lead.deliverables.filter(d => files.includes(d)) : lead.deliverables;
 
     const presignedUrls = [];
@@ -21,7 +24,7 @@ exports.sendAllDeliverables = async (req, res) => {
       presignedUrls.push({ name: fileKey.split('/').pop(), url });
     }
     let linksHtml = `
-    <p>Hello ${lead.clientName || "Client"},</p>
+    <p>Dear Sir/Ma'am,</p>
     <p>Greetings from team SkyQuest!!!</p>
     <p>We are glad to be associated with you, please allow me to deliver the final report as agreed.</p>
     <p><strong>Download Link(s):</strong></p>
@@ -84,11 +87,14 @@ exports.sendAllDeliverables = async (req, res) => {
     const mailOptions = {
       from: process.env.OUTLOOK_DISUSER,
       to: lead.clientEmail,
-      subject: `Your Deliverables for ${lead.projectName}`,
+      cc: "aditya.agrawal@skyquestt.com",
+      subject: `Final Report_${lead.projectName}`,
       html: linksHtml,
     };
 
     await transporter.sendMail(mailOptions);
+    lead.done = "Dispatched";
+    await lead.save();
     const uploaderEmails = await User.find({ role: "uploader" }).select("email");
     const accountsEmails = await User.find({ role: "accounts" }).select("email");
     const salesUser = await User.findById(lead.salesUser);

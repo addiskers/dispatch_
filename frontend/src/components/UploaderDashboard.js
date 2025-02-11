@@ -8,7 +8,6 @@ function UploaderDashboard({ token, onLogout }) {
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
   const sidebarRef = useRef(null);
 
-  // Close sidebar when clicking outside on mobile
   useEffect(() => {
     function handleClickOutside(event) {
       if (

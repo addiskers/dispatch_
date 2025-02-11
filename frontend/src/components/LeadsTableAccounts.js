@@ -47,6 +47,30 @@ function LeadsTableAccounts({ token }) {
       alert("Failed to update payment status.");
     }
   }
+  async function handleUpdateDone(leadId, currentStatus) {
+    if (currentStatus === "Dispatched") {
+      alert("You cannot modify a dispatched lead.");
+      return;
+    }
+
+    if (currentStatus === "Done") {
+      alert("You cannot mark a lead as undone once marked as Done.");
+      return;
+    }
+
+    try {
+      await axios.patch(
+        `${process.env.REACT_APP_API_BASE_URL}/api/leads/${leadId}/done`,
+        { done: "Done" },
+        { headers: { Authorization: `Bearer ${token}` } }
+      );
+      alert("Lead marked as Ready to Dispatch!");
+      fetchAllLeads();
+    } catch (err) {
+      console.error("Error updating status:", err);
+      alert("Failed to update status. Please try again.");
+    }
+  }
 
   const handleStatusChange = (leadId, value) => {
     setStatusUpdates((prev) => ({
@@ -98,7 +122,7 @@ function LeadsTableAccounts({ token }) {
               <th>Project Name</th>
               <th>Payment Status</th>
               <th>Actions</th>
-              <th>Done</th>
+              <th>Ready to Dispatch</th>
             </tr>
           </thead>
           <tbody>
@@ -131,7 +155,21 @@ function LeadsTableAccounts({ token }) {
                       Update Payment
                     </Button>
                   </td>
-                  <td>{lead.done ? "Yes" : "No"}</td>
+                  <td>
+                    {lead.done === "Dispatched" ? (
+                      <span className="text-success fw-bold">Dispatched</span>
+                    ) : lead.done === "Done" ? (
+                      <span className="text-primary fw-bold">Ready to Dispatch</span>
+                    ) : (
+                      <Button
+                        variant="success"
+                        onClick={() => handleUpdateDone(lead.leadId, lead.done)}
+                      >
+                        Mark as Done
+                      </Button>
+                    )}
+                  </td>
+                 
                 </tr>
               ))
             ) : (

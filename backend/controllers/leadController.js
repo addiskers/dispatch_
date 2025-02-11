@@ -77,10 +77,9 @@ exports.createLead = async (req, res) => {
 
     const uploaderEmails = await User.find({ role: "uploader" }).select("email");
     const accountsEmails = await User.find({ role: "accounts" }).select("email");
-    const salesUser = await User.findById(req.user.userId);
     const superadminEmails = await User.find({ role: "superadmin" }).select("email");
-
-    const recipients = [...uploaderEmails, ...accountsEmails, salesUser.email, ...superadminEmails];
+    const salesUser = await User.findById(req.user.userId);
+    const recipients = [...uploaderEmails, ...accountsEmails, salesUser.email,];
     const eventAttendees = [salesUser.email, ...accountsEmails.map(e => e.email), ...superadminEmails.map(e => e.email), ...uploaderEmails.map(e => e.email)];
     const eventAttendeesPay = [salesUser.email, ...accountsEmails.map(e => e.email), ...superadminEmails.map(e => e.email)];
     const subject = `New Lead Created: ${projectName}`;
@@ -165,12 +164,12 @@ exports.updatePaymentStatus = async (req, res) => {
 
     const { leadId } = req.params;
     const { paymentStatus, paymentRemark } = req.body;
+    const oldStatus = lead.paymentStatus;
 
     const lead = await Lead.findOne({ leadId });
     if (!lead) {
       return res.status(404).json({ message: "Lead not found." });
     }
-    const oldStatus = lead.paymentStatus;
     if (
       (oldStatus === "full" && paymentStatus !== "full") ||
       (oldStatus === "partial" && paymentStatus === "not_received")
@@ -184,9 +183,8 @@ exports.updatePaymentStatus = async (req, res) => {
     const uploaderEmails = await User.find({ role: "uploader" }).select("email");
     const accountsEmails = await User.find({ role: "accounts" }).select("email");
     const salesUser = await User.findById(req.user.userId);
-    const superadminEmails = await User.find({ role: "superadmin" }).select("email");
 
-    const recipients = [...uploaderEmails, ...accountsEmails, salesUser.email,...superadminEmails];
+    const recipients = [...uploaderEmails, ...accountsEmails, salesUser.email,];
     const subject = `Payment Status Updated: ${lead.projectName}`;
     const html = `
       <p>Dear Team,</p>
@@ -261,6 +259,10 @@ exports.getLeadListForUploader = async (req, res) => {
  */
 exports.updateDoneStatus = async (req, res) => {
   try {
+    if (!["superadmin", "accounts"].includes(req.user.role)) {
+      return res.status(403).json({ message: "Access denied: Only accounts or superadmin can update lead status." });
+    }
+    
     const { leadId } = req.params;
     const { done } = req.body;
     
@@ -268,18 +270,45 @@ exports.updateDoneStatus = async (req, res) => {
     if (!lead) {
       return res.status(404).json({ message: "Lead not found" });
     }
-    if (lead.done && !done) {
-      return res.status(400).json({ message: "Cannot mark as Undone once Done" });
+
+    if (lead.done === "Dispatched") {
+      return res.status(400).json({ message: "Cannot modify status after dispatch." });
     }
+
+    if (lead.done === "Done" && !done) {
+      return res.status(400).json({ message: "Cannot mark as undone after marking as done." });
+    }
+
     const oldDoneStatus = lead.done;
-    lead.done = done;
+    lead.done = done ? "Done" : "Waiting for Approval";
     await lead.save();
-    await logActivity(req.user.userId, "updated done status", {
+
+    if (done) {
+      const uploaderEmails = await User.find({ role: "uploader" }).select("email");
+      const accountsEmails = await User.find({ role: "accounts" }).select("email");
+
+      const recipients = [...uploaderEmails.map(u => u.email), ...accountsEmails.map(a => a.email)];
+      const subject = `Ready to Dispatch: ${lead.projectName}`;
+      const html = `
+        <p>Dear Team,</p>
+        <p>The dispatch status for the project <strong>${lead.projectName}</strong> has been updated:</p>
+        <ul>
+          <li><strong>Lead ID:</strong> ${lead.leadId}</li>
+          <li><strong>Old Status:</strong> ${oldDoneStatus}</li>
+          <li><strong>New Status:</strong> ${lead.done}</li>
+        </ul>
+        <p>Best regards,<br><strong>In-House Notification System</strong></p>
+      `;
+      await sendNotificationEmail(recipients, subject, html);
+    }
+
+    await logActivity(req.user.userId, "updated dispatch status", {
       leadId,
       oldValue: { done: oldDoneStatus },
-      newValue: { done },
+      newValue: { done: lead.done },
     });
-    return res.json({ message: `Lead marked as ${done ? "Done" : "Undone"}`, lead });
+
+    return res.json({ message: `Lead marked as ${lead.done}`, lead });
   } catch (error) {
     console.error("Error updating done status:", error);
     return res.status(500).json({ message: "Internal server error" });

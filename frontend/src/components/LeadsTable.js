@@ -67,7 +67,7 @@ function LeadsTable({ token }) {
               <th>Project Name</th>
               <th>Payment Status</th>
               <th>Delivery Date</th>
-            
+              <th>Status</th>
             </tr>
           </thead>
           <tbody>
@@ -88,7 +88,15 @@ function LeadsTable({ token }) {
                       ? new Date(lead.deliveryDate).toLocaleDateString()
                       : "Not Set"}
                   </td>
-                  
+                  <td>
+                  {lead.done === "Dispatched" ? (
+                    <span className="text-primary fw-bold">Dispatched</span>
+                  ) : lead.done === "Done" ? (
+                    <span className="text-success fw-bold">Ready to Dispatch</span>
+                  ) : (
+                    <span className="text-warning fw-bold">Waiting for Approval</span>
+                  )}
+                </td>
                 </tr>
               ))
             ) : (

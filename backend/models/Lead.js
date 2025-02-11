@@ -24,8 +24,8 @@ const LeadSchema = new mongoose.Schema(
       default: "",
     },
     done: {
-      type: Boolean,
-      default: false,
+      type: String,
+      default: "false",
     },
     deliverables: {
       type: [String],

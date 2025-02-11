@@ -25,25 +25,6 @@ function LeadsTableuploader({ token }) {
     fetchLeads();
   }, [token]);
 
-  async function handleUpdateDone(leadId, done) {
-    if (done) {
-      alert("You cannot mark a lead as undone once marked as done.");
-      return;
-    }
-
-    try {
-      await axios.patch(
-        `${process.env.REACT_APP_API_BASE_URL}/api/leads/${leadId}/done`,
-        { done: true },
-        { headers: { Authorization: `Bearer ${token}` } }
-      );
-      alert("Lead marked as Done!");
-      fetchLeads();
-    } catch (err) {
-      console.error("Error updating done status:", err);
-      alert("Failed to update status. Please try again.");
-    }
-  }
 
   const filteredLeads = leads.filter(
     (lead) =>
@@ -88,7 +69,7 @@ function LeadsTableuploader({ token }) {
               <th>Project Name</th>
               <th>Payment Status</th>
               <th>Delivery Date</th>
-              <th>Actions</th>
+              <th>Status</th>
             </tr>
           </thead>
           <tbody>
@@ -110,20 +91,14 @@ function LeadsTableuploader({ token }) {
                       : "Not Set"}
                   </td>
                   <td>
-                {lead.done ? (
-                  <Button variant="secondary" disabled>
-                    Done
-                  </Button>
-                ) : (
-                  <Button
-                    variant="success"
-                    onClick={() => handleUpdateDone(lead.leadId, lead.done)}
-                  >
-                    Mark as Done
-                  </Button>
-                )}
-              </td>
-
+                  {lead.done === "Dispatched" ? (
+                    <span className="text-primary fw-bold">Dispatched</span>
+                  ) : lead.done === "Done" ? (
+                    <span className="text-success fw-bold">Ready to Dispatch</span>
+                  ) : (
+                    <span className="text-warning fw-bold">Waiting for Approval</span>
+                  )}
+                </td>
                 </tr>
               ))
             ) : (
