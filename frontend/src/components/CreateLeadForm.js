@@ -222,9 +222,8 @@ function CreateLeadForm({ token, onLeadCreated }) {
               <Form.Control
                 placeholder="Enter Client Company"
                 value={form.clientCompany}
-                onChange={(e) =>
-                  setForm({ ...form, clientCompany: e.target.value })
-                }
+                onChange={(e) => setForm({ ...form, clientCompany: e.target.value })}
+                onBlur={(e) => setForm({ ...form, clientCompany: e.target.value.trim() })}
               />
             </Form.Group>
           </Col>
@@ -304,9 +303,8 @@ function CreateLeadForm({ token, onLeadCreated }) {
               <Form.Control
                 placeholder="Enter Project Name"
                 value={form.projectName}
-                onChange={(e) =>
-                  setForm({ ...form, projectName: e.target.value })
-                }
+                onChange={(e) => setForm({ ...form, projectName: e.target.value })}
+                onBlur={(e) => setForm({ ...form, projectName: e.target.value.trim() })}
               />
             </Form.Group>
           </Col>
@@ -316,9 +314,8 @@ function CreateLeadForm({ token, onLeadCreated }) {
               <Form.Control
                 placeholder="Enter Sqcode"
                 value={form.sqcode}
-                onChange={(e) =>
-                  setForm({ ...form, sqcode: e.target.value })
-                }
+                onChange={(e) => setForm({ ...form, sqcode: e.target.value })}
+                onBlur={(e) => setForm({ ...form, sqcode: e.target.value.trim() })}
               />
             </Form.Group>
           </Col>
@@ -330,9 +327,8 @@ function CreateLeadForm({ token, onLeadCreated }) {
             as="textarea"
             placeholder="Enter Project Description"
             value={form.projectDescription}
-            onChange={(e) =>
-              setForm({ ...form, projectDescription: e.target.value })
-            }
+            onChange={(e) => setForm({ ...form, projectDescription: e.target.value })}
+            onBlur={(e) => setForm({ ...form, projectDescription: e.target.value.trim() })}
           />
         </Form.Group>
 
