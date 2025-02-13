@@ -161,36 +161,38 @@ exports.updatePaymentStatus = async (req, res) => {
     if (req.user.role !== "accounts") {
       return res.status(403).json({ message: "Access denied: Only accounts can update payment status." });
     }
-
     const { leadId } = req.params;
     const { paymentStatus, paymentRemark } = req.body;
-    const lead = await Lead.findOne({ leadId });
-    const oldStatus = lead.paymentStatus;
-
+    const lead = await Lead.findOne({ leadId }).populate("salesUser", "email");
     if (!lead) {
       return res.status(404).json({ message: "Lead not found." });
     }
+    const oldStatus = lead.paymentStatus;
     if (
       (oldStatus === "full" && paymentStatus !== "full") ||
       (oldStatus === "partial" && paymentStatus === "not_received")
     ) {
       return res.status(400).json({ message: "Invalid payment status transition." });
     }
+
     lead.paymentStatus = paymentStatus;
     if (paymentRemark) lead.paymentRemark = paymentRemark;
 
     await lead.save();
     const uploaderEmails = await User.find({ role: "uploader" }).select("email");
     const accountsEmails = await User.find({ role: "accounts" }).select("email");
-    const salesUser = await User.findById(req.user.userId);
-
-    const recipients = [...uploaderEmails, ...accountsEmails, salesUser.email,];
+    const salesUserEmail = lead.salesUser ? lead.salesUser.email : null;
+    const recipients = [
+      ...uploaderEmails.map(user => user.email),
+      ...accountsEmails.map(user => user.email),
+      salesUserEmail, 
+    ].filter(Boolean); 
     const subject = `Payment Status Updated: ${lead.projectName}`;
     const html = `
       <p>Dear Team,</p>
       <p>The payment status for the project <strong>${lead.projectName}</strong> has been updated:</p>
       <ul>
-        <li> <strong>Lead id: </strong> ${lead.leadId}</li>
+        <li> <strong>Lead ID: </strong> ${lead.leadId}</li>
         <li><strong>Old Status:</strong> ${oldStatus}</li>
         <li><strong>New Status:</strong> ${paymentStatus}</li>
       </ul>

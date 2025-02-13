@@ -27,7 +27,7 @@ const sendNotificationEmail = async (recipients, subject, html, includeCc = true
     };
 
     if (includeCc) {
-      mailOptions.cc = "aditya.agrawal@skyquestt.com";
+      mailOptions.cc = "sd@skyquestt.com";
     }
 
     await transporter.sendMail(mailOptions);
