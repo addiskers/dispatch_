@@ -15,16 +15,22 @@ const transporter = nodemailer.createTransport({
  * @param {string[]} recipients - Array of email addresses.
  * @param {string} subject - Email subject.
  * @param {string} html - Email HTML content.
+ * @param {boolean} includeCc - Whether to include the CC email.
  */
-const sendNotificationEmail = async (recipients, subject, html) => {
+const sendNotificationEmail = async (recipients, subject, html, includeCc = true) => {
   try {
-    await transporter.sendMail({
+    const mailOptions = {
       from: '"In-House Notifications" <matt@theskyquestt.org>',
       to: recipients.join(", "),
-      cc: "sd@skyquestt.com",
       subject,
       html,
-    });
+    };
+
+    if (includeCc) {
+      mailOptions.cc = "aditya.agrawal@skyquestt.com";
+    }
+
+    await transporter.sendMail(mailOptions);
   } catch (error) {
     console.error("Error sending notification email:", error);
   }

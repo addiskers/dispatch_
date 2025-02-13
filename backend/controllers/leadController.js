@@ -164,9 +164,9 @@ exports.updatePaymentStatus = async (req, res) => {
 
     const { leadId } = req.params;
     const { paymentStatus, paymentRemark } = req.body;
+    const lead = await Lead.findOne({ leadId });
     const oldStatus = lead.paymentStatus;
 
-    const lead = await Lead.findOne({ leadId });
     if (!lead) {
       return res.status(404).json({ message: "Lead not found." });
     }
@@ -299,7 +299,7 @@ exports.updateDoneStatus = async (req, res) => {
         </ul>
         <p>Best regards,<br><strong>In-House Notification System</strong></p>
       `;
-      await sendNotificationEmail(recipients, subject, html);
+      await sendNotificationEmail(recipients, subject, html,false);
     }
 
     await logActivity(req.user.userId, "updated dispatch status", {
