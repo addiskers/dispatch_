@@ -19,7 +19,7 @@ function LeadsTable({ token }) {
   useEffect(() => {
     async function fetchLeads() {
       try {
-        const res = await axios.get(`${process.env.REACT_APP_API_BASE_URL}/api/leads/my-leads`, {
+        const res = await axios.get(`${process.env.REACT_APP_API_BASE_URL}/api/leads/accounts/all-leads`, {
           headers: { Authorization: `Bearer ${token}` },
         });
         setLeads(res.data);
