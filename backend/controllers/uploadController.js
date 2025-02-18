@@ -103,7 +103,6 @@ exports.sendAllDeliverables = async (req, res) => {
     const recipients = [
       ...uploaderEmails.map(user => user.email),
       ...accountsEmails.map(user => user.email),
-      ...superadminEmails.map(user => user.email),
       salesUser.email,
     ];
 

@@ -43,7 +43,14 @@
   font-size: 1.25rem;
   font-weight: 600;
 }
-
+.remove-tag{
+  padding: 3px 4px;
+  border-radius: 6px; 
+  font-weight: 400;
+  transition: all 0.2s ease;
+  font-size: 12px;
+  background-color: #9a9797;
+}
 .close-btn {
   background: transparent;
   border: none;

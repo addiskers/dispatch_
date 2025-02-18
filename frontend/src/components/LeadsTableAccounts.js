@@ -1,16 +1,22 @@
 import React, { useState, useEffect } from "react";
 import axios from "axios";
-import { Table, Button, Form } from "react-bootstrap";
-
+import { Table, Button, Form, Row, Col } from "react-bootstrap";
 import LeadDetailsuploader from "./LeadDetailsuploader"; 
+import DatePicker from "react-datepicker";
+import "react-datepicker/dist/react-datepicker.css"; 
+
 function LeadsTableAccounts({ token }) {
   const [leads, setLeads] = useState([]);
   const [statusUpdates, setStatusUpdates] = useState({});
-  const [searchTerm, setSearchTerm] = useState("");
   const [currentPage, setCurrentPage] = useState(1);
   const [leadsPerPage] = useState(10);
   const [selectedLeadId, setSelectedLeadId] = useState(null);
-
+  const [searchTerm, setSearchTerm] = useState("");
+  const [statusFilter, setStatusFilter] = useState("");
+  const [creationDateFrom, setCreationDateFrom] = useState(null);
+  const [creationDateTo, setCreationDateTo] = useState(null);
+  const [deliveryDateFrom, setDeliveryDateFrom] = useState(null);
+  const [deliveryDateTo, setDeliveryDateTo] = useState(null);
   useEffect(() => {
     fetchAllLeads();
   }, [token]);
@@ -79,16 +85,28 @@ function LeadsTableAccounts({ token }) {
     }));
   };
 
-  const filteredLeads = leads.filter(
-    (lead) =>
-      lead.clientCompany &&
-      lead.clientCompany.toLowerCase().includes(searchTerm.toLowerCase())
-  );
+  const filteredLeads = leads.filter((lead) => {
+    const matchesSearchTerm =
+      lead.projectName &&
+      lead.projectName.toLowerCase().includes(searchTerm.toLowerCase());
+
+    const matchesStatus = statusFilter ? lead.done === statusFilter : true;
+
+    const matchesCreationDate =
+      (!creationDateFrom || new Date(lead.createdAt) >= new Date(creationDateFrom)) &&
+      (!creationDateTo || new Date(lead.createdAt) <= new Date(creationDateTo));
+
+    const matchesDeliveryDate =
+      (!deliveryDateFrom || new Date(lead.deliveryDate) >= new Date(deliveryDateFrom)) &&
+      (!deliveryDateTo || new Date(lead.deliveryDate) <= new Date(deliveryDateTo));
+
+    return matchesSearchTerm && matchesStatus && matchesCreationDate && matchesDeliveryDate;
+  });
 
   const indexOfLastLead = currentPage * leadsPerPage;
   const indexOfFirstLead = indexOfLastLead - leadsPerPage;
   const currentLeads = filteredLeads.slice(indexOfFirstLead, indexOfLastLead);
-  const totalPages = Math.ceil(filteredLeads.length / leadsPerPage);
+  const totalPages = Math.max(Math.ceil(filteredLeads.length / leadsPerPage), 1);
 
   const handleNextPage = () => {
     if (currentPage < totalPages) setCurrentPage(currentPage + 1);
@@ -100,18 +118,86 @@ function LeadsTableAccounts({ token }) {
 
   return (
     <div>
-      <h3>Leads Table</h3>
-
-      {/* Search Box */}
-      <Form.Group className="mb-3">
-        <Form.Control
-          type="text"
-          placeholder="Search by Client Company"
-          value={searchTerm}
-          onChange={(e) => setSearchTerm(e.target.value)}
-        />
-      </Form.Group>
-
+       <h3>My Leads</h3>
+            <Form className="mb-4">
+              <Row className="g-3">
+                {/* Search by Project Name - Full width on mobile, 3 columns on larger screens */}
+                <Col xs={12} md={6} lg={3}>
+                  <Form.Group>
+                    <Form.Label>Search by Project Name</Form.Label>
+                    <Form.Control
+                      type="text"
+                      placeholder="Enter Project Name"
+                      value={searchTerm}
+                      onChange={(e) => setSearchTerm(e.target.value)}
+                    />
+                  </Form.Group>
+                </Col>
+      
+                {/* Creation Date Filters - Stack vertically on mobile */}
+                <Col xs={12} md={6} lg={3}>
+                  <Form.Group>
+                    <Form.Label>Creation Date Range</Form.Label>
+                    <div className="d-flex flex-column gap-2">
+                      <DatePicker
+                        selected={creationDateFrom}
+                        onChange={(date) => setCreationDateFrom(date)}
+                        dateFormat="yyyy-MM-dd"
+                        placeholderText="Start Date"
+                        className="form-control"
+                      />
+                      <DatePicker
+                        selected={creationDateTo}
+                        onChange={(date) => setCreationDateTo(date)}
+                        dateFormat="yyyy-MM-dd"
+                        placeholderText="End Date"
+                        className="form-control"
+                      />
+                    </div>
+                  </Form.Group>
+                </Col>
+      
+                {/* Delivery Date Filters - Stack vertically on mobile */}
+                <Col xs={12} md={6} lg={3}>
+                  <Form.Group>
+                    <Form.Label>Delivery Date Range</Form.Label>
+                    <div className="d-flex flex-column gap-2">
+                      <DatePicker
+                        selected={deliveryDateFrom}
+                        onChange={(date) => setDeliveryDateFrom(date)}
+                        dateFormat="yyyy-MM-dd"
+                        placeholderText="Start Date"
+                        className="form-control"
+                      />
+                      <DatePicker
+                        selected={deliveryDateTo}
+                        onChange={(date) => setDeliveryDateTo(date)}
+                        dateFormat="yyyy-MM-dd"
+                        placeholderText="End Date"
+                        className="form-control"
+                      />
+                    </div>
+                  </Form.Group>
+                </Col>
+      
+                {/* Status Filter - Full width on mobile, auto-width on larger screens */}
+                <Col xs={12} md={6} lg={3}>
+                  <Form.Group>
+                    <Form.Label>Filter by Status</Form.Label>
+                    <Form.Select
+                      value={statusFilter}
+                      onChange={(e) => setStatusFilter(e.target.value)}
+                    >
+                      <option value="">All</option>
+                      <option value="false">Waiting for Approval</option>
+                      <option value="Done">Ready to Dispatch</option>
+                      <option value="Dispatched">Dispatched</option>
+                    </Form.Select>
+                  </Form.Group>
+                </Col>
+              </Row>
+            </Form>
+      
       {/* Leads Table */}
       <div className="table-container">
         <Table striped bordered hover>
@@ -122,7 +208,7 @@ function LeadsTableAccounts({ token }) {
               <th>Project Name</th>
               <th>Payment Status</th>
               <th>Actions</th>
-              <th>Ready to Dispatch</th>
+              <th>Dispatch Status</th>
             </tr>
           </thead>
           <tbody>
@@ -136,7 +222,7 @@ function LeadsTableAccounts({ token }) {
                     {lead.leadId}
                   </td>
                   <td>{lead.clientCompany}</td>
-                  <td>{lead.projectName}</td>
+                  <td className="project-name">{lead.projectName}</td>  
                   <td>
                     <Form.Select
                       value={statusUpdates[lead.leadId] || "not_received"}

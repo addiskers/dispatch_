@@ -23,7 +23,7 @@ router.patch("/:leadId/done", authMiddleware, leadController.updateDoneStatus);
 // --- ACCOUNTS endpoints ---
 router.get("/accounts/all-leads", authMiddleware, leadController.getAllLeads);
 router.get("/:leadId", authMiddleware, getLeadById);
-router.put("/:leadId", authMiddleware, updateLeadById);
+router.patch("/:leadId", authMiddleware, updateLeadById);
 router.post("/upload-contracts", authMiddleware, uploadContracts);
 
 module.exports = router;

@@ -130,11 +130,10 @@ function LeadDetails({ token, leadId, onClose,userRole  }) {
 
   async function handleSaveChanges() {
     try {
-      await axios.put(
+      const response = await axios.patch(
         `${process.env.REACT_APP_API_BASE_URL}/api/leads/${leadId}`,
         editedLead,
-        { headers: { Authorization: `Bearer ${token}` } }
-      );
+        { headers: { Authorization: `Bearer ${token}` } }      )
       alert("Lead updated successfully!");
       setIsEditing(false);
       setIsEditingSales(false);
