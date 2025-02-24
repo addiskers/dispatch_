@@ -188,46 +188,61 @@ const ContractPage = ({ token }) => {
           </div>
         )}
 
-        {validLead && (
+{validLead && (
           <>
-            {/* Contracts Section */}
             <div className="contracts-section">
               <div className="section-header">
                 <h3>Existing Contracts</h3>
-                <span className="contract-count">
-                  {contracts.length} Contract{contracts.length !== 1 ? 's' : ''}
-                </span>
+                <span className="contract-count">{contracts.length} Contracts</span>
               </div>
-              <div className="contracts-list">
-                {contracts.length > 0 ? (
-                  contracts.map((contractKey) => (
-                    <div key={contractKey} className="contract-item">
-                      <input
-                        type="checkbox"
-                        checked={selectedInvoices.includes(contractKey)}
-                        onChange={() =>
-                          setSelectedInvoices((prev) =>
-                            prev.includes(contractKey)
-                              ? prev.filter((key) => key !== contractKey)
-                              : [...prev, contractKey]
-                          )
-                        }
-                      />
-                      <FileIcon className="file-icon" />
-                      <span
-                        className="contract-name"
-                        onClick={() => handleDownload(contractKey)}
-                      >
-                        {getFileName(contractKey)}
-                      </span>
-                      {downloadLoading[contractKey] && (
-                        <Loader2 className="loading-spinner small" />
-                      )}
+              <div className="contracts-table">
+                <div className="contracts-table-header">
+                  <div className="checkbox-column">Select</div>
+                  <div className="name-column">File Name</div>
+                  <div className="actions-column">Actions</div>
+                </div>
+                <div className="contracts-table-body">
+                  {contracts.length > 0 ? (
+                    contracts.map((contractKey) => (
+                      <div key={contractKey} className="contract-row">
+                        <div className="checkbox-column">
+                          <input
+                            type="checkbox"
+                            checked={selectedInvoices.includes(contractKey)}
+                            onChange={() =>
+                              setSelectedInvoices((prev) =>
+                                prev.includes(contractKey)
+                                  ? prev.filter((key) => key !== contractKey)
+                                  : [...prev, contractKey]
+                              )
+                            }
+                            className="contract-checkbox"
+                          />
+                        </div>
+                        <div className="name-column">
+                          <FileIcon className="file-icon" />
+                          <span className="file-name">{getFileName(contractKey)}</span>
+                        </div>
+                        <div className="actions-column">
+                          <button 
+                            className="download-button"
+                            onClick={() => handleDownload(contractKey)}
+                          >
+                            {downloadLoading[contractKey] ? (
+                              <Loader2 className="loading-spinner-small" />
+                            ) : (
+                              "Download"
+                            )}
+                          </button>
+                        </div>
+                      </div>
+                    ))
+                  ) : (
+                    <div className="no-contracts">
+                      <p>No contracts found for this lead.</p>
                     </div>
-                  ))
-                ) : (
-                  <p className="no-contracts">No contracts found for this lead.</p>
-                )}
+                  )}
+                </div>
               </div>
             </div>
 
