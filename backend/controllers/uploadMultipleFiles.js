@@ -19,7 +19,7 @@ exports.uploadMultipleFiles = [
   upload.array("deliverables", 10), 
   async (req, res) => {
     try {
-      if (!["uploader", "superadmin"].includes(req.user.role)) {
+      if (!["uploader", "superadmin",].includes(req.user.role)) {
         return res.status(403).json({ message: "Access denied: Only uploader and superadmin can upload deliverables." });
       }
 

@@ -20,7 +20,7 @@ const transporter = nodemailer.createTransport({
 const sendNotificationEmail = async (recipients, subject, html, includeCc = true) => {
   try {
     const mailOptions = {
-      from: '"In-House Notifications" <matt@theskyquestt.org>',
+      from: '"Dispatch Notification" <matt@theskyquestt.org>',
       to: recipients.join(", "),
       subject,
       html,

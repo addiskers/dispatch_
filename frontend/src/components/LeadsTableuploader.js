@@ -172,11 +172,11 @@ function LeadsTableuploader({ token }) {
                   <td>{lead.clientCompany}</td>
                   <td className="project-name">{lead.projectName}</td>                 
                   <td>{lead.paymentStatus}</td>
-                  <td>{lead.deliveryDate
+                  <td>{lead.createdAt
                       ? new Date(lead.createdAt).toLocaleDateString()
                       : "Not Set"}</td>
                   <td>{lead.deliveryDate
-                      ? new Date(lead.createdAt).toLocaleDateString()
+                      ? new Date(lead.deliveryDate).toLocaleDateString()
                       : "Not Set"}</td>
                   <td>
                 {lead.done === "Dispatched" ? (

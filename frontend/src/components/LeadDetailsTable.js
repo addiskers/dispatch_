@@ -136,7 +136,7 @@ function LeadDetailsTable({ token, leadId, onClose,userRole  }) {
         deliveryDate: editedLead.deliveryDate,
       };
   
-      await axios.put(
+      await axios.patch(
         `${process.env.REACT_APP_API_BASE_URL}/api/leads/${leadId}`,
         allowedUpdates,
         { headers: { Authorization: `Bearer ${token}` } }

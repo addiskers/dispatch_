@@ -337,14 +337,16 @@ exports.updateLeadById = async (req, res) => {
     const { leadId } = req.params;
     const { role } = req.user;
 
-    const oldLead = await Lead.findOne({ leadId });
+    const oldLead = await Lead.findOne({ leadId }).lean();
     if (!oldLead) {
       return res.status(404).json({ message: "Lead not found" });
     }
 
+    let updatedFields = req.body;
+
     if (role === "sales") {
       const allowedFields = ["clientName", "clientEmail", "deliveryDate"];
-      req.body = Object.keys(req.body)
+      updatedFields = Object.keys(req.body)
         .filter((key) => allowedFields.includes(key))
         .reduce((obj, key) => {
           obj[key] = req.body[key];
@@ -354,20 +356,38 @@ exports.updateLeadById = async (req, res) => {
       return res.status(403).json({ message: "Access denied" });
     }
 
-    const updatedLead = await Lead.findOneAndUpdate({ leadId }, req.body, {
-      new: true, 
-      runValidators: true, 
+    const updatedLead = await Lead.findOneAndUpdate({ leadId }, updatedFields, {
+      new: true,
+      runValidators: true,
+      lean: true,
     });
 
     if (!updatedLead) {
       return res.status(404).json({ message: "Lead not found" });
     }
 
-    await logActivity(req.user.userId, "updated lead", {
-      leadId,
-      oldValue: oldLead,
-      newValue: updatedLead,
+    // Extract only modified fields
+    const changes = {};
+    Object.keys(updatedFields).forEach((key) => {
+      if (JSON.stringify(oldLead[key]) !== JSON.stringify(updatedLead[key])) {
+        changes[key] = {
+          oldValue: oldLead[key] ?? "N/A",
+          newValue: updatedLead[key] ?? "N/A",
+        };
+      }
     });
+
+    if (Object.keys(changes).length > 0) {
+      await logActivity(req.user.userId, "Updated Lead", {
+        leadId,
+        oldValue: Object.fromEntries(
+          Object.entries(changes).map(([key, val]) => [key, val.oldValue])
+        ),
+        newValue: Object.fromEntries(
+          Object.entries(changes).map(([key, val]) => [key, val.newValue])
+        ),
+      });
+    }
 
     res.status(200).json(updatedLead);
   } catch (error) {
