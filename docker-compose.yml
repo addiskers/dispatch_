@@ -19,7 +19,10 @@ services:
       OUTLOOK_CLIENT_ID: ${OUTLOOK_CLIENT_ID} 
       OUTLOOK_CLIENT_SECRET: ${OUTLOOK_CLIENT_SECRET} 
       OUTLOOK_TENANT_ID: ${OUTLOOK_TENANT_ID}
-      OUTLOOK_USER_EMAIL: ${OUTLOOK_USER_EMAIL} 
+      OUTLOOK_USER_EMAIL: ${OUTLOOK_USER_EMAIL}
+      SITE_DOMAIN: ${SITE_DOMAIN}
+      USER_EMAIL: ${USER_EMAIL}
+      FOLDER_PATH: ${FOLDER_PATH}
     volumes:
       - ./backend:/app
       - ./backend/.env:/app/.env

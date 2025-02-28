@@ -5,13 +5,11 @@ const dotenv = require("dotenv");
 dotenv.config();
 const connectDB = require("./config/db");
 const chatRoutes = require("./routes/chatRoutes");
-
-
+const onedriveRoutes = require("./routes/onedriveRoutes");
 const authRoutes = require("./routes/authRoutes");
 const leadRoutes = require("./routes/leadRoutes");
 const uploadRoutes = require("./routes/uploadRoutes");
 const logRoutes = require("./routes/logRoutes");
-// Connect to Mongo
 
 connectDB(process.env.MONGO_URI);
 const helmet = require("helmet");
@@ -48,6 +46,8 @@ app.use("/api/leads", leadRoutes);
 app.use("/api/upload", uploadRoutes);
 app.use("/api/logs", logRoutes);
 app.use("/api/chats", chatRoutes);
+app.use("/onedrive", onedriveRoutes);
+
 const PORT = process.env.PORT || 5000;
 
 

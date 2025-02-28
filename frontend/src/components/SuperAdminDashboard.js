@@ -2,6 +2,7 @@ import React, { useState, useEffect, useRef } from "react";
 import LeadsSection from "./LeadsSection"; 
 import ManageAccessSection from "./ManageAccessSection"; 
 import LogsSection from "./LogsSection"; 
+import SampleManagementPage from "./SampleManagementPage"; 
 import ContractPage from "./ContractPage"; 
 import MultipleFileUpload from "./MultipleFileUpload";
 import "../styles/superAdminDashboard.css";
@@ -37,6 +38,8 @@ function SuperAdminDashboard({ token, onLogout }) {
       return <ContractPage token={token} />; 
     } else if (selectedSection === "Uploads") {
       return <MultipleFileUpload token={token} />;
+    }else if (selectedSection === "Sample") {
+      return <SampleManagementPage token={token} />;
     }
   }
 
@@ -45,7 +48,8 @@ function SuperAdminDashboard({ token, onLogout }) {
     { name: "Manage Access", section: "Manage Access" },
     { name: "Logs", section: "Logs" },
     { name: "Contracts", section: "Contracts" },
-    { name: "Upload", section: "Uploads" }
+    { name: "Upload", section: "Uploads" },
+    { name: "Sample", section: "Sample" }
   ];
 
   const handleMenuClick = (section) => {
