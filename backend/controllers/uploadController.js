@@ -13,7 +13,7 @@ exports.sendAllDeliverables = async (req, res) => {
     if (!lead) {
       return res.status(404).json({ message: "Lead ID and Project Name do not match" });
     }
-    if (lead.done !== "Done") {
+     if (lead.done !== "Done" && lead.done !== "Dispatched") {
       return res.status(400).json({ message: "Lead is not ready for dispatch." });
     }
     const deliverablesToSend = files ? lead.deliverables.filter(d => files.includes(d)) : lead.deliverables;
