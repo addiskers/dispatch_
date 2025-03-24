@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from "react";
 import axios from "axios";
-import { Loader2, FileIcon, Upload, Send, Search } from "lucide-react";
+import { Loader2, FileIcon, Upload, Send, Search, X } from "lucide-react";
 import "../styles/contractpage.css";
 
 const ContractPage = ({ token }) => {
@@ -8,7 +8,10 @@ const ContractPage = ({ token }) => {
   const [projectName, setProjectName] = useState("");
   const [contracts, setContracts] = useState([]);
   const [selectedInvoices, setSelectedInvoices] = useState([]);
-  const [recipientEmail, setRecipientEmail] = useState("");
+  const [toEmails, setToEmails] = useState([]);
+  const [ccEmails, setCcEmails] = useState([]);
+  const [toEmailInput, setToEmailInput] = useState("");
+  const [ccEmailInput, setCcEmailInput] = useState("");
   const [files, setFiles] = useState(null);
   const [loading, setLoading] = useState(false);
   const [validLead, setValidLead] = useState(false);
@@ -114,9 +117,42 @@ const ContractPage = ({ token }) => {
     }
   };
 
+  const handleAddEmail = (e, type) => {
+    const email = type === 'to' ? toEmailInput.trim() : ccEmailInput.trim();
+    
+    if ((e.key === "," || e.key === "Enter") && email) {
+      e.preventDefault();
+      const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+      if (!emailRegex.test(email)) {
+        alert("Please enter a valid email address");
+        return;
+      }
+      
+      if (type === 'to') {
+        if (!toEmails.includes(email)) {
+          setToEmails([...toEmails, email]);
+        }
+        setToEmailInput("");
+      } else {
+        if (!ccEmails.includes(email)) {
+          setCcEmails([...ccEmails, email]);
+        }
+        setCcEmailInput("");
+      }
+    }
+  };
+
+  const handleRemoveEmail = (email, type) => {
+    if (type === 'to') {
+      setToEmails(toEmails.filter(e => e !== email));
+    } else {
+      setCcEmails(ccEmails.filter(e => e !== email));
+    }
+  };
+
   const handleSendInvoice = async () => {
-    if (!recipientEmail || selectedInvoices.length === 0) {
-      alert("Please enter recipient email and select at least one invoice.");
+    if (toEmails.length === 0 || selectedInvoices.length === 0) {
+      alert("Please enter at least one recipient email and select at least one invoice.");
       return;
     }
 
@@ -126,7 +162,8 @@ const ContractPage = ({ token }) => {
         `${process.env.REACT_APP_API_BASE_URL}/api/upload/send-invoice`,
         {
           leadId,
-          recipientEmail,
+          toEmails,
+          ccEmails,
           files: selectedInvoices,
         },
         {
@@ -135,6 +172,11 @@ const ContractPage = ({ token }) => {
       );
 
       alert("Invoice sent successfully!");
+      setToEmails([]);
+      setCcEmails([]);
+      setToEmailInput("");
+      setCcEmailInput("");
+      setSelectedInvoices([]);
     } catch (error) {
       console.error("Error sending invoice:", error);
       alert("Failed to send invoice.");
@@ -188,7 +230,7 @@ const ContractPage = ({ token }) => {
           </div>
         )}
 
-{validLead && (
+        {validLead && (
           <>
             <div className="contracts-section">
               <div className="section-header">
@@ -251,16 +293,63 @@ const ContractPage = ({ token }) => {
             {/* Invoice Section */}
             <div className="invoice-section">
               <h3>Send Invoice</h3>
-              <div className="invoice-input-group">
-                <input
-                  type="email"
-                  placeholder="Recipient email address"
-                  value={recipientEmail}
-                  onChange={(e) => setRecipientEmail(e.target.value)}
-                />
+              
+              {/* To emails */}
+              <div className="email-input-container">
+                <label>To:</label>
+                <div className="email-chips-container">
+                  {toEmails.map((email, index) => (
+                    <div key={index} className="email-chip">
+                      <span>{email}</span>
+                      <button 
+                        className="remove-email"
+                        onClick={() => handleRemoveEmail(email, 'to')}
+                      >
+                        <X size={16} />
+                      </button>
+                    </div>
+                  ))}
+                  <input
+                    type="email"
+                    placeholder="Enter email addresses (press Enter or comma to add)"
+                    value={toEmailInput}
+                    onChange={(e) => setToEmailInput(e.target.value)}
+                    onKeyDown={(e) => handleAddEmail(e, 'to')}
+                    className="email-input"
+                  />
+                </div>
+              </div>
+              
+              {/* Cc emails */}
+              <div className="email-input-container">
+                <label>Cc:</label>
+                <div className="email-chips-container">
+                  {ccEmails.map((email, index) => (
+                    <div key={index} className="email-chip">
+                      <span>{email}</span>
+                      <button 
+                        className="remove-email"
+                        onClick={() => handleRemoveEmail(email, 'cc')}
+                      >
+                        <X size={16} />
+                      </button>
+                    </div>
+                  ))}
+                  <input
+                    type="email"
+                    placeholder="Enter CC email addresses (press Enter or comma to add)"
+                    value={ccEmailInput}
+                    onChange={(e) => setCcEmailInput(e.target.value)}
+                    onKeyDown={(e) => handleAddEmail(e, 'cc')}
+                    className="email-input"
+                  />
+                </div>
+              </div>
+              
+              <div className="invoice-actions">
                 <button
                   onClick={handleSendInvoice}
-                  disabled={loading || selectedInvoices.length === 0}
+                  disabled={loading || selectedInvoices.length === 0 || toEmails.length === 0}
                   className="primary-button"
                 >
                   <Send className="button-icon" />
