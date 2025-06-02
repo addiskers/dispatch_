@@ -1,0 +1,243 @@
+/* Main container styles */
+.conversation-timeline-modal .modal-body {
+  max-height: 70vh;
+  overflow-y: auto;
+}
+
+/* Conversation list styles */
+.conversation-card {
+  transition: all 0.2s ease;
+  border-left: 3px solid transparent;
+}
+
+.conversation-card:hover {
+  border-left-color: #0d6efd;
+  box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+}
+
+.conversation-badges {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+}
+
+.conversation-time {
+  font-size: 0.85rem;
+  white-space: nowrap;
+}
+
+/* Email content styles */
+.email-header {
+  display: flex;
+  align-items: center;
+  margin-bottom: 10px;
+}
+
+.email-subject {
+  margin-bottom: 0;
+  font-weight: 600;
+}
+
+.email-body {
+  color: #555;
+  margin-bottom: 15px;
+}
+
+.view-thread-btn {
+  margin-top: 5px;
+}
+
+/* Email thread styles */
+.thread-header {
+  margin-bottom: 20px;
+}
+
+.back-button {
+  padding: 0;
+  margin-bottom: 10px;
+  text-decoration: none;
+}
+
+.thread-subject {
+  display: flex;
+  align-items: center;
+  margin-bottom: 15px;
+}
+
+.email-card {
+  border-left: 3px solid #e9ecef;
+}
+
+.email-card:hover {
+  border-left-color: #0d6efd;
+}
+
+.email-html-content {
+  max-width: 100%;
+  overflow-x: auto;
+}
+
+.email-html-content img {
+  max-width: 100%;
+  height: auto;
+}
+
+.email-text-content {
+  white-space: pre-line;
+}
+
+/* Attachment styles */
+.email-attachments {
+  border-top: 1px solid #e9ecef;
+  padding-top: 15px;
+}
+
+.attachment-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+.attachment-item {
+  background-color: #f8f9fa;
+  border-radius: 4px;
+  padding: 8px 12px;
+  transition: all 0.2s ease;
+}
+
+.attachment-item:hover {
+  background-color: #e9ecef;
+}
+
+.attachment-link {
+  display: flex;
+  align-items: center;
+  text-decoration: none;
+  color: #495057;
+}
+
+.attachment-link i {
+  margin-right: 8px;
+  color: #dc3545;
+}
+
+.attachment-name {
+  max-width: 200px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.attachment-size {
+  margin-left: 8px;
+  color: #6c757d;
+  font-size: 0.85rem;
+}
+
+/* Call styles */
+.call-content {
+  padding: 10px 0;
+}
+
+.recording-link {
+  margin-left: 15px;
+}
+/* Existing styles */
+
+/* New styles for transcript functionality */
+.transcript-view {
+  padding: 0.5rem;
+}
+
+.call-title {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  margin-bottom: 1rem;
+}
+
+.call-date {
+  font-size: 0.9rem;
+  font-weight: normal;
+}
+
+.transcript-card {
+  margin-bottom: 1.5rem;
+  box-shadow: 0 2px 5px rgba(0, 0, 0, 0.1);
+}
+
+.transcript-segments {
+  max-height: 400px;
+  overflow-y: auto;
+  padding-right: 0.5rem;
+}
+
+.transcript-segment {
+  padding: 0.75rem;
+  margin-bottom: 1rem;
+  border-radius: 0.5rem;
+  background-color: #f8f9fa;
+  position: relative;
+}
+
+.transcript-segment.agent {
+  background-color: #e9f5ff;
+  margin-left: 1.5rem;
+  margin-right: 0.5rem;
+}
+
+.transcript-segment.customer {
+  background-color: #f2f2f2;
+  margin-right: 1.5rem;
+  margin-left: 0.5rem;
+}
+
+.segment-header {
+  display: flex;
+  justify-content: space-between;
+  margin-bottom: 0.5rem;
+  font-size: 0.85rem;
+}
+
+.segment-time {
+  color: #777;
+  font-size: 0.8rem;
+}
+
+.segment-text {
+  white-space: pre-wrap;
+  line-height: 1.4;
+}
+
+.transcript-text {
+  white-space: pre-wrap;
+  line-height: 1.5;
+  padding: 1rem;
+  background-color: #f8f9fa;
+  border-radius: 0.5rem;
+  max-height: 400px;
+  overflow-y: auto;
+}
+
+.call-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+}
+
+/* Responsive adjustments for smaller screens */
+@media (max-width: 768px) {
+  .call-actions {
+    flex-direction: column;
+  }
+  
+  .call-title {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+  
+  .call-date, .badge {
+    margin-top: 0.25rem;
+    margin-left: 0 !important;
+  }
+}

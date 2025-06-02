@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from "react";
 import LeadsTableUploader from "./LeadsTableuploader.js";
-import MultipleFileUpload from "./MultipleFileUpload";
+import MultipleFileUpload from "./MultipleFileUpload.js";
 import "../styles/superAdminDashboard.css";
 
 function UploaderDashboard({ token, onLogout }) {

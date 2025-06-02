@@ -6,6 +6,8 @@ import SampleManagementPage from "./SampleManagementPage";
 import ContractPage from "./ContractPage"; 
 import MultipleFileUpload from "./MultipleFileUpload";
 import "../styles/superAdminDashboard.css";
+import FreshworksLeads from "./FreshworksLeads"; 
+import  Sale  from "./Sale";
 
 function SuperAdminDashboard({ token, onLogout }) {
   const [selectedSection, setSelectedSection] = useState("Manage Access");
@@ -40,6 +42,11 @@ function SuperAdminDashboard({ token, onLogout }) {
       return <MultipleFileUpload token={token} />;
     }else if (selectedSection === "Sample") {
       return <SampleManagementPage token={token} />;
+    }else if (selectedSection === "Freshworks Leads") {
+      return <FreshworksLeads token={token} />; 
+    }
+    else if (selectedSection === "Sale"){
+      return <Sale token={token} />;
     }
   }
 
@@ -49,7 +56,10 @@ function SuperAdminDashboard({ token, onLogout }) {
     { name: "Logs", section: "Logs" },
     { name: "Contracts", section: "Contracts" },
     { name: "Upload", section: "Uploads" },
-    { name: "Sample", section: "Sample" }
+    { name: "Sample", section: "Sample" },
+    { name: "Freshworks Leads", section: "Freshworks Leads" },
+    { name: "Logout", section: "Logout" },
+    { name: "Sale", section: "Sale" },
   ];
 
   const handleMenuClick = (section) => {

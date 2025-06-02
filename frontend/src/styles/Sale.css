@@ -1,0 +1,463 @@
+/* Sales Activity Dashboard Styles */
+
+.sales-activity-dashboard {
+  padding: 20px;
+  background-color: #f8f9fa;
+  min-height: 100vh;
+}
+
+/* Dashboard Header */
+.dashboard-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 25px;
+}
+
+.dashboard-header h1 {
+  font-size: 1.8rem;
+  font-weight: 600;
+  color: #333;
+  margin: 0;
+}
+
+.date-indicator {
+  font-size: 0.9rem;
+  color: #6c757d;
+  background-color: #fff;
+  padding: 5px 12px;
+  border-radius: 20px;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
+  display: flex;
+  align-items: center;
+}
+
+/* Agent Cards */
+.agent-metrics-cards {
+  margin-bottom: 30px;
+}
+
+.agent-card {
+  border: none;
+  border-radius: 10px;
+  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.05);
+  transition: transform 0.3s ease, box-shadow 0.3s ease;
+  height: 100%;
+}
+
+.agent-card:hover {
+  transform: translateY(-5px);
+  box-shadow: 0 6px 12px rgba(0, 0, 0, 0.1);
+}
+
+.inactive-agent {
+  opacity: 0.7;
+  background-color: #f8f9fa;
+}
+
+.agent-header {
+  display: flex;
+  align-items: center;
+  margin-bottom: 15px;
+  position: relative;
+}
+
+.agent-avatar {
+  width: 42px;
+  height: 42px;
+  border-radius: 50%;
+  background-color: #e9ecef;
+  color: #495057;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: 600;
+  font-size: 1rem;
+  margin-right: 12px;
+}
+
+.agent-info {
+  flex: 1;
+}
+
+.agent-name {
+  font-weight: 600;
+  margin-bottom: 2px;
+  font-size: 1rem;
+  color: #343a40;
+}
+
+.agent-role {
+  font-size: 0.8rem;
+  color: #6c757d;
+}
+
+.agent-status {
+  position: absolute;
+  top: 0;
+  right: 0;
+  font-size: 0.7rem;
+  color: #dc3545;
+  background-color: rgba(220, 53, 69, 0.1);
+  padding: 2px 6px;
+  border-radius: 4px;
+}
+
+.metrics-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 15px;
+}
+
+.metric-item {
+  display: flex;
+  align-items: center;
+}
+
+.metric-icon {
+  width: 36px;
+  height: 36px;
+  border-radius: 8px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin-right: 10px;
+  color: white;
+}
+
+.sample-time {
+  background-color: #007bff;
+}
+
+.follow-ups {
+  background-color: #28a745;
+}
+
+.calls {
+  background-color: #fd7e14;
+}
+
+.conversions {
+  background-color: #6f42c1;
+}
+
+.metric-data {
+  display: flex;
+  flex-direction: column;
+}
+
+.metric-value {
+  font-weight: 700;
+  font-size: 1.2rem;
+  color: #343a40;
+  line-height: 1.2;
+}
+
+.metric-label {
+  font-size: 0.7rem;
+  color: #6c757d;
+}
+
+/* Activity Filters */
+.activity-filters {
+  gap: 10px;
+}
+
+.search-field {
+  width: 240px;
+}
+
+.filter-select {
+  width: 150px;
+}
+
+.export-btn {
+  display: flex;
+  align-items: center;
+}
+
+/* Activity Table */
+.activity-table {
+  margin-bottom: 0;
+}
+
+.activity-table thead th {
+  background-color: #f8f9fa;
+  border-bottom: 1px solid #dee2e6;
+  padding: 12px 15px;
+  font-weight: 600;
+  color: #495057;
+}
+
+.sortable-header {
+  cursor: pointer;
+  user-select: none;
+  white-space: nowrap;
+}
+
+.sortable-header:hover {
+  background-color: #e9ecef;
+}
+
+.activity-table tbody td {
+  padding: 12px 15px;
+  vertical-align: middle;
+  border-bottom: 1px solid #dee2e6;
+}
+
+.avatar-small {
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  background-color: #e9ecef;
+  color: #495057;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: 600;
+  font-size: 0.8rem;
+}
+
+.cell-client, .cell-report {
+  max-width: 200px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.filter-badge {
+  display: flex;
+  align-items: center;
+  padding: 6px 12px;
+  font-weight: 500;
+}
+
+.filter-remove {
+  color: rgba(255, 255, 255, 0.8);
+  font-size: 1.2rem;
+  line-height: 1;
+}
+
+.filter-remove:hover {
+  color: white;
+}
+
+/* Summary Cards */
+.summary-cards {
+  margin-bottom: 25px;
+}
+
+.summary-card {
+  border: none;
+  border-radius: 10px;
+  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.05);
+  height: 100%;
+}
+
+.summary-title {
+  font-size: 0.9rem;
+  font-weight: 600;
+  color: #6c757d;
+  margin-bottom: 15px;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+/* Best Agent Section */
+.best-agent {
+  display: flex;
+  align-items: center;
+}
+
+.avatar-medium {
+  width: 56px;
+  height: 56px;
+  border-radius: 50%;
+  background-color: #e9ecef;
+  color: #495057;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: 600;
+  font-size: 1.2rem;
+  margin-right: 15px;
+}
+
+.agent-summary {
+  flex: 1;
+}
+
+.agent-summary .agent-name {
+  font-size: 1.1rem;
+  font-weight: 600;
+  margin-bottom: 8px;
+}
+
+.agent-stats {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+}
+
+.agent-stat {
+  display: flex;
+  justify-content: space-between;
+  font-size: 0.85rem;
+}
+
+.stat-label {
+  color: #6c757d;
+}
+
+.stat-value {
+  font-weight: 600;
+  color: #343a40;
+}
+
+/* Team Averages */
+.team-averages {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.team-stat {
+  display: flex;
+  align-items: center;
+}
+
+.stat-icon {
+  width: 40px;
+  height: 40px;
+  border-radius: 8px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin-right: 12px;
+  color: white;
+}
+
+.avg-sample {
+  background-color: #007bff;
+}
+
+.avg-followups {
+  background-color: #28a745;
+}
+
+.avg-calls {
+  background-color: #fd7e14;
+}
+
+.stat-content {
+  flex: 1;
+}
+
+.stat-content .stat-value {
+  font-size: 1.2rem;
+  font-weight: 700;
+  margin-bottom: 2px;
+}
+
+.stat-content .stat-label {
+  font-size: 0.8rem;
+}
+
+/* Conversion Stats */
+.conversion-stats {
+  display: flex;
+  flex-direction: column;
+  gap: 15px;
+}
+
+.conversion-gauge {
+  text-align: center;
+  padding: 5px 0 10px;
+}
+
+.gauge-value {
+  font-size: 2rem;
+  font-weight: 700;
+  color: #343a40;
+  margin-bottom: 5px;
+}
+
+.gauge-label {
+  font-size: 0.85rem;
+  color: #6c757d;
+}
+
+.conversion-breakdown {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.breakdown-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.breakdown-label {
+  width: 80px;
+  font-size: 0.85rem;
+  color: #6c757d;
+}
+
+.breakdown-bar {
+  flex: 1;
+  height: 8px;
+  background-color: #e9ecef;
+  border-radius: 4px;
+  overflow: hidden;
+}
+
+.breakdown-bar .progress-bar {
+  height: 100%;
+  border-radius: 4px;
+}
+
+.breakdown-value {
+  width: 20px;
+  text-align: right;
+  font-weight: 600;
+  font-size: 0.85rem;
+}
+
+/* Responsive Adjustments */
+@media (max-width: 992px) {
+  .activity-filters {
+    margin-top: 15px;
+    width: 100%;
+    flex-wrap: wrap;
+  }
+  
+  .search-field {
+    width: 100%;
+    margin-bottom: 10px;
+  }
+  
+  .filter-select {
+    margin-bottom: 10px;
+  }
+}
+
+@media (max-width: 768px) {
+  .dashboard-header {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+  
+  .date-indicator {
+    margin-top: 10px;
+  }
+  
+  .agent-metrics-cards .col-md-3 {
+    margin-bottom: 20px;
+  }
+  
+  .summary-cards .col-md-4 {
+    margin-bottom: 20px;
+  }
+}

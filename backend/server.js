@@ -10,6 +10,7 @@ const authRoutes = require("./routes/authRoutes");
 const leadRoutes = require("./routes/leadRoutes");
 const uploadRoutes = require("./routes/uploadRoutes");
 const logRoutes = require("./routes/logRoutes");
+const freshworksRoutes = require("./routes/freshworksRoutes");
 
 connectDB(process.env.MONGO_URI);
 const helmet = require("helmet");
@@ -47,6 +48,7 @@ app.use("/api/upload", uploadRoutes);
 app.use("/api/logs", logRoutes);
 app.use("/api/chats", chatRoutes);
 app.use("/onedrive", onedriveRoutes);
+app.use("/api/freshworks", freshworksRoutes);
 
 const PORT = process.env.PORT || 5000;
 
