@@ -63,7 +63,8 @@ function detectFieldChanges(oldContact, newContact) {
     'display_name', 'email', 'job_title', 'country', 
     'work_number', 'mobile_number', 'lead_score', 
     'last_contacted', 'last_contacted_mode', 'recent_note', 
-    'owner_id', 'owner_name', 'contact_status_id', 'status_name'
+    'owner_id', 'owner_name', 'contact_status_id', 'status_name',
+    'territory_id', 'territory_name'
   ];
   
   // Check basic fields
@@ -123,6 +124,15 @@ function findStatusName(statusId, contactStatuses) {
   if (!statusId || !contactStatuses) return null;
   const status = contactStatuses.find(status => status.id === statusId);
   return status ? status.name : null;
+}
+
+/**
+ * Find territory name by ID from territories array
+ */
+function findTerritoryName(territoryId, territories) {
+  if (!territoryId || !territories) return null;
+  const territory = territories.find(territory => territory.id === territoryId);
+  return territory ? territory.name : null;
 }
 
 /**
@@ -618,12 +628,13 @@ async function syncContacts() {
       
       const url = `${FRESHWORKS_BASE_URL}/api/contacts/view/402001974783` +
                   `?per_page=100&page=${page}` +
-                  `&sort=updated_at&sort_type=desc&include=owner,contact_status`;
+                  `&sort=updated_at&sort_type=desc&include=owner,contact_status,territory`;
 
       const response = await axios.get(url, { headers });
       const contacts = response.data.contacts || [];
       const users = response.data.users || [];
       const contactStatuses = response.data.contact_status || [];
+      const territories = response.data.territories || [];
 
       if (contacts.length === 0) break;
 
@@ -654,9 +665,10 @@ async function syncContacts() {
           newestContactSeen = contact.updated_at;
         }
         
-        // Enrich contact with owner and status names
+        // Enrich contact with owner, status, and territory names
         contact.owner_name = findOwnerName(contact.owner_id, users);
         contact.status_name = findStatusName(contact.contact_status_id, contactStatuses);
+        contact.territory_name = findTerritoryName(contact.territory_id, territories);
         
         // Check if contact exists and detect changes
         const existingContact = await contactsCol.findOne({ id: contact.id });
@@ -875,6 +887,12 @@ async function getSyncStatus() {
       "conversations.0": { $exists: true } 
     });
 
+    // Territory statistics
+    const territoryStats = await contactsCol.aggregate([
+      { $group: { _id: "$territory_name", count: { $sum: 1 } } },
+      { $sort: { count: -1 } }
+    ]).toArray();
+
     console.log('Current Sync Status:');
     if (state) {
       console.log(`   Last sync: ${state.lastSyncAt}`);
@@ -888,6 +906,13 @@ async function getSyncStatus() {
     console.log(`   Total contacts in DB: ${totalContacts}`);
     console.log(`   Contacts with conversations: ${contactsWithConversations}`);
     console.log(`   Ignored email domains: ${IGNORED_EMAIL_DOMAINS.join(', ')}`);
+    
+    if (territoryStats.length > 0) {
+      console.log('   Territory Distribution:');
+      territoryStats.forEach(stat => {
+        console.log(`     ${stat._id || 'Unknown'}: ${stat.count} contacts`);
+      });
+    }
     
     return state;
   } finally {
