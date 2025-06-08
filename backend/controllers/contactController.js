@@ -1,8 +1,6 @@
 const Contact = require('../models/Contact');
 
-// Updated getContactsTable function with territory support and NA handling
-
-// Updated getContactsTable function - fixed territory mapping
+// Updated getContactsTable function with fixed search including market name
 const getContactsTable = async (req, res) => {
   try {
     // Extract query parameters
@@ -16,20 +14,21 @@ const getContactsTable = async (req, res) => {
       owner = '',
       startDate = '',
       endDate = '',
-      territory = '', // Territory filter
+      territory = '',
       leadLevel = ''
     } = req.query;
 
     // Build query object
     const query = {};
 
-    // Add search filter
+    // FIXED: Add search filter - INCLUDING market name field
     if (search) {
       query.$or = [
         { display_name: { $regex: search, $options: 'i' } },
         { email: { $regex: search, $options: 'i' } },
         { mobile_number: { $regex: search, $options: 'i' } },
-        { 'custom_field.cf_company_name': { $regex: search, $options: 'i' } }
+        { 'custom_field.cf_company_name': { $regex: search, $options: 'i' } },
+        { 'custom_field.cf_report_name': { $regex: search, $options: 'i' } } // Added market name search
       ];
     }
 
@@ -112,18 +111,48 @@ const getContactsTable = async (req, res) => {
       $nin: [null, '', '-', 'NA', 'na', 'N/A', 'n/a', undefined]
     };
 
-    // Add date range filter
+    // Add date range filter with proper timezone handling
     if (startDate || endDate) {
-      query.created_at = {};
-      if (startDate) query.created_at.$gte = new Date(startDate);
-      if (endDate) query.created_at.$lte = new Date(endDate);
+      query.$expr = query.$expr || { $and: [] };
+      if (!Array.isArray(query.$expr.$and)) {
+        query.$expr.$and = [];
+      }
+      
+      if (startDate) {
+        const startDateObj = new Date(startDate);
+        console.log('Original startDate:', startDate);
+        console.log('Parsed startDate:', startDateObj);
+        
+        query.$expr.$and.push({
+          $gte: [
+            { $dateFromString: { dateString: "$created_at" } },
+            startDateObj
+          ]
+        });
+      }
+      
+      if (endDate) {
+        const endDateObj = new Date(endDate);
+        console.log('Original endDate:', endDate);
+        console.log('Parsed endDate:', endDateObj);
+        
+        query.$expr.$and.push({
+          $lte: [
+            { $dateFromString: { dateString: "$created_at" } },
+            endDateObj
+          ]
+        });
+      }
     }
+
+    console.log('Final MongoDB query:', JSON.stringify(query, null, 2));
 
     // Calculate skip value for pagination
     const skip = (parseInt(page) - 1) * parseInt(limit);
 
     // Get total count for pagination with the same filter
     const totalCount = await Contact.countDocuments(query);
+    console.log('Total count found:', totalCount);
 
     // Map frontend sort fields to database fields
     let dbSortField = sortBy;
@@ -137,20 +166,23 @@ const getContactsTable = async (req, res) => {
       dbSortField = 'territory_name';
     }
 
-
     // Get contacts with only required fields for table
     const contacts = await Contact.find(query)
       .select('id display_name email country job_title custom_field owner_name created_at last_contacted last_contacted_mode status_name territory_name')
       .sort({ [dbSortField]: sortOrder === 'asc' ? 1 : -1 })
       .skip(skip)
       .limit(parseInt(limit))
-      .lean(); // Use lean() for better performance
+      .lean();
 
-    console.log('Sample contact territory data:', contacts.slice(0, 3).map(c => ({
-      name: c.display_name,
-      territory_name: c.territory_name,
-      territory_type: typeof c.territory_name
-    }))); // Debug log
+    console.log('Contacts found:', contacts.length);
+    if (contacts.length > 0) {
+      console.log('Sample contact market names:', contacts.slice(0, 3).map(c => ({
+        name: c.display_name,
+        market_name: c.custom_field?.cf_report_name,
+        created_at: c.created_at,
+        territory_name: c.territory_name
+      })));
+    }
 
     // Helper function to format field values
     const formatValue = (value) => {
@@ -163,7 +195,6 @@ const getContactsTable = async (req, res) => {
     // Transform data for table view and double-check market_name
     const tableData = contacts
       .filter(contact => {
-        // Double filter in case some still slip through
         const marketName = contact.custom_field?.cf_report_name;
         return marketName && 
                marketName !== '-' && 
@@ -181,7 +212,7 @@ const getContactsTable = async (req, res) => {
         company: formatValue(contact.custom_field?.cf_company_name),
         country: formatValue(contact.country),
         job_title: formatValue(contact.job_title),
-        territory: formatValue(contact.territory_name), // This should map territory_name to territory
+        territory: formatValue(contact.territory_name),
         lead_level: formatValue(contact.custom_field?.cf_lead_level),
         status_name: formatValue(contact.status_name),
         owner_name: formatValue(contact.owner_name),
@@ -189,8 +220,6 @@ const getContactsTable = async (req, res) => {
         last_contacted_mode: formatValue(contact.last_contacted_mode),
         last_contacted_time: contact.last_contacted || null
       }));
-
- 
 
     // Calculate pagination metadata based on filtered results
     const totalPages = Math.ceil(totalCount / parseInt(limit));
@@ -217,7 +246,7 @@ const getContactsTable = async (req, res) => {
   }
 };
 
-// Get all contacts with full details
+// ALSO UPDATE getAllContacts function with the same fix
 const getAllContacts = async (req, res) => {
   try {
     const {
@@ -234,12 +263,14 @@ const getAllContacts = async (req, res) => {
 
     const query = {};
 
+    // FIXED: Add market name to search
     if (search) {
       query.$or = [
         { display_name: { $regex: search, $options: 'i' } },
         { email: { $regex: search, $options: 'i' } },
         { mobile_number: { $regex: search, $options: 'i' } },
-        { 'custom_field.cf_company_name': { $regex: search, $options: 'i' } }
+        { 'custom_field.cf_company_name': { $regex: search, $options: 'i' } },
+        { 'custom_field.cf_report_name': { $regex: search, $options: 'i' } } // Added market name search
       ];
     }
 

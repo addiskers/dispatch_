@@ -13,16 +13,20 @@ const FreshworksLeads = () => {
   const [filters, setFilters] = useState({
     status: '',
     owner: '',
-    territory: '', // Changed from region to territory
-    leadLevel: ''
+    territory: '',
+    leadLevel: '',
+    dateFilter: '', // today, yesterday, week, month, custom
+    startDate: '',
+    endDate: ''
   });
   const [filterOptions, setFilterOptions] = useState({
     statuses: [],
     owners: [],
-    territories: [], // Changed from regions to territories
+    territories: [],
     leadLevels: []
   });
   const [showFilters, setShowFilters] = useState(false);
+  const [showCustomDatePicker, setShowCustomDatePicker] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
   const [showColumnCustomizer, setShowColumnCustomizer] = useState(false);
   
@@ -39,7 +43,7 @@ const FreshworksLeads = () => {
     owner_name: { label: 'Owner', width: 120, visible: true },
     email: { label: 'Email', width: 200, visible: false },
     country: { label: 'Country', width: 120, visible: false },
-    territory: { label: 'Territory', width: 120, visible: false }, // Changed from region to territory
+    territory: { label: 'Territory', width: 120, visible: false },
     last_contacted_mode: { label: 'Contact Mode', width: 130, visible: false }
   });
   
@@ -54,6 +58,65 @@ const FreshworksLeads = () => {
   const [tempColumnOrder, setTempColumnOrder] = useState(Object.keys(availableColumns));
 
   const API_BASE_URL = process.env.REACT_APP_API_URL || 'http://localhost:5000/api';
+
+  // Date filter options
+  const dateFilterOptions = [
+    { value: '', label: 'All Time' },
+    { value: 'today', label: 'Today' },
+    { value: 'yesterday', label: 'Yesterday' },
+    { value: 'week', label: 'Last 7 Days' },
+    { value: 'month', label: 'Last 30 Days' },
+    { value: 'custom', label: 'Custom Range' }
+  ];
+
+  // Helper function to get date ranges
+  const getDateRange = (filterType) => {
+    const now = new Date();
+    const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+    
+    switch (filterType) {
+      case 'today':
+        const todayEnd = new Date(today);
+        todayEnd.setHours(23, 59, 59, 999);
+        return {
+          startDate: today.toISOString(),
+          endDate: todayEnd.toISOString()
+        };
+      
+      case 'yesterday':
+        const yesterday = new Date(today);
+        yesterday.setDate(yesterday.getDate() - 1);
+        const yesterdayEnd = new Date(yesterday);
+        yesterdayEnd.setHours(23, 59, 59, 999);
+        return {
+          startDate: yesterday.toISOString(),
+          endDate: yesterdayEnd.toISOString()
+        };
+      
+      case 'week':
+        const weekAgo = new Date(today);
+        weekAgo.setDate(weekAgo.getDate() - 7);
+        const todayEndWeek = new Date(today);
+        todayEndWeek.setHours(23, 59, 59, 999);
+        return {
+          startDate: weekAgo.toISOString(),
+          endDate: todayEndWeek.toISOString()
+        };
+      
+      case 'month':
+        const monthAgo = new Date(today);
+        monthAgo.setDate(monthAgo.getDate() - 30);
+        const todayEndMonth = new Date(today);
+        todayEndMonth.setHours(23, 59, 59, 999);
+        return {
+          startDate: monthAgo.toISOString(),
+          endDate: todayEndMonth.toISOString()
+        };
+      
+      default:
+        return { startDate: '', endDate: '' };
+    }
+  };
 
   useEffect(() => {
     fetchContacts();
@@ -92,6 +155,18 @@ const FreshworksLeads = () => {
   const fetchContacts = async () => {
     try {
       setLoading(true);
+      
+      // Get date range based on filter
+      let dateRange = { startDate: '', endDate: '' };
+      if (filters.dateFilter && filters.dateFilter !== 'custom') {
+        dateRange = getDateRange(filters.dateFilter);
+      } else if (filters.dateFilter === 'custom') {
+        dateRange = {
+          startDate: filters.startDate,
+          endDate: filters.endDate
+        };
+      }
+
       const params = new URLSearchParams({
         page: currentPage,
         limit: 100,
@@ -100,8 +175,10 @@ const FreshworksLeads = () => {
         sortOrder: sortConfig.direction,
         status: filters.status,
         owner: filters.owner,
-        territory: filters.territory, // Changed from region to territory
-        leadLevel: filters.leadLevel
+        territory: filters.territory,
+        leadLevel: filters.leadLevel,
+        startDate: dateRange.startDate,
+        endDate: dateRange.endDate
       });
 
       const response = await fetch(`${API_BASE_URL}/contacts/table?${params}`);
@@ -129,7 +206,7 @@ const FreshworksLeads = () => {
         setFilterOptions({
           statuses: data.data.statuses || [],
           owners: data.data.owners || [],
-          territories: data.data.territories || [], // Changed from regions to territories
+          territories: data.data.territories || [],
           leadLevels: data.data.leadLevels || []
         });
       }
@@ -152,17 +229,62 @@ const FreshworksLeads = () => {
   };
 
   const handleFilterChange = (filterName, value) => {
-    setFilters(prev => ({ ...prev, [filterName]: value }));
+    setFilters(prev => {
+      const newFilters = { ...prev, [filterName]: value };
+      
+      // Handle date filter changes
+      if (filterName === 'dateFilter') {
+        if (value === 'custom') {
+          setShowCustomDatePicker(true);
+        } else {
+          setShowCustomDatePicker(false);
+          // Clear custom date values when switching to preset filters
+          newFilters.startDate = '';
+          newFilters.endDate = '';
+        }
+      }
+      
+      return newFilters;
+    });
     setCurrentPage(1);
+  };
+
+  const handleCustomDateChange = (dateType, value) => {
+    setFilters(prev => ({
+      ...prev,
+      [dateType]: value
+    }));
   };
 
   const clearFilters = () => {
-    setFilters({ status: '', owner: '', territory: '', leadLevel: '' }); // Changed region to territory
+    setFilters({ 
+      status: '', 
+      owner: '', 
+      territory: '', 
+      leadLevel: '',
+      dateFilter: '',
+      startDate: '',
+      endDate: ''
+    });
     setSearchTerm('');
     setCurrentPage(1);
+    setShowCustomDatePicker(false);
   };
 
-  // Column customizer functions
+  // Get the display text for active date filter
+  const getDateFilterDisplayText = () => {
+    if (!filters.dateFilter) return '';
+    
+    const option = dateFilterOptions.find(opt => opt.value === filters.dateFilter);
+    if (filters.dateFilter === 'custom' && (filters.startDate || filters.endDate)) {
+      const start = filters.startDate ? new Date(filters.startDate).toLocaleDateString() : '';
+      const end = filters.endDate ? new Date(filters.endDate).toLocaleDateString() : '';
+      return `Custom: ${start} - ${end}`;
+    }
+    return option ? option.label : '';
+  };
+
+  // Column customizer functions (keeping existing functionality)
   const toggleColumnVisibility = (columnKey) => {
     setTempColumnConfig(prev => ({
       ...prev,
@@ -183,7 +305,6 @@ const FreshworksLeads = () => {
     setColumnConfig(tempColumnConfig);
     setColumnOrder(tempColumnOrder);
     
-    // Save to localStorage
     localStorage.setItem('freshworks-column-config', JSON.stringify(tempColumnConfig));
     localStorage.setItem('freshworks-column-order', JSON.stringify(tempColumnOrder));
     
@@ -196,7 +317,7 @@ const FreshworksLeads = () => {
     setShowColumnCustomizer(false);
   };
 
-  // Drag and drop for column reordering
+  // Drag and drop functionality (keeping existing)
   const handleDragStart = (e, columnKey) => {
     setDraggedColumn(columnKey);
     e.dataTransfer.effectAllowed = 'move';
@@ -220,9 +341,7 @@ const FreshworksLeads = () => {
       const draggedIndex = newOrder.indexOf(draggedColumn);
       const targetIndex = newOrder.indexOf(targetColumnKey);
       
-      // Remove dragged item
       newOrder.splice(draggedIndex, 1);
-      // Insert at target position
       newOrder.splice(targetIndex, 0, draggedColumn);
       
       setTempColumnOrder(newOrder);
@@ -239,7 +358,7 @@ const FreshworksLeads = () => {
     setDragOverColumn(null);
   };
 
-  // Column resizing
+  // Column resizing (keeping existing)
   const handleMouseDown = (e, columnKey) => {
     e.preventDefault();
     e.stopPropagation();
@@ -261,7 +380,6 @@ const FreshworksLeads = () => {
     };
 
     const handleMouseUp = () => {
-      // Save to localStorage
       localStorage.setItem('freshworks-column-config', JSON.stringify(columnConfig));
       
       document.removeEventListener('mousemove', handleMouseMove);
@@ -328,7 +446,7 @@ const FreshworksLeads = () => {
           return formatDate(contact.created_at);
         case 'last_contacted_time':
           return formatDateTime(contact.last_contacted_time);
-        case 'territory': // Handle territory column
+        case 'territory':
           return contact.territory || '-';
         default:
           return contact[columnKey] || '-';
@@ -425,7 +543,15 @@ const FreshworksLeads = () => {
     );
   }
 
-  const activeFiltersCount = Object.values(filters).filter(Boolean).length;
+  const activeFiltersCount = Object.values(filters).filter((value, index) => {
+    // Don't count startDate and endDate separately if dateFilter is set
+    const keys = Object.keys(filters);
+    const key = keys[index];
+    if ((key === 'startDate' || key === 'endDate') && filters.dateFilter) {
+      return false;
+    }
+    return Boolean(value);
+  }).length;
 
   return (
     <div className="freshworks-leads-container">
@@ -498,7 +624,29 @@ const FreshworksLeads = () => {
           {showFilters && (
             <div className="mt-3 p-3 bg-light rounded">
               <div className="row g-3">
+                {/* Date Filter */}
                 <div className="col-md-3">
+                  <label className="form-label fw-bold text-muted small">DATE RANGE</label>
+                  <select
+                    className="form-select"
+                    value={filters.dateFilter}
+                    onChange={(e) => handleFilterChange('dateFilter', e.target.value)}
+                  >
+                    {dateFilterOptions.map(option => (
+                      <option key={option.value} value={option.value}>
+                        {option.label}
+                      </option>
+                    ))}
+                  </select>
+                  {filters.dateFilter && (
+                    <small className="text-muted d-block mt-1">
+                      {getDateFilterDisplayText()}
+                    </small>
+                  )}
+                </div>
+
+                <div className="col-md-3">
+                  <label className="form-label fw-bold text-muted small">STATUS</label>
                   <select
                     className="form-select"
                     value={filters.status}
@@ -510,7 +658,9 @@ const FreshworksLeads = () => {
                     ))}
                   </select>
                 </div>
+
                 <div className="col-md-3">
+                  <label className="form-label fw-bold text-muted small">OWNER</label>
                   <select
                     className="form-select"
                     value={filters.owner}
@@ -522,19 +672,56 @@ const FreshworksLeads = () => {
                     ))}
                   </select>
                 </div>
+
                 <div className="col-md-3">
+                  <label className="form-label fw-bold text-muted small">TERRITORY</label>
                   <select
                     className="form-select"
-                    value={filters.territory} // Changed from region to territory
-                    onChange={(e) => handleFilterChange('territory', e.target.value)} // Changed from region to territory
+                    value={filters.territory}
+                    onChange={(e) => handleFilterChange('territory', e.target.value)}
                   >
-                    <option value="">All Territories</option> {/* Changed from Regions to Territories */}
-                    {filterOptions.territories.map(territory => ( // Changed from regions to territories
+                    <option value="">All Territories</option>
+                    {filterOptions.territories.map(territory => (
                       <option key={territory} value={territory}>{territory}</option>
                     ))}
                   </select>
                 </div>
+              </div>
+
+              {/* Custom Date Range Picker */}
+              {showCustomDatePicker && (
+                <div className="row g-3 mt-2 p-3 border rounded bg-white">
+                  <div className="col-md-6">
+                    <label className="form-label fw-bold text-muted small">START DATE</label>
+                    <input
+                      type="date"
+                      className="form-control"
+                      value={filters.startDate ? filters.startDate.split('T')[0] : ''}
+                      onChange={(e) => {
+                        const date = e.target.value ? `${e.target.value}T00:00:00.000Z` : '';
+                        handleCustomDateChange('startDate', date);
+                      }}
+                    />
+                  </div>
+                  <div className="col-md-6">
+                    <label className="form-label fw-bold text-muted small">END DATE</label>
+                    <input
+                      type="date"
+                      className="form-control"
+                      value={filters.endDate ? filters.endDate.split('T')[0] : ''}
+                      onChange={(e) => {
+                        const date = e.target.value ? `${e.target.value}T23:59:59.999Z` : '';
+                        handleCustomDateChange('endDate', date);
+                      }}
+                    />
+                  </div>
+                </div>
+              )}
+
+              {/* Lead Level Filter */}
+              <div className="row g-3 mt-2">
                 <div className="col-md-3">
+                  <label className="form-label fw-bold text-muted small">LEAD LEVEL</label>
                   <select
                     className="form-select"
                     value={filters.leadLevel}
@@ -547,8 +734,9 @@ const FreshworksLeads = () => {
                   </select>
                 </div>
               </div>
+
               {activeFiltersCount > 0 && (
-                <div className="mt-2">
+                <div className="mt-3">
                   <button 
                     onClick={clearFilters}
                     className="btn btn-sm btn-outline-primary"
@@ -708,7 +896,6 @@ const FreshworksLeads = () => {
             </div>
             
             <div className="customize-body">
-              {/* Search Fields */}
               <div className="search-container">
                 <div className="search-input-container">
                   <span className="search-icon">🔍</span>
@@ -722,7 +909,6 @@ const FreshworksLeads = () => {
                 </div>
               </div>
 
-              {/* Columns List */}
               <div className="columns-container">
                 <div className="visible-columns-section">
                   {filteredColumns
@@ -755,12 +941,10 @@ const FreshworksLeads = () => {
                   ))}
                 </div>
                 
-                {/* Divider */}
                 <div className="section-divider">
                   <span className="divider-text">Fields not shown in table</span>
                 </div>
 
-                {/* Hidden Columns */}
                 <div className="hidden-columns-section">
                   {filteredColumns
                     .filter(([_, config]) => !config.visible)
