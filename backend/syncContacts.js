@@ -3,7 +3,7 @@ require('dotenv').config();
 const axios = require('axios');
 const { MongoClient } = require('mongodb');
 const cron = require('node-cron');
-
+const { calculateCRMAnalytics } = require('./crmAnalytics');
 // Configuration from environment variables
 const {
   MONGO_URI = 'mongodb://localhost:27017/sale',
@@ -738,7 +738,8 @@ async function syncContacts() {
                   return new Date(c.created_at);
                 })) : null
             };
-            
+            contact.crm_analytics = calculateCRMAnalytics(contact);
+
             conversationsProcessed += totalEmailMessages + phoneConversations.length + notes.length;
             console.log(`   Processed ${contact.conversations.length} conversations (${emailThreads.length} email threads with ${totalEmailMessages} messages, ${phoneConversations.length} calls, ${notes.length} notes) for ${contact.display_name}`);
           } else {
@@ -758,6 +759,8 @@ async function syncContacts() {
               },
               last_conversation_date: null
             };
+            contact.crm_analytics = getEmptyAnalytics(contact);
+
             console.log(`   No conversations found for ${contact.display_name}`);
           }
         } else if (existingContact && existingContact.conversations) {
@@ -765,6 +768,9 @@ async function syncContacts() {
           contact.conversations = existingContact.conversations;
           contact.conversation_stats = existingContact.conversation_stats || {};
           console.log(`   Keeping ${existingContact.conversations.length} existing conversations for ${contact.display_name}`);
+          contact.crm_analytics = calculateCRMAnalytics(contact);
+
+          
         } else {
           contact.conversations = [];
           contact.conversation_stats = {
@@ -781,7 +787,8 @@ async function syncContacts() {
               needs_response: false
             },
             last_conversation_date: null
-          };
+          };contact.crm_analytics = getEmptyAnalytics(contact);
+
         }
         
         // Prepare update data
@@ -960,3 +967,54 @@ initialize().catch(error => {
   console.error('Failed to initialize:', error);
   process.exit(1);
 });
+function getEmptyAnalytics(contact) {
+  const createdDate = new Date(contact.created_at);
+  const now = new Date();
+  
+  return {
+    first_contact: null,
+    first_call: null,
+    first_email_sent: null,
+    first_email_received: null,
+    last_contact: null,
+    engagement: {
+      total_touchpoints: 0,
+      outgoing_emails: 0,
+      incoming_emails: 0,
+      outgoing_calls: 0,
+      incoming_calls: 0,
+      email_opens: 0,
+      email_clicks: 0,
+      email_replies: 0,
+      call_answers: 0,
+      call_duration_total: 0,
+      avg_call_duration: 0
+    },
+    response_metrics: {
+      first_response_time: null,
+      avg_response_time: null,
+      last_response_date: null,
+      response_rate: 0,
+      needs_follow_up: true
+    },
+    lead_progression: {
+      days_in_pipeline: Math.ceil((now - createdDate) / (1000 * 60 * 60 * 24)),
+      status_changes: [],
+      qualification_score: contact.lead_score || 0,
+      next_action_due: null,
+      last_action_date: null
+    },
+    contact_frequency: {
+      last_7_days: 0,
+      last_30_days: 0,
+      last_90_days: 0,
+      avg_contacts_per_week: 0
+    },
+    meetings: {
+      scheduled: 0,
+      completed: 0,
+      no_shows: 0,
+      next_meeting: null
+    }
+  };
+}
