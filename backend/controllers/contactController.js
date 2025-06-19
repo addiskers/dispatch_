@@ -1,6 +1,6 @@
 const Contact = require('../models/Contact');
 
-// Updated getContactsTable function with fixed search including market name
+// Updated getContactsTable function with fixed search including market name and CRM analytics
 const getContactsTable = async (req, res) => {
   try {
     // Extract query parameters
@@ -15,7 +15,10 @@ const getContactsTable = async (req, res) => {
       startDate = '',
       endDate = '',
       territory = '',
-      leadLevel = ''
+      leadLevel = '',
+      contactCategory = '',
+      customTags = '',
+      isActive = ''
     } = req.query;
 
     // Build query object
@@ -98,7 +101,81 @@ const getContactsTable = async (req, res) => {
       }
     }
 
-    // IMPORTANT: Filter out contacts with empty, "-", "NA", or invalid market names
+    // Handle contact category filter - check for "Unassigned" selection
+    if (contactCategory) {
+      if (contactCategory.startsWith('Unassigned')) {
+        query.$and = query.$and || [];
+        query.$and.push({
+          $or: [
+            { 'custom_field.cf_contact_category': { $exists: false } },
+            { 'custom_field.cf_contact_category': null },
+            { 'custom_field.cf_contact_category': '' },
+            { 'custom_field.cf_contact_category': '-' },
+            { 'custom_field.cf_contact_category': 'NA' },
+            { 'custom_field.cf_contact_category': 'na' },
+            { 'custom_field.cf_contact_category': 'N/A' },
+            { 'custom_field.cf_contact_category': 'n/a' }
+          ]
+        });
+      } else {
+        query['custom_field.cf_contact_category'] = contactCategory;
+      }
+    }
+
+    // Handle custom tags filter - check for "Unassigned" selection
+    if (customTags) {
+      if (customTags.startsWith('Unassigned')) {
+        query.$and = query.$and || [];
+        query.$and.push({
+          $or: [
+            { 'custom_field.cf_custom_tags': { $exists: false } },
+            { 'custom_field.cf_custom_tags': null },
+            { 'custom_field.cf_custom_tags': '' },
+            { 'custom_field.cf_custom_tags': '-' },
+            { 'custom_field.cf_custom_tags': 'NA' },
+            { 'custom_field.cf_custom_tags': 'na' },
+            { 'custom_field.cf_custom_tags': 'N/A' },
+            { 'custom_field.cf_custom_tags': 'n/a' }
+          ]
+        });
+      } else {
+        query['custom_field.cf_custom_tags'] = customTags;
+      }
+    }
+
+    // Handle active status filter (based on CRM analytics)
+    if (isActive) {
+      query.$and = query.$and || [];
+      
+      if (isActive === 'yes') {
+        // Contact is active if they have incoming emails OR connected calls
+        query.$and.push({
+          $or: [
+            { 'crm_analytics.engagement.incoming_emails': { $gt: 0 } },
+            { 'crm_analytics.engagement.connected_calls': { $gt: 0 } }
+          ]
+        });
+      } else if (isActive === 'no') {
+        // Contact is not active if they have NO incoming emails AND NO connected calls
+        query.$and.push({
+          $and: [
+            { 
+              $or: [
+                { 'crm_analytics.engagement.incoming_emails': { $exists: false } },
+                { 'crm_analytics.engagement.incoming_emails': 0 }
+              ]
+            },
+            { 
+              $or: [
+                { 'crm_analytics.engagement.connected_calls': { $exists: false } },
+                { 'crm_analytics.engagement.connected_calls': 0 }
+              ]
+            }
+          ]
+        });
+      }
+    }
+
     query['custom_field.cf_report_name'] = { 
       $exists: true, 
       $ne: null, 
@@ -164,11 +241,39 @@ const getContactsTable = async (req, res) => {
       dbSortField = 'custom_field.cf_company_name';
     } else if (sortBy === 'territory') {
       dbSortField = 'territory_name';
+    } else if (sortBy === 'contact_category') {
+      dbSortField = 'custom_field.cf_contact_category';
+    } else if (sortBy === 'custom_tags') {
+      dbSortField = 'custom_field.cf_custom_tags';
+    } else if (sortBy === 'is_active') {
+      // For sorting by active status, we'll use a computed field approach
+      dbSortField = 'crm_analytics.engagement.incoming_emails';
+    } else if (sortBy === 'sample_sent_timing') {
+      // For sorting by sample sent timing
+      dbSortField = 'crm_analytics.first_email_with_attachment.date';
+    } else if (sortBy === 'last_email_received') {
+      dbSortField = 'crm_analytics.last_email_received.date';
+    } else if (sortBy === 'first_email_with_attachment') {
+      dbSortField = 'crm_analytics.first_email_with_attachment.date';
+    } else if (sortBy === 'total_touchpoints') {
+      dbSortField = 'crm_analytics.engagement.total_touchpoints';
+    } else if (sortBy === 'outgoing_emails') {
+      dbSortField = 'crm_analytics.engagement.outgoing_emails';
+    } else if (sortBy === 'incoming_emails') {
+      dbSortField = 'crm_analytics.engagement.incoming_emails';
+    } else if (sortBy === 'outgoing_calls') {
+      dbSortField = 'crm_analytics.engagement.outgoing_calls';
+    } else if (sortBy === 'connected_calls') {
+      dbSortField = 'crm_analytics.engagement.connected_calls';
+    } else if (sortBy === 'not_connected_calls') {
+      dbSortField = 'crm_analytics.engagement.not_connected_calls';
+    } else if (sortBy === 'call_duration_total') {
+      dbSortField = 'crm_analytics.engagement.call_duration_total';
     }
 
-    // Get contacts with only required fields for table
+    // Get contacts with required fields for table INCLUDING CRM analytics
     const contacts = await Contact.find(query)
-      .select('id display_name email country job_title custom_field owner_name created_at last_contacted last_contacted_mode status_name territory_name')
+      .select('id display_name email country job_title custom_field owner_name created_at last_contacted last_contacted_mode status_name territory_name crm_analytics')
       .sort({ [dbSortField]: sortOrder === 'asc' ? 1 : -1 })
       .skip(skip)
       .limit(parseInt(limit))
@@ -190,6 +295,37 @@ const getContactsTable = async (req, res) => {
         return 'NA';
       }
       return value;
+    };
+
+    // Helper function to format duration in minutes and seconds
+    const formatDuration = (seconds) => {
+      if (!seconds || seconds === 0) return '0m 0s';
+      const minutes = Math.floor(seconds / 60);
+      const remainingSeconds = seconds % 60;
+      return `${minutes}m ${remainingSeconds}s`;
+    };
+
+    // Helper function to determine if contact is active
+    const isContactActive = (contact) => {
+      const incomingEmails = contact.crm_analytics?.engagement?.incoming_emails || 0;
+      const connectedCalls = contact.crm_analytics?.engagement?.connected_calls || 0;
+      return incomingEmails > 0 || connectedCalls > 0;
+    };
+
+    // Helper function to calculate sample sent timing for individual contact
+    const calculateSampleSentTiming = (contact) => {
+      if (!contact.created_at || !contact.crm_analytics?.first_email_with_attachment?.date) {
+        return null;
+      }
+      
+      const createdDate = new Date(contact.created_at);
+      const sampleDate = new Date(contact.crm_analytics.first_email_with_attachment.date);
+      
+      if (sampleDate > createdDate) {
+        const hoursDelay = (sampleDate - createdDate) / (1000 * 60 * 60);
+        return hoursDelay >= 0 && hoursDelay <= 8760 ? hoursDelay.toFixed(1) : null;
+      }
+      return null;
     };
 
     // Transform data for table view and double-check market_name
@@ -214,12 +350,126 @@ const getContactsTable = async (req, res) => {
         job_title: formatValue(contact.job_title),
         territory: formatValue(contact.territory_name),
         lead_level: formatValue(contact.custom_field?.cf_lead_level),
+        contact_category: formatValue(contact.custom_field?.cf_contact_category),
+        custom_tags: formatValue(contact.custom_field?.cf_custom_tags),
+        is_active: isContactActive(contact) ? 'Yes' : 'No',
+        sample_sent_timing: calculateSampleSentTiming(contact),
         status_name: formatValue(contact.status_name),
         owner_name: formatValue(contact.owner_name),
         created_at: contact.created_at,
         last_contacted_mode: formatValue(contact.last_contacted_mode),
-        last_contacted_time: contact.last_contacted || null
+        last_contacted_time: contact.last_contacted || null,
+        
+        // CRM Analytics fields
+        last_email_received: contact.crm_analytics?.last_email_received?.date || null,
+        first_email_with_attachment: contact.crm_analytics?.first_email_with_attachment?.date || null,
+        total_touchpoints: contact.crm_analytics?.engagement?.total_touchpoints || 0,
+        outgoing_emails: contact.crm_analytics?.engagement?.outgoing_emails || 0,
+        incoming_emails: contact.crm_analytics?.engagement?.incoming_emails || 0,
+        outgoing_calls: contact.crm_analytics?.engagement?.outgoing_calls || 0,
+        connected_calls: contact.crm_analytics?.engagement?.connected_calls || 0,
+        not_connected_calls: contact.crm_analytics?.engagement?.not_connected_calls || 0,
+        call_duration_total: contact.crm_analytics?.engagement?.call_duration_total || 0,
+        call_duration_formatted: formatDuration(contact.crm_analytics?.engagement?.call_duration_total || 0)
       }));
+
+    // Calculate analytics for all filtered contacts (not just current page)
+    const allFilteredContacts = await Contact.find(query)
+      .select('custom_field crm_analytics created_at')
+      .lean();
+
+    // Calculate analytics for all filtered contacts
+    const calculateFilteredAnalytics = (contacts) => {
+      if (!contacts || contacts.length === 0) {
+        return {
+          totalContacts: 0,
+          avgTouchpoints: '0.0',
+          avgEmails: '0.0',
+          avgCalls: '0.0',              // NEW: Add average calls
+          avgConnectedCalls: '0.0',
+          avgSampleSentHours: '0.0',
+          clientEmailsReceived: 0,
+          avgCallDuration: '0',
+          responseRate: '0.0',
+          samplesSentCount: 0
+        };
+      }
+
+      let totalTouchpoints = 0;
+      let totalOutgoingEmails = 0;
+      let totalOutgoingCalls = 0;        // NEW: Track total outgoing calls
+      let totalIncomingEmails = 0;
+      let totalConnectedCalls = 0;
+      let totalSampleSentHours = 0;
+      let validSampleSentCount = 0;
+      let totalCallDuration = 0;
+      let validCallDurationCount = 0;
+      let contactsWithCalls = 0;
+
+      contacts.forEach(contact => {
+        if (contact.crm_analytics?.engagement) {
+          const engagement = contact.crm_analytics.engagement;
+          
+          // Total touchpoints
+          totalTouchpoints += engagement.total_touchpoints || 0;
+          
+          // Total emails (outgoing)
+          totalOutgoingEmails += engagement.outgoing_emails || 0;
+          
+          // NEW: Total outgoing calls
+          totalOutgoingCalls += engagement.outgoing_calls || 0;
+          
+          // Connected calls
+          const connectedCalls = engagement.connected_calls || 0;
+          totalConnectedCalls += connectedCalls;
+          
+          // Count contacts with calls for average calculation
+          if ((engagement.outgoing_calls || 0) > 0) {
+            contactsWithCalls++;
+          }
+          
+          // Incoming emails (client emails received)
+          totalIncomingEmails += engagement.incoming_emails || 0;
+          
+          // Call duration (only for contacts with calls)
+          if (engagement.call_duration_total && engagement.call_duration_total > 0) {
+            totalCallDuration += engagement.call_duration_total;
+            validCallDurationCount++;
+          }
+        }
+        
+        if (contact.created_at && contact.crm_analytics?.first_email_with_attachment?.date) {
+          const createdDate = new Date(contact.created_at);
+          const sampleSentDate = new Date(contact.crm_analytics.first_email_with_attachment.date);
+          
+          if (sampleSentDate > createdDate) {
+            const hoursDelay = (sampleSentDate - createdDate) / (1000 * 60 * 60);
+            if (hoursDelay >= 0 && hoursDelay <= 8760) { 
+              totalSampleSentHours += hoursDelay;
+              validSampleSentCount++;
+            }
+          }
+        }
+      });
+
+      // Calculate response rate (incoming emails / outgoing emails)
+      const responseRate = totalOutgoingEmails > 0 ? (totalIncomingEmails / totalOutgoingEmails) * 100 : 0;
+
+      return {
+        totalContacts: contacts.length,
+        avgTouchpoints: contacts.length > 0 ? (totalTouchpoints / contacts.length).toFixed(1) : '0.0',
+        avgEmails: contacts.length > 0 ? (totalOutgoingEmails / contacts.length).toFixed(1) : '0.0',
+        avgCalls: contacts.length > 0 ? (totalOutgoingCalls / contacts.length).toFixed(1) : '0.0',  // NEW: Average calls per contact
+        avgConnectedCalls: contactsWithCalls > 0 ? (totalConnectedCalls / contactsWithCalls).toFixed(1) : '0.0',
+        avgSampleSentHours: validSampleSentCount > 0 ? (totalSampleSentHours / validSampleSentCount).toFixed(1) : '0.0',
+        clientEmailsReceived: totalIncomingEmails,
+        avgCallDuration: validCallDurationCount > 0 ? (totalCallDuration / validCallDurationCount).toFixed(0) : '0',
+        responseRate: responseRate.toFixed(1),
+        samplesSentCount: validSampleSentCount
+      };
+    };
+
+    const analytics = calculateFilteredAnalytics(allFilteredContacts);
 
     // Calculate pagination metadata based on filtered results
     const totalPages = Math.ceil(totalCount / parseInt(limit));
@@ -227,6 +477,7 @@ const getContactsTable = async (req, res) => {
     res.json({
       success: true,
       data: tableData,
+      analytics: analytics, // Add analytics to response
       pagination: {
         currentPage: parseInt(page),
         totalPages,
@@ -363,7 +614,6 @@ const getContactById = async (req, res) => {
 // Get contact statistics
 const getContactStats = async (req, res) => {
   try {
-    // Add market name filter to stats as well - exclude NA values
     const marketNameFilter = {
       'custom_field.cf_report_name': { 
         $exists: true, 
@@ -422,7 +672,7 @@ const getContactStats = async (req, res) => {
         }
       },
       { $sort: { count: -1 } },
-      { $limit: 10 } // Top 10 owners
+      { $limit: 10 } 
     ]);
 
     // Get contacts by territory (changed from region)
@@ -430,7 +680,7 @@ const getContactStats = async (req, res) => {
       { $match: marketNameFilter },
       {
         $group: {
-          _id: '$territory_name', // Use territory_name instead of cf_region
+          _id: '$territory_name',
           count: { $sum: 1 }
         }
       },
@@ -492,7 +742,7 @@ const getContactStats = async (req, res) => {
         },
         statusDistribution,
         ownerDistribution,
-        territoryDistribution, // Changed from regionDistribution
+        territoryDistribution, 
         callStats: callStats[0] || {
           avgCallDuration: 0,
           totalCalls: 0,
@@ -651,11 +901,13 @@ const getFilterOptions = async (req, res) => {
       }
     };
 
-    const [statuses, owners, territories, leadLevels] = await Promise.all([
+    const [statuses, owners, territories, leadLevels, contactCategories, customTags] = await Promise.all([
       Contact.distinct('status_name', marketNameFilter),
       Contact.distinct('owner_name', marketNameFilter),
       Contact.distinct('territory_name', marketNameFilter),
-      Contact.distinct('custom_field.cf_lead_level', marketNameFilter)
+      Contact.distinct('custom_field.cf_lead_level', marketNameFilter),
+      Contact.distinct('custom_field.cf_contact_category', marketNameFilter),
+      Contact.distinct('custom_field.cf_custom_tags', marketNameFilter)
     ]);
 
     // Filter out NA, null, empty values from all filter options
@@ -671,7 +923,7 @@ const getFilterOptions = async (req, res) => {
     );
 
     // Count contacts with missing/NA values for each field
-    const [unassignedOwnerCount, unassignedTerritoryCount, unassignedLeadLevelCount] = await Promise.all([
+    const [unassignedOwnerCount, unassignedTerritoryCount, unassignedLeadLevelCount, unassignedContactCategoryCount, unassignedCustomTagsCount] = await Promise.all([
       Contact.countDocuments({
         ...marketNameFilter,
         $or: [
@@ -710,6 +962,32 @@ const getFilterOptions = async (req, res) => {
           { 'custom_field.cf_lead_level': 'N/A' },
           { 'custom_field.cf_lead_level': 'n/a' }
         ]
+      }),
+      Contact.countDocuments({
+        ...marketNameFilter,
+        $or: [
+          { 'custom_field.cf_contact_category': { $exists: false } },
+          { 'custom_field.cf_contact_category': null },
+          { 'custom_field.cf_contact_category': '' },
+          { 'custom_field.cf_contact_category': '-' },
+          { 'custom_field.cf_contact_category': 'NA' },
+          { 'custom_field.cf_contact_category': 'na' },
+          { 'custom_field.cf_contact_category': 'N/A' },
+          { 'custom_field.cf_contact_category': 'n/a' }
+        ]
+      }),
+      Contact.countDocuments({
+        ...marketNameFilter,
+        $or: [
+          { 'custom_field.cf_custom_tags': { $exists: false } },
+          { 'custom_field.cf_custom_tags': null },
+          { 'custom_field.cf_custom_tags': '' },
+          { 'custom_field.cf_custom_tags': '-' },
+          { 'custom_field.cf_custom_tags': 'NA' },
+          { 'custom_field.cf_custom_tags': 'na' },
+          { 'custom_field.cf_custom_tags': 'N/A' },
+          { 'custom_field.cf_custom_tags': 'n/a' }
+        ]
       })
     ]);
 
@@ -717,6 +995,8 @@ const getFilterOptions = async (req, res) => {
     const processedOwners = filterNA(owners);
     const processedTerritories = filterNA(territories);
     const processedLeadLevels = filterNA(leadLevels);
+    const processedContactCategories = filterNA(contactCategories);
+    const processedCustomTags = filterNA(customTags);
 
     // Add "Unassigned" options if there are contacts without these values
     if (unassignedOwnerCount > 0) {
@@ -731,13 +1011,24 @@ const getFilterOptions = async (req, res) => {
       processedLeadLevels.unshift(`Unassigned (${unassignedLeadLevelCount})`);
     }
 
+    if (unassignedContactCategoryCount > 0) {
+      processedContactCategories.unshift(`Unassigned (${unassignedContactCategoryCount})`);
+    }
+
+    if (unassignedCustomTagsCount > 0) {
+      processedCustomTags.unshift(`Unassigned (${unassignedCustomTagsCount})`);
+    }
+
     res.json({
       success: true,
       data: {
         statuses: filterNA(statuses),
         owners: processedOwners,
         territories: processedTerritories,
-        leadLevels: processedLeadLevels
+        leadLevels: processedLeadLevels,
+        contactCategories: processedContactCategories,
+        customTags: processedCustomTags,
+        activeStatus: ['Yes', 'No'] // Static options for active filter
       }
     });
   } catch (error) {

@@ -3,6 +3,18 @@ import '../styles/freshworksleads.css';
 
 const FreshworksLeads = () => {
   const [contacts, setContacts] = useState([]);
+  const [analytics, setAnalytics] = useState({
+    totalContacts: 0,
+    avgTouchpoints: '0.0',
+    avgEmails: '0.0',
+    avgCalls: '0.0',              
+    avgConnectedCalls: '0.0',
+    avgSampleSentHours: '0.0',
+    clientEmailsReceived: 0,
+    avgCallDuration: '0',
+    responseRate: '0.0',
+    samplesSentCount: 0
+  });
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [searchTerm, setSearchTerm] = useState('');
@@ -15,6 +27,9 @@ const FreshworksLeads = () => {
     owner: '',
     territory: '',
     leadLevel: '',
+    contactCategory: '',
+    customTags: '',
+    isActive: '',
     dateFilter: '', // today, yesterday, week, month, custom
     startDate: '',
     endDate: ''
@@ -23,14 +38,17 @@ const FreshworksLeads = () => {
     statuses: [],
     owners: [],
     territories: [],
-    leadLevels: []
+    leadLevels: [],
+    contactCategories: [],
+    customTags: [],
+    activeStatus: []
   });
   const [showFilters, setShowFilters] = useState(false);
   const [showCustomDatePicker, setShowCustomDatePicker] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
   const [showColumnCustomizer, setShowColumnCustomizer] = useState(false);
   
-  // Column configuration
+  // Column configuration - UPDATED with CRM analytics columns
   const [availableColumns] = useState({
     created_at: { label: 'Date', width: 120, visible: true },
     market_name: { label: 'Market Name', width: 150, visible: true },
@@ -44,7 +62,22 @@ const FreshworksLeads = () => {
     email: { label: 'Email', width: 200, visible: false },
     country: { label: 'Country', width: 120, visible: false },
     territory: { label: 'Territory', width: 120, visible: false },
-    last_contacted_mode: { label: 'Contact Mode', width: 130, visible: false }
+    last_contacted_mode: { label: 'Contact Mode', width: 130, visible: false },
+    contact_category: { label: 'Contact Category', width: 140, visible: false },
+    custom_tags: { label: 'Custom Tags', width: 140, visible: false },
+    is_active: { label: 'Active Status', width: 120, visible: false },
+    sample_sent_timing: { label: 'Sample Sent (Hours)', width: 150, visible: false },
+    
+    // NEW CRM Analytics columns
+    last_email_received: { label: 'Last Email Received', width: 160, visible: false },
+    first_email_with_attachment: { label: 'First Email w/ Attachment', width: 180, visible: false },
+    total_touchpoints: { label: 'Total Touchpoints', width: 140, visible: false },
+    outgoing_emails: { label: 'Outgoing Emails', width: 130, visible: false },
+    incoming_emails: { label: 'Incoming Emails', width: 130, visible: false },
+    outgoing_calls: { label: 'Outgoing Calls', width: 130, visible: false },
+    connected_calls: { label: 'Connected Calls', width: 130, visible: false },
+    not_connected_calls: { label: 'Not Connected Calls', width: 150, visible: false },
+    call_duration_total: { label: 'Total Call Duration', width: 150, visible: false }
   });
   
   const [columnConfig, setColumnConfig] = useState(availableColumns);
@@ -177,6 +210,9 @@ const FreshworksLeads = () => {
         owner: filters.owner,
         territory: filters.territory,
         leadLevel: filters.leadLevel,
+        contactCategory: filters.contactCategory,
+        customTags: filters.customTags,
+        isActive: filters.isActive,
         startDate: dateRange.startDate,
         endDate: dateRange.endDate
       });
@@ -186,6 +222,18 @@ const FreshworksLeads = () => {
 
       if (data.success) {
         setContacts(data.data);
+        setAnalytics(data.analytics || {
+          totalContacts: 0,
+          avgTouchpoints: '0.0',
+          avgEmails: '0.0',
+          avgCalls: '0.0',              
+          avgConnectedCalls: '0.0',
+          avgSampleSentHours: '0.0',
+          clientEmailsReceived: 0,
+          avgCallDuration: '0',
+          responseRate: '0.0',
+          samplesSentCount: 0
+        });
         setTotalPages(data.pagination.totalPages);
         setTotalCount(data.pagination.totalCount);
       } else {
@@ -207,7 +255,10 @@ const FreshworksLeads = () => {
           statuses: data.data.statuses || [],
           owners: data.data.owners || [],
           territories: data.data.territories || [],
-          leadLevels: data.data.leadLevels || []
+          leadLevels: data.data.leadLevels || [],
+          contactCategories: data.data.contactCategories || [],
+          customTags: data.data.customTags || [],
+          activeStatus: data.data.activeStatus || []
         });
       }
     } catch (err) {
@@ -262,6 +313,9 @@ const FreshworksLeads = () => {
       owner: '', 
       territory: '', 
       leadLevel: '',
+      contactCategory: '',
+      customTags: '',
+      isActive: '',
       dateFilter: '',
       startDate: '',
       endDate: ''
@@ -417,6 +471,13 @@ const FreshworksLeads = () => {
     return `${dateStr} ${timeStr}`;
   };
 
+  const formatDuration = (seconds) => {
+    if (!seconds || seconds === 0) return '0m 0s';
+    const minutes = Math.floor(seconds / 60);
+    const remainingSeconds = seconds % 60;
+    return `${minutes}m ${remainingSeconds}s`;
+  };
+
   const getSortIcon = (column) => {
     if (sortConfig.key !== column) return '↕';
     return sortConfig.direction === 'asc' ? '↑' : '↓';
@@ -439,6 +500,31 @@ const FreshworksLeads = () => {
     return 'bg-secondary';
   };
 
+  const getCategoryBadgeClass = (category) => {
+    const categoryLower = category?.toLowerCase() || '';
+    if (categoryLower === 'corporate') return 'bg-primary';
+    if (categoryLower === 'generic') return 'bg-success';
+    if (categoryLower === 'test') return 'bg-warning';
+    if (categoryLower === 'invalid') return 'bg-danger';
+    if (categoryLower === 'student') return 'bg-info';
+    if (categoryLower === 'edu') return 'bg-info';
+    if (categoryLower === 'duplicate') return 'bg-dark';
+    return 'bg-secondary';
+  };
+
+  const getCustomTagsBadgeClass = (tag) => {
+    const tagLower = tag?.toLowerCase() || '';
+    if (tagLower.includes('sample requested')) return 'bg-info';
+    if (tagLower.includes('inbound')) return 'bg-success';
+    if (tagLower.includes('outbound')) return 'bg-primary';
+    if (tagLower.includes('hot')) return 'bg-danger';
+    if (tagLower.includes('cold')) return 'bg-secondary';
+    if (tagLower.includes('follow')) return 'bg-warning';
+    if (tagLower.includes('demo')) return 'bg-purple';
+    if (tagLower.includes('quote')) return 'bg-dark';
+    return 'bg-light text-dark';
+  };
+
   const renderCellContent = (columnKey, contact) => {
     const getValue = () => {
       switch (columnKey) {
@@ -448,6 +534,42 @@ const FreshworksLeads = () => {
           return formatDateTime(contact.last_contacted_time);
         case 'territory':
           return contact.territory || '-';
+        case 'contact_category':
+          return contact.contact_category || '-';
+        case 'custom_tags':
+          return contact.custom_tags || '-';
+        case 'is_active':
+          return contact.is_active || 'No';
+        case 'sample_sent_timing':
+          // Calculate sample sent timing for individual contact
+          if (contact.created_at && contact.first_email_with_attachment) {
+            const createdDate = new Date(contact.created_at);
+            const sampleDate = new Date(contact.first_email_with_attachment);
+            const hoursDelay = (sampleDate - createdDate) / (1000 * 60 * 60);
+            return hoursDelay > 0 ? `${hoursDelay.toFixed(1)}h` : '-';
+          }
+          return '-';
+        
+        // NEW CRM Analytics fields
+        case 'last_email_received':
+          return formatDateTime(contact.last_email_received);
+        case 'first_email_with_attachment':
+          return formatDateTime(contact.first_email_with_attachment);
+        case 'total_touchpoints':
+          return contact.total_touchpoints || 0;
+        case 'outgoing_emails':
+          return contact.outgoing_emails || 0;
+        case 'incoming_emails':
+          return contact.incoming_emails || 0;
+        case 'outgoing_calls':
+          return contact.outgoing_calls || 0;
+        case 'connected_calls':
+          return contact.connected_calls || 0;
+        case 'not_connected_calls':
+          return contact.not_connected_calls || 0;
+        case 'call_duration_total':
+          return contact.call_duration_formatted || formatDuration(contact.call_duration_total || 0);
+        
         default:
           return contact[columnKey] || '-';
       }
@@ -459,11 +581,14 @@ const FreshworksLeads = () => {
     switch (columnKey) {
       case 'created_at':
       case 'last_contacted_time':
+      case 'last_email_received':
+      case 'first_email_with_attachment':
         return (
           <span className="date-time-cell" title={displayValue}>
             {displayValue}
           </span>
         );
+      
       case 'market_name':
       case 'company':
         return (
@@ -471,12 +596,14 @@ const FreshworksLeads = () => {
             {displayValue}
           </span>
         );
+      
       case 'display_name':
         return (
           <strong title={displayValue}>
             {displayValue}
           </strong>
         );
+      
       case 'status_name':
         return (
           <span 
@@ -486,6 +613,7 @@ const FreshworksLeads = () => {
             {displayValue}
           </span>
         );
+      
       case 'lead_level':
         return (
           <span 
@@ -495,6 +623,67 @@ const FreshworksLeads = () => {
             {displayValue}
           </span>
         );
+
+      case 'contact_category':
+        return (
+          <span 
+            className={`badge category-badge ${getCategoryBadgeClass(contact.contact_category)}`}
+            title={displayValue}
+          >
+            {displayValue}
+          </span>
+        );
+
+      case 'custom_tags':
+        return (
+          <span 
+            className={`badge custom-tags-badge ${getCustomTagsBadgeClass(contact.custom_tags)}`}
+            title={displayValue}
+          >
+            {displayValue}
+          </span>
+        );
+
+      case 'is_active':
+        return (
+          <span 
+            className={`badge active-status-badge ${contact.is_active === 'Yes' ? 'bg-success' : 'bg-secondary'}`}
+            title={contact.is_active === 'Yes' ? 'Contact has responded via email or phone' : 'Contact has not responded yet'}
+          >
+            {contact.is_active === 'Yes' ? '✓ Active' : '✗ Inactive'}
+          </span>
+        );
+
+      case 'sample_sent_timing':
+        return (
+          <span 
+            className={`sample-timing-cell ${displayValue === '-' ? 'text-muted' : 'text-info fw-bold'}`}
+            title={displayValue === '-' ? 'No sample sent yet' : `Sample sent ${displayValue} after contact creation`}
+          >
+            {displayValue}
+          </span>
+        );
+      
+      // CRM Analytics numeric fields
+      case 'total_touchpoints':
+      case 'outgoing_emails':
+      case 'incoming_emails':
+      case 'outgoing_calls':
+      case 'connected_calls':
+      case 'not_connected_calls':
+        return (
+          <span className="analytics-number" title={displayValue}>
+            <strong>{displayValue}</strong>
+          </span>
+        );
+      
+      case 'call_duration_total':
+        return (
+          <span className="duration-cell" title={`Total: ${displayValue}`}>
+            {displayValue}
+          </span>
+        );
+      
       default:
         return (
           <span title={displayValue}>
@@ -561,7 +750,11 @@ const FreshworksLeads = () => {
           <div className="d-flex justify-content-between align-items-center">
             <div>
               <h1 className="dashboard-title">Leads Management</h1>
-              <p className="text-muted mb-0">Total: {totalCount.toLocaleString()} contacts</p>
+              <p className="text-muted mb-0">
+                {loading ? 'Loading...' : 
+                  `${totalCount.toLocaleString()} total filtered • Showing ${contacts.length} on page ${currentPage} of ${totalPages}`
+                }
+              </p>
             </div>
             <div className="d-flex gap-2">
               <button 
@@ -718,7 +911,7 @@ const FreshworksLeads = () => {
                 </div>
               )}
 
-              {/* Lead Level Filter */}
+              {/* Lead Level and Contact Category Filters */}
               <div className="row g-3 mt-2">
                 <div className="col-md-3">
                   <label className="form-label fw-bold text-muted small">LEAD LEVEL</label>
@@ -731,6 +924,47 @@ const FreshworksLeads = () => {
                     {filterOptions.leadLevels.map(level => (
                       <option key={level} value={level}>{level}</option>
                     ))}
+                  </select>
+                </div>
+
+                <div className="col-md-3">
+                  <label className="form-label fw-bold text-muted small">CONTACT CATEGORY</label>
+                  <select
+                    className="form-select"
+                    value={filters.contactCategory}
+                    onChange={(e) => handleFilterChange('contactCategory', e.target.value)}
+                  >
+                    <option value="">All Categories</option>
+                    {filterOptions.contactCategories.map(category => (
+                      <option key={category} value={category}>{category}</option>
+                    ))}
+                  </select>
+                </div>
+
+                <div className="col-md-3">
+                  <label className="form-label fw-bold text-muted small">CUSTOM TAGS</label>
+                  <select
+                    className="form-select"
+                    value={filters.customTags}
+                    onChange={(e) => handleFilterChange('customTags', e.target.value)}
+                  >
+                    <option value="">All Tags</option>
+                    {filterOptions.customTags.map(tag => (
+                      <option key={tag} value={tag}>{tag}</option>
+                    ))}
+                  </select>
+                </div>
+
+                <div className="col-md-3">
+                  <label className="form-label fw-bold text-muted small">ACTIVE STATUS</label>
+                  <select
+                    className="form-select"
+                    value={filters.isActive}
+                    onChange={(e) => handleFilterChange('isActive', e.target.value)}
+                  >
+                    <option value="">All Contacts</option>
+                    <option value="yes">Active (Responded)</option>
+                    <option value="no">Not Active (No Response)</option>
                   </select>
                 </div>
               </div>
@@ -747,6 +981,148 @@ const FreshworksLeads = () => {
               )}
             </div>
           )}
+        </div>
+
+        {/* Analytics Section - 4x4 Layout */}
+        <div className={`analytics-section bg-light border rounded p-3 mb-3 ${loading ? 'loading' : ''}`}>
+          <div className="row g-3">
+            <div className="col-md-12 mb-2">
+              <h6 className="fw-bold text-primary mb-3">
+                📊 Analytics for All Filtered Results ({analytics.totalContacts.toLocaleString()} contacts)
+                {loading && <span className="spinner-border spinner-border-sm ms-2" role="status"></span>}
+              </h6>
+            </div>
+            
+            {/* First Row - 4 Core Metrics */}
+            <div className="col-lg-3 col-md-6 col-sm-6">
+              <div className="analytics-card bg-white p-3 rounded border" title="Total number of contacts matching current filters">
+                <div className="d-flex align-items-center">
+                  <div className="analytics-icon bg-primary text-white rounded-circle p-2 me-3">
+                    👥
+                  </div>
+                  <div>
+                    <div className="analytics-number text-primary fw-bold fs-4">
+                      {loading ? '...' : (analytics.totalContacts || 0).toLocaleString()}
+                    </div>
+                    <div className="analytics-label text-muted small">Total Contacts</div>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <div className="col-lg-3 col-md-6 col-sm-6">
+              <div className="analytics-card bg-white p-3 rounded border" title="Average number of touchpoints per contact">
+                <div className="d-flex align-items-center">
+                  <div className="analytics-icon bg-info text-white rounded-circle p-2 me-3">
+                    🎯
+                  </div>
+                  <div>
+                    <div className="analytics-number text-info fw-bold fs-4">
+                      {loading ? '...' : (analytics.avgTouchpoints || '0.0')}
+                    </div>
+                    <div className="analytics-label text-muted small">Avg Touchpoints</div>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <div className="col-lg-3 col-md-6 col-sm-6">
+              <div className="analytics-card bg-white p-3 rounded border" title="Average emails sent per contact">
+                <div className="d-flex align-items-center">
+                  <div className="analytics-icon bg-success text-white rounded-circle p-2 me-3">
+                    📧
+                  </div>
+                  <div>
+                    <div className="analytics-number text-success fw-bold fs-4">
+                      {loading ? '...' : (analytics.avgEmails || '0.0')}
+                    </div>
+                    <div className="analytics-label text-muted small">Avg Emails Sent</div>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <div className="col-lg-3 col-md-6 col-sm-6">
+              <div className="analytics-card bg-white p-3 rounded border" title="Average calls made per contact">
+                <div className="d-flex align-items-center">
+                  <div className="analytics-icon bg-purple text-white rounded-circle p-2 me-3" style={{background: 'linear-gradient(135deg, #6f42c1, #5a359a)'}}>
+                    📱
+                  </div>
+                  <div>
+                    <div className="analytics-number fw-bold fs-4" style={{color: '#6f42c1'}}>
+                      {loading ? '...' : (analytics.avgCalls || '0.0')}
+                    </div>
+                    <div className="analytics-label text-muted small">Avg Calls Made</div>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {/* Second Row - 4 Additional Metrics */}
+            <div className="col-lg-3 col-md-6 col-sm-6">
+              <div className="analytics-card bg-white p-3 rounded border" title="Average connected calls per contact with call activity">
+                <div className="d-flex align-items-center">
+                  <div className="analytics-icon bg-warning text-white rounded-circle p-2 me-3">
+                    📞
+                  </div>
+                  <div>
+                    <div className="analytics-number text-warning fw-bold fs-4">
+                      {loading ? '...' : (analytics.avgConnectedCalls || '0.0')}
+                    </div>
+                    <div className="analytics-label text-muted small">Avg Connected Calls</div>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <div className="col-lg-3 col-md-6 col-sm-6">
+              <div className="analytics-card bg-white p-3 rounded border" title={`Average hours between contact creation and sample report sent (${analytics.samplesSentCount || 0} samples sent)`}>
+                <div className="d-flex align-items-center">
+                  <div className="analytics-icon bg-danger text-white rounded-circle p-2 me-3">
+                    📊
+                  </div>
+                  <div>
+                    <div className="analytics-number text-danger fw-bold fs-4">
+                      {loading ? '...' : `${analytics.avgSampleSentHours || '0.0'}h`}
+                    </div>
+                    <div className="analytics-label text-muted small">Avg Sample Sent Timing</div>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <div className="col-lg-3 col-md-6 col-sm-6">
+              <div className="analytics-card bg-white p-3 rounded border" title="Total client responses received">
+                <div className="d-flex align-items-center">
+                  <div className="analytics-icon bg-secondary text-white rounded-circle p-2 me-3">
+                    📨
+                  </div>
+                  <div>
+                    <div className="analytics-number text-secondary fw-bold fs-4">
+                      {loading ? '...' : (analytics.clientEmailsReceived || 0).toLocaleString()}
+                    </div>
+                    <div className="analytics-label text-muted small">Client Emails Received</div>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <div className="col-lg-3 col-md-6 col-sm-6">
+              <div className="analytics-card bg-white p-3 rounded border" title="Average call duration in seconds">
+                <div className="d-flex align-items-center">
+                  <div className="analytics-icon bg-dark text-white rounded-circle p-2 me-3">
+                    ⏱️
+                  </div>
+                  <div>
+                    <div className="analytics-number text-dark fw-bold fs-4">
+                      {loading ? '...' : `${analytics.avgCallDuration || '0'}s`}
+                    </div>
+                    <div className="analytics-label text-muted small">Avg Call Duration</div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
         </div>
 
         {/* Table */}

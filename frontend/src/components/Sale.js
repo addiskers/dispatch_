@@ -1,177 +1,259 @@
-import React from 'react';
-import { Card, Row, Col, Table, Badge, ProgressBar } from 'react-bootstrap';
+import React, { useState, useEffect } from 'react';
 import { 
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer,
-  LineChart, Line, AreaChart, Area, PieChart, Pie, Cell
+  LineChart, Line, PieChart, Pie, Cell, ComposedChart
 } from 'recharts';
-import "../styles/Sale.css";
-// Dummy data for the dashboard
-const salesTeamData = [
-  {
-    id: 1,
-    name: "Jagraj Singh",
-    role: "Senior Business Developer",
-    avgSampleTime: 2.3, // in days
-    followUps: 42,
-    avgCalls: 18,
-    conversionRate: 32,
-    revenueGenerated: 52000,
-    pendingQuotes: 8,
-    lastMonthPerformance: 120, // percentage of target
-    avatar: "JS"
-  },
-  {
-    id: 2,
-    name: "Hashita Mehta",
-    role: "Business Development Manager",
-    avgSampleTime: 1.8,
-    followUps: 56,
-    avgCalls: 22,
-    conversionRate: 38,
-    revenueGenerated: 65000,
-    pendingQuotes: 5,
-    lastMonthPerformance: 145,
-    avatar: "HM"
-  },
-  {
-    id: 3,
-    name: "Priyanshi Shah",
-    role: "Sales Executive",
-    avgSampleTime: 2.7,
-    followUps: 38,
-    avgCalls: 15,
-    conversionRate: 28,
-    revenueGenerated: 43000,
-    pendingQuotes: 12,
-    lastMonthPerformance: 95,
-    avatar: "PS"
-  },
-  {
-    id: 4,
-    name: "Ankit Patel",
-    role: "Business Developer",
-    avgSampleTime: 2.1,
-    followUps: 49,
-    avgCalls: 20,
-    conversionRate: 34,
-    revenueGenerated: 48000,
-    pendingQuotes: 7,
-    lastMonthPerformance: 110,
-    avatar: "AP"
-  }
-];
-
-// Aggregate data
-const averages = {
-  sampleTime: salesTeamData.reduce((sum, person) => sum + person.avgSampleTime, 0) / salesTeamData.length,
-  followUps: salesTeamData.reduce((sum, person) => sum + person.followUps, 0) / salesTeamData.length,
-  calls: salesTeamData.reduce((sum, person) => sum + person.avgCalls, 0) / salesTeamData.length,
-  conversion: salesTeamData.reduce((sum, person) => sum + person.conversionRate, 0) / salesTeamData.length,
-};
-
-// Monthly trend data
-const monthlyTrendData = [
-  { month: 'Jan', samples: 45, followUps: 120, calls: 380, conversions: 22 },
-  { month: 'Feb', samples: 52, followUps: 145, calls: 420, conversions: 28 },
-  { month: 'Mar', samples: 48, followUps: 135, calls: 390, conversions: 25 },
-  { month: 'Apr', samples: 70, followUps: 180, calls: 450, conversions: 32 },
-  { month: 'May', samples: 80, followUps: 220, calls: 520, conversions: 37 },
-];
-
-// Deal stage data
-const dealStageData = [
-  { name: 'Qualified', value: 25, color: '#0088FE' },
-  { name: 'Proposal', value: 40, color: '#00C49F' },
-  { name: 'Negotiation', value: 20, color: '#FFBB28' },
-  { name: 'Closed Won', value: 15, color: '#FF8042' },
-];
-
-// Performance comparison data
-const performanceData = salesTeamData.map(person => ({
-  name: person.name.split(' ')[0],
-  sampleTime: person.avgSampleTime,
-  followUps: person.followUps,
-  calls: person.avgCalls,
-  conversion: person.conversionRate
-}));
-
-// Recent activities data (dummy)
-const recentActivities = [
-  { id: 1, agent: "Jagraj Singh", action: "Sent sample", client: "Acme Corp", time: "2 hours ago" },
-  { id: 2, agent: "Hashita Mehta", action: "Closed deal", client: "TechGiant Inc", time: "3 hours ago" },
-  { id: 3, agent: "Priyanshi Shah", action: "Added follow-up", client: "Startup Labs", time: "5 hours ago" },
-  { id: 4, agent: "Ankit Patel", action: "Scheduled call", client: "Global Systems", time: "Yesterday" },
-  { id: 5, agent: "Jagraj Singh", action: "Updated quote", client: "MediHealth", time: "Yesterday" },
-];
 
 const Sale = () => {
+  const [analyticsData, setAnalyticsData] = useState(null);
+  const [teamPerformance, setTeamPerformance] = useState([]);
+  const [callAnalytics, setCallAnalytics] = useState(null);
+  const [emailAnalytics, setEmailAnalytics] = useState(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
+
+  // Fetch all analytics data
+  useEffect(() => {
+    const fetchAnalyticsData = async () => {
+      try {
+        setLoading(true);
+        
+        // Simulated API calls - replace with actual API endpoints
+        const [analyticsRes, teamRes, callRes, emailRes] = await Promise.all([
+          fetch('/api/analytics/crm'),
+          fetch('/api/analytics/team-performance'),
+          fetch('/api/analytics/calls'),
+          fetch('/api/analytics/emails')
+        ]);
+
+        if (!analyticsRes.ok || !teamRes.ok || !callRes.ok || !emailRes.ok) {
+          throw new Error('Failed to fetch analytics data');
+        }
+
+        const [analytics, team, calls, emails] = await Promise.all([
+          analyticsRes.json(),
+          teamRes.json(),
+          callRes.json(),
+          emailRes.json()
+        ]);
+
+        setAnalyticsData(analytics.data);
+        setTeamPerformance(team.data);
+        setCallAnalytics(calls.data);
+        setEmailAnalytics(emails.data);
+      } catch (err) {
+        // For demo purposes, using mock data
+        console.log('Using mock data for demo');
+        setTimeout(() => {
+          setAnalyticsData(mockAnalyticsData);
+          setTeamPerformance(mockTeamData);
+          setCallAnalytics(mockCallData);
+          setEmailAnalytics(mockEmailData);
+          setLoading(false);
+        }, 1000);
+      }
+    };
+
+    fetchAnalyticsData();
+  }, []);
+
+  // Mock data for demonstration
+  const mockAnalyticsData = {
+    totalContacts: 1250,
+    userPerformance: [
+      { userName: 'Jagraj Singh', leadsHandled: 45, emailsSent: 127, callsMade: 38, connectedCalls: 12, responseRate: 31.6 },
+      { userName: 'Priyanshi Harwani', leadsHandled: 32, emailsSent: 89, callsMade: 25, connectedCalls: 8, responseRate: 32.0 },
+      { userName: 'Hashita Mehta', leadsHandled: 28, emailsSent: 76, callsMade: 22, connectedCalls: 9, responseRate: 40.9 },
+      { userName: 'Ankit Patel', leadsHandled: 35, emailsSent: 98, callsMade: 29, connectedCalls: 10, responseRate: 34.5 }
+    ],
+    totalMetrics: {
+      outgoingEmails: 390,
+      incomingEmails: 45,
+      outgoingCalls: 114,
+      connectedCalls: 39,
+      responseRate: 34.2
+    },
+    monthlyTrends: [
+      { month: '2024-08', newLeads: 85, emailsSent: 220, callsMade: 95 },
+      { month: '2024-09', newLeads: 92, emailsSent: 245, callsMade: 108 },
+      { month: '2024-10', newLeads: 110, emailsSent: 290, callsMade: 125 },
+      { month: '2024-11', newLeads: 125, emailsSent: 315, callsMade: 140 },
+      { month: '2024-12', newLeads: 140, emailsSent: 390, callsMade: 155 },
+      { month: '2025-01', newLeads: 150, emailsSent: 420, callsMade: 168 }
+    ]
+  };
+
+  const mockTeamData = mockAnalyticsData.userPerformance;
+
+  const mockCallData = {
+    totalCalls: 114,
+    answeredCalls: 39,
+    noResponseCalls: 65,
+    leftMessageCalls: 10,
+    avgCallDuration: 28,
+    callOutcomes: {
+      'No response': 65,
+      'Connected': 39,
+      'Left message': 10
+    }
+  };
+
+  const mockEmailData = {
+    responseRate: 11.5
+  };
+
+  if (loading) {
+    return (
+      <div className="flex justify-center items-center h-96">
+        <div className="animate-spin rounded-full h-32 w-32 border-b-2 border-blue-500"></div>
+      </div>
+    );
+  }
+
+  if (error && !analyticsData) {
+    return (
+      <div className="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded">
+        <strong>Error Loading Analytics:</strong> {error}
+      </div>
+    );
+  }
+
+  // Color schemes
+  const colors = ['#0088FE', '#00C49F', '#FFBB28', '#FF8042', '#8884D8', '#82CA9D'];
+  
+  // Prepare data for charts
+  const userPerformanceData = analyticsData?.userPerformance?.map(user => ({
+    name: user.userName?.split(' ')[0] || 'Unknown',
+    leadsHandled: user.leadsHandled,
+    emailsSent: user.emailsSent,
+    callsMade: user.callsMade,
+    connectedCalls: user.connectedCalls,
+    responseRate: Math.round(user.responseRate || 0)
+  })) || [];
+
+  const callOutcomeData = callAnalytics ? Object.entries(callAnalytics.callOutcomes).map(([outcome, count]) => ({
+    name: outcome,
+    value: count
+  })) : [];
+
+  const emailVsCallData = analyticsData ? [{
+    name: 'Communication Methods',
+    emails: analyticsData.totalMetrics.outgoingEmails,
+    calls: analyticsData.totalMetrics.outgoingCalls,
+    emailResponses: analyticsData.totalMetrics.incomingEmails,
+    callResponses: analyticsData.totalMetrics.connectedCalls
+  }] : [];
+
+  const monthlyTrendData = analyticsData?.monthlyTrends?.slice(-6) || [];
+
+  // Metrics cards data
+  const metricsData = {
+    totalContacts: analyticsData?.totalContacts || 0,
+    outgoingEmails: analyticsData?.totalMetrics?.outgoingEmails || 0,
+    incomingEmails: analyticsData?.totalMetrics?.incomingEmails || 0,
+    totalCalls: callAnalytics?.totalCalls || 0,
+    answeredCalls: callAnalytics?.answeredCalls || 0,
+    responseRate: Math.round(analyticsData?.totalMetrics?.responseRate || 0),
+    avgCallDuration: Math.round(callAnalytics?.avgCallDuration || 0)
+  };
+
   return (
-    <div className="sales-dashboard">
-      <div className="dashboard-header">
-        <h1>Sales Performance Dashboard</h1>
-        <div className="date-indicator">
-          <span>Last updated: May 19, 2025</span>
-        </div>
+    <div className="p-6 bg-gray-50 min-h-screen">
+      <div className="mb-6">
+        <h1 className="text-3xl font-bold text-blue-600 mb-2">CRM Analytics Dashboard</h1>
+        <p className="text-gray-600">Real-time insights into your sales team performance</p>
       </div>
       
       {/* Key Metrics Cards */}
-      <Row className="metrics-cards mb-4">
-        <Col md={3}>
-          <Card className="metric-card">
-            <Card.Body>
-              <h6 className="metric-title">Avg. Sample Time</h6>
-              <div className="metric-value">{averages.sampleTime.toFixed(1)} days</div>
-              <div className="metric-trend positive">
-                <i className="bi bi-arrow-down-right"></i> 12% from last month
-              </div>
-            </Card.Body>
-          </Card>
-        </Col>
-        <Col md={3}>
-          <Card className="metric-card">
-            <Card.Body>
-              <h6 className="metric-title">Avg. Follow-ups</h6>
-              <div className="metric-value">{Math.round(averages.followUps)}</div>
-              <div className="metric-trend positive">
-                <i className="bi bi-arrow-up-right"></i> 8% from last month
-              </div>
-            </Card.Body>
-          </Card>
-        </Col>
-        <Col md={3}>
-          <Card className="metric-card">
-            <Card.Body>
-              <h6 className="metric-title">Avg. Calls per Rep</h6>
-              <div className="metric-value">{Math.round(averages.calls)}</div>
-              <div className="metric-trend positive">
-                <i className="bi bi-arrow-up-right"></i> 5% from last month
-              </div>
-            </Card.Body>
-          </Card>
-        </Col>
-        <Col md={3}>
-          <Card className="metric-card">
-            <Card.Body>
-              <h6 className="metric-title">Avg. Conversion Rate</h6>
-              <div className="metric-value">{Math.round(averages.conversion)}%</div>
-              <div className="metric-trend positive">
-                <i className="bi bi-arrow-up-right"></i> 3% from last month
-              </div>
-            </Card.Body>
-          </Card>
-        </Col>
-      </Row>
-      
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
+        <div className="bg-white rounded-lg shadow-md p-6 text-center">
+          <div className="text-3xl font-bold text-blue-600 mb-2">{metricsData.totalContacts}</div>
+          <h3 className="text-gray-600 font-semibold">Total Contacts</h3>
+          <p className="text-sm text-green-500 mt-1">
+            <span className="inline-block transform rotate-12">↗</span> Active leads
+          </p>
+        </div>
+        
+        <div className="bg-white rounded-lg shadow-md p-6 text-center">
+          <div className="text-3xl font-bold text-cyan-600 mb-2">{metricsData.outgoingEmails}</div>
+          <h3 className="text-gray-600 font-semibold">Emails Sent</h3>
+          <p className="text-sm text-cyan-500 mt-1">
+            {metricsData.incomingEmails} responses
+          </p>
+        </div>
+        
+        <div className="bg-white rounded-lg shadow-md p-6 text-center">
+          <div className="text-3xl font-bold text-yellow-600 mb-2">{metricsData.totalCalls}</div>
+          <h3 className="text-gray-600 font-semibold">Total Calls</h3>
+          <p className="text-sm text-green-500 mt-1">
+            {metricsData.answeredCalls} answered
+          </p>
+        </div>
+        
+        <div className="bg-white rounded-lg shadow-md p-6 text-center">
+          <div className="text-3xl font-bold text-green-600 mb-2">{metricsData.responseRate}%</div>
+          <h3 className="text-gray-600 font-semibold">Response Rate</h3>
+          <p className="text-sm text-gray-500 mt-1">
+            Avg: {metricsData.avgCallDuration}s
+          </p>
+        </div>
+      </div>
+
       {/* Main Dashboard Content */}
-      <Row>
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         {/* Left Column - Charts */}
-        <Col lg={8}>
-          {/* Monthly Trend Chart */}
-          <Card className="mb-4">
-            <Card.Header>
-              <h5 className="card-title">Monthly Performance Trends</h5>
-            </Card.Header>
-            <Card.Body>
+        <div className="lg:col-span-2 space-y-6">
+          {/* Team Performance Chart */}
+          <div className="bg-white rounded-lg shadow-md">
+            <div className="bg-blue-600 text-white p-4 rounded-t-lg">
+              <h2 className="text-xl font-semibold">Team Performance - Leads Handled by Person</h2>
+            </div>
+            <div className="p-4">
+              <ResponsiveContainer width="100%" height={300}>
+                <ComposedChart data={userPerformanceData}>
+                  <CartesianGrid strokeDasharray="3 3" />
+                  <XAxis dataKey="name" />
+                  <YAxis yAxisId="left" />
+                  <YAxis yAxisId="right" orientation="right" />
+                  <Tooltip />
+                  <Legend />
+                  <Bar yAxisId="left" dataKey="leadsHandled" fill="#0088FE" name="Leads Handled" />
+                  <Bar yAxisId="left" dataKey="emailsSent" fill="#00C49F" name="Emails Sent" />
+                  <Bar yAxisId="left" dataKey="callsMade" fill="#FFBB28" name="Calls Made" />
+                  <Line yAxisId="right" type="monotone" dataKey="responseRate" stroke="#FF8042" name="Response Rate %" strokeWidth={3} />
+                </ComposedChart>
+              </ResponsiveContainer>
+            </div>
+          </div>
+
+          {/* Email vs Call Communication */}
+          <div className="bg-white rounded-lg shadow-md">
+            <div className="bg-cyan-600 text-white p-4 rounded-t-lg">
+              <h2 className="text-xl font-semibold">Communication Methods Comparison</h2>
+            </div>
+            <div className="p-4">
+              <ResponsiveContainer width="100%" height={300}>
+                <BarChart data={emailVsCallData}>
+                  <CartesianGrid strokeDasharray="3 3" />
+                  <XAxis dataKey="name" />
+                  <YAxis />
+                  <Tooltip />
+                  <Legend />
+                  <Bar dataKey="emails" fill="#0088FE" name="Outgoing Emails" />
+                  <Bar dataKey="calls" fill="#00C49F" name="Outgoing Calls" />
+                  <Bar dataKey="emailResponses" fill="#FFBB28" name="Email Responses" />
+                  <Bar dataKey="callResponses" fill="#FF8042" name="Call Responses" />
+                </BarChart>
+              </ResponsiveContainer>
+            </div>
+          </div>
+          
+          {/* Monthly Trends */}
+          <div className="bg-white rounded-lg shadow-md">
+            <div className="bg-green-600 text-white p-4 rounded-t-lg">
+              <h2 className="text-xl font-semibold">Monthly Activity Trends</h2>
+            </div>
+            <div className="p-4">
               <ResponsiveContainer width="100%" height={300}>
                 <LineChart data={monthlyTrendData}>
                   <CartesianGrid strokeDasharray="3 3" />
@@ -179,151 +261,135 @@ const Sale = () => {
                   <YAxis />
                   <Tooltip />
                   <Legend />
-                  <Line type="monotone" dataKey="samples" stroke="#8884d8" name="Samples Sent" />
-                  <Line type="monotone" dataKey="followUps" stroke="#82ca9d" name="Follow-ups" />
-                  <Line type="monotone" dataKey="calls" stroke="#ffc658" name="Calls Made" />
+                  <Line type="monotone" dataKey="newLeads" stroke="#8884d8" name="New Leads" strokeWidth={2} />
+                  <Line type="monotone" dataKey="emailsSent" stroke="#82ca9d" name="Emails Sent" strokeWidth={2} />
+                  <Line type="monotone" dataKey="callsMade" stroke="#ffc658" name="Calls Made" strokeWidth={2} />
                 </LineChart>
               </ResponsiveContainer>
-            </Card.Body>
-          </Card>
-          
-          {/* Team Performance Comparison */}
-          <Card className="mb-4">
-            <Card.Header>
-              <h5 className="card-title">Team Performance Comparison</h5>
-            </Card.Header>
-            <Card.Body>
-              <ResponsiveContainer width="100%" height={300}>
-                <BarChart data={performanceData}>
-                  <CartesianGrid strokeDasharray="3 3" />
-                  <XAxis dataKey="name" />
-                  <YAxis />
-                  <Tooltip />
-                  <Legend />
-                  <Bar dataKey="followUps" fill="#8884d8" name="Follow-ups" />
-                  <Bar dataKey="calls" fill="#82ca9d" name="Calls" />
-                  <Bar dataKey="conversion" fill="#ffc658" name="Conversion %" />
-                </BarChart>
-              </ResponsiveContainer>
-            </Card.Body>
-          </Card>
-          
-          {/* Sample Time Analysis */}
-          <Card className="mb-4">
-            <Card.Header>
-              <h5 className="card-title">Average Sample Time (Days)</h5>
-            </Card.Header>
-            <Card.Body>
-              <ResponsiveContainer width="100%" height={250}>
-                <AreaChart data={performanceData}>
-                  <CartesianGrid strokeDasharray="3 3" />
-                  <XAxis dataKey="name" />
-                  <YAxis />
-                  <Tooltip />
-                  <Area type="monotone" dataKey="sampleTime" fill="#8884d8" stroke="#8884d8" name="Avg. Days" />
-                </AreaChart>
-              </ResponsiveContainer>
-            </Card.Body>
-          </Card>
-        </Col>
+            </div>
+          </div>
+        </div>
         
-        {/* Right Column - Team Stats & Activities */}
-        <Col lg={4}>
-          {/* Deal Stage Distribution */}
-          <Card className="mb-4">
-            <Card.Header>
-              <h5 className="card-title">Deal Stage Distribution</h5>
-            </Card.Header>
-            <Card.Body className="text-center">
+        {/* Right Column - Stats & Analytics */}
+        <div className="space-y-6">
+          {/* Call Outcomes Distribution */}
+          <div className="bg-white rounded-lg shadow-md">
+            <div className="bg-yellow-600 text-white p-4 rounded-t-lg">
+              <h2 className="text-xl font-semibold">Call Outcomes</h2>
+            </div>
+            <div className="p-4 text-center">
               <ResponsiveContainer width="100%" height={250}>
                 <PieChart>
                   <Pie
-                    data={dealStageData}
+                    data={callOutcomeData}
                     cx="50%"
                     cy="50%"
+                    labelLine={false}
+                    label={({name, percent}) => `${name}: ${(percent * 100).toFixed(0)}%`}
                     outerRadius={80}
                     fill="#8884d8"
                     dataKey="value"
-                    nameKey="name"
-                    label
                   >
-                    {dealStageData.map((entry, index) => (
-                      <Cell key={`cell-${index}`} fill={entry.color} />
+                    {callOutcomeData.map((entry, index) => (
+                      <Cell key={`cell-${index}`} fill={colors[index % colors.length]} />
                     ))}
                   </Pie>
                   <Tooltip />
-                  <Legend />
                 </PieChart>
               </ResponsiveContainer>
-            </Card.Body>
-          </Card>
+            </div>
+          </div>
           
-          {/* Team Performance */}
-          <Card className="mb-4">
-            <Card.Header>
-              <h5 className="card-title">Team Performance</h5>
-            </Card.Header>
-            <Card.Body className="p-0">
-              <Table className="team-performance-table" hover>
-                <thead>
+          {/* Team Performance Table */}
+          <div className="bg-white rounded-lg shadow-md">
+            <div className="bg-gray-600 text-white p-4 rounded-t-lg">
+              <h2 className="text-xl font-semibold">Team Performance Summary</h2>
+            </div>
+            <div className="overflow-x-auto">
+              <table className="w-full">
+                <thead className="bg-gray-50">
                   <tr>
-                    <th>Agent</th>
-                    <th>Progress</th>
-                    <th>%</th>
+                    <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Agent</th>
+                    <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Leads</th>
+                    <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Calls</th>
+                    <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Response %</th>
                   </tr>
                 </thead>
-                <tbody>
-                  {salesTeamData.map(person => (
-                    <tr key={person.id}>
-                      <td>
-                        <div className="d-flex align-items-center">
-                          <div className="avatar">{person.avatar}</div>
-                          <div className="ms-2">{person.name.split(' ')[0]}</div>
+                <tbody className="bg-white divide-y divide-gray-200">
+                  {userPerformanceData.slice(0, 5).map((person, index) => (
+                    <tr key={index} className="hover:bg-gray-50">
+                      <td className="px-4 py-4 whitespace-nowrap">
+                        <div className="flex items-center">
+                          <div className="h-8 w-8 rounded-full bg-blue-600 text-white flex items-center justify-center text-xs font-medium mr-3">
+                            {person.name.substring(0, 2).toUpperCase()}
+                          </div>
+                          <span className="text-sm font-medium text-gray-900">{person.name}</span>
                         </div>
                       </td>
-                      <td>
-                        <ProgressBar 
-                          now={person.lastMonthPerformance} 
-                          variant={person.lastMonthPerformance >= 100 ? "success" : "warning"}
-                        />
+                      <td className="px-4 py-4 whitespace-nowrap">
+                        <span className="inline-flex px-2 py-1 text-xs font-semibold rounded-full bg-blue-100 text-blue-800">
+                          {person.leadsHandled}
+                        </span>
                       </td>
-                      <td className="text-end">
-                        <Badge bg={person.lastMonthPerformance >= 100 ? "success" : "warning"}>
-                          {person.lastMonthPerformance}%
-                        </Badge>
+                      <td className="px-4 py-4 whitespace-nowrap">
+                        <span className="inline-flex px-2 py-1 text-xs font-semibold rounded-full bg-cyan-100 text-cyan-800">
+                          {person.callsMade}
+                        </span>
+                      </td>
+                      <td className="px-4 py-4 whitespace-nowrap">
+                        <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${
+                          person.responseRate > 30 
+                            ? 'bg-green-100 text-green-800' 
+                            : person.responseRate > 15 
+                            ? 'bg-yellow-100 text-yellow-800' 
+                            : 'bg-red-100 text-red-800'
+                        }`}>
+                          {person.responseRate}%
+                        </span>
                       </td>
                     </tr>
                   ))}
                 </tbody>
-              </Table>
-            </Card.Body>
-          </Card>
-          
-          {/* Recent Activities */}
-          <Card className="mb-4">
-            <Card.Header className="d-flex justify-content-between align-items-center">
-              <h5 className="card-title mb-0">Recent Activities</h5>
-              <Badge bg="info">{recentActivities.length} new</Badge>
-            </Card.Header>
-            <Card.Body className="p-0">
-              <div className="activity-list">
-                {recentActivities.map(activity => (
-                  <div key={activity.id} className="activity-item">
-                    <div className="activity-content">
-                      <div className="activity-title">
-                        <span className="agent-name">{activity.agent.split(' ')[0]}</span>
-                        <span className="activity-action">{activity.action}</span>
-                        <span className="client-name">{activity.client}</span>
-                      </div>
-                      <div className="activity-time">{activity.time}</div>
-                    </div>
-                  </div>
-                ))}
+              </table>
+            </div>
+          </div>
+
+          {/* Quick Stats */}
+          <div className="bg-white rounded-lg shadow-md">
+            <div className="bg-gray-800 text-white p-4 rounded-t-lg">
+              <h2 className="text-xl font-semibold">Quick Statistics</h2>
+            </div>
+            <div className="p-4 space-y-4">
+              <div className="flex justify-between items-center">
+                <span className="text-gray-600">Email Response Rate</span>
+                <span className="inline-flex px-3 py-1 text-sm font-semibold rounded-full bg-cyan-100 text-cyan-800">
+                  {emailAnalytics ? Math.round(emailAnalytics.responseRate) : 0}%
+                </span>
               </div>
-            </Card.Body>
-          </Card>
-        </Col>
-      </Row>
+              <div className="flex justify-between items-center">
+                <span className="text-gray-600">Call Answer Rate</span>
+                <span className="inline-flex px-3 py-1 text-sm font-semibold rounded-full bg-green-100 text-green-800">
+                  {callAnalytics && callAnalytics.totalCalls > 0 
+                    ? Math.round((callAnalytics.answeredCalls / callAnalytics.totalCalls) * 100)
+                    : 0}%
+                </span>
+              </div>
+              <div className="flex justify-between items-center">
+                <span className="text-gray-600">Active Team Members</span>
+                <span className="inline-flex px-3 py-1 text-sm font-semibold rounded-full bg-blue-100 text-blue-800">
+                  {analyticsData?.userPerformance?.length || 0}
+                </span>
+              </div>
+              <div className="flex justify-between items-center">
+                <span className="text-gray-600">Avg Call Duration</span>
+                <span className="inline-flex px-3 py-1 text-sm font-semibold rounded-full bg-yellow-100 text-yellow-800">
+                  {Math.round(callAnalytics?.avgCallDuration || 0)}s
+                </span>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
     </div>
   );
 };

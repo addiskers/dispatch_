@@ -14,7 +14,7 @@ const freshworksRoutes = require("./routes/freshworksRoutes");
 const conactsRoutes = require("./routes/contactRoutes");
 connectDB(process.env.MONGO_URI);
 const helmet = require("helmet");
-
+const analyticsRoutes = require('./routes/analytics');
 
 const app = express();
 
@@ -42,6 +42,7 @@ app.use(cors({
 
 app.use(helmet());  
 // Routes
+app.use('/api/analytics', analyticsRoutes);
 app.use("/api/auth", authRoutes);
 app.use("/api/leads", leadRoutes);
 app.use("/api/upload", uploadRoutes);

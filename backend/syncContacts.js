@@ -4,6 +4,7 @@ const axios = require('axios');
 const { MongoClient } = require('mongodb');
 const cron = require('node-cron');
 const { calculateCRMAnalytics } = require('./crmAnalytics');
+
 // Configuration from environment variables
 const {
   MONGO_URI = 'mongodb://localhost:27017/sale',
@@ -18,7 +19,7 @@ if (!FRESHWORKS_API_KEY || !FRESHWORKS_BASE_URL) {
 }
 
 // Email domains to exclude from sync
-const IGNORED_EMAIL_DOMAINS = ['skyquestt.com', 'gii.co.jp'];
+const IGNORED_EMAIL_DOMAINS = ['skyquestt.com', 'gii.co.jp','freshchat.com'];
 
 // API headers for Freshworks requests
 const headers = {
@@ -26,6 +27,28 @@ const headers = {
   "Content-Type": "application/json",
   "Accept": "*/*"
 };
+
+/**
+ * Check if contact has a valid market name (cf_report_name)
+ */
+function hasValidMarketName(contact) {
+  const marketName = contact.custom_field?.cf_report_name;
+  
+  // Check if market name exists and is not empty/invalid
+  if (!marketName || 
+      marketName === null || 
+      marketName === undefined || 
+      marketName === '' || 
+      marketName === '-' ||
+      marketName === 'NA' ||
+      marketName === 'na' ||
+      marketName === 'N/A' ||
+      marketName === 'n/a') {
+    return false;
+  }
+  
+  return true;
+}
 
 /**
  * Check if contact should be ignored based on email domains
@@ -52,6 +75,23 @@ function shouldIgnoreContact(contact) {
       email.toLowerCase().includes(domain.toLowerCase())
     )
   );
+}
+
+/**
+ * Main contact validation - combines all ignore conditions
+ */
+function shouldSkipContact(contact) {
+  // Check email domains
+  if (shouldIgnoreContact(contact)) {
+    return { skip: true, reason: 'ignored_email_domain' };
+  }
+  
+  // Check market name
+  if (!hasValidMarketName(contact)) {
+    return { skip: true, reason: 'invalid_market_name' };
+  }
+  
+  return { skip: false, reason: null };
 }
 
 /**
@@ -619,7 +659,8 @@ async function syncContacts() {
     let updatedRecords = 0;
     let recordsWithChanges = 0;
     let conversationsProcessed = 0;
-    let ignoredContacts = 0;
+    let ignoredByEmailDomain = 0;
+    let ignoredByMarketName = 0;
     let newestContactSeen = lastSync;
 
     // Process contacts page by page
@@ -641,10 +682,16 @@ async function syncContacts() {
       let pageHasNewData = false;
 
       for (const contact of contacts) {
-        // Skip ignored contacts
-        if (shouldIgnoreContact(contact)) {
-          console.log(`*** IGNORING contact ${contact.id} - contains ignored email domain ***`);
-          ignoredContacts++;
+        // Check if contact should be skipped
+        const skipResult = shouldSkipContact(contact);
+        if (skipResult.skip) {
+          if (skipResult.reason === 'ignored_email_domain') {
+            console.log(`*** IGNORING contact ${contact.id} (${contact.display_name}) - contains ignored email domain ***`);
+            ignoredByEmailDomain++;
+          } else if (skipResult.reason === 'invalid_market_name') {
+            console.log(`*** SKIPPING contact ${contact.id} (${contact.display_name}) - invalid/missing market name: "${contact.custom_field?.cf_report_name}" ***`);
+            ignoredByMarketName++;
+          }
           continue;
         }
         
@@ -741,7 +788,7 @@ async function syncContacts() {
             contact.crm_analytics = calculateCRMAnalytics(contact);
 
             conversationsProcessed += totalEmailMessages + phoneConversations.length + notes.length;
-            console.log(`   Processed ${contact.conversations.length} conversations (${emailThreads.length} email threads with ${totalEmailMessages} messages, ${phoneConversations.length} calls, ${notes.length} notes) for ${contact.display_name}`);
+            console.log(`   Processed ${contact.conversations.length} conversations (${emailThreads.length} email threads with ${totalEmailMessages} messages, ${phoneConversations.length} calls, ${notes.length} notes) for ${contact.display_name} [Market: ${contact.custom_field.cf_report_name}]`);
           } else {
             contact.conversations = [];
             contact.conversation_stats = {
@@ -761,13 +808,13 @@ async function syncContacts() {
             };
             contact.crm_analytics = getEmptyAnalytics(contact);
 
-            console.log(`   No conversations found for ${contact.display_name}`);
+            console.log(`   No conversations found for ${contact.display_name} [Market: ${contact.custom_field.cf_report_name}]`);
           }
         } else if (existingContact && existingContact.conversations) {
           // Keep existing conversations
           contact.conversations = existingContact.conversations;
           contact.conversation_stats = existingContact.conversation_stats || {};
-          console.log(`   Keeping ${existingContact.conversations.length} existing conversations for ${contact.display_name}`);
+          console.log(`   Keeping ${existingContact.conversations.length} existing conversations for ${contact.display_name} [Market: ${contact.custom_field.cf_report_name}]`);
           contact.crm_analytics = calculateCRMAnalytics(contact);
 
           
@@ -787,8 +834,8 @@ async function syncContacts() {
               needs_response: false
             },
             last_conversation_date: null
-          };contact.crm_analytics = getEmptyAnalytics(contact);
-
+          };
+          contact.crm_analytics = getEmptyAnalytics(contact);
         }
         
         // Prepare update data
@@ -852,7 +899,8 @@ async function syncContacts() {
           newRecords,
           updatedRecords,
           conversationsProcessed,
-          ignoredContacts
+          ignoredByEmailDomain,
+          ignoredByMarketName
         } 
       },
       { upsert: true }
@@ -865,7 +913,9 @@ async function syncContacts() {
     console.log(`Updated records: ${updatedRecords}`);
     console.log(`Records with field changes: ${recordsWithChanges}`);
     console.log(`Total conversations processed: ${conversationsProcessed}`);
-    console.log(`Ignored contacts: ${ignoredContacts}`);
+    console.log(`Ignored by email domain: ${ignoredByEmailDomain}`);
+    console.log(`Ignored by missing/invalid market name: ${ignoredByMarketName}`);
+    console.log(`Total ignored contacts: ${ignoredByEmailDomain + ignoredByMarketName}`);
     console.log(`Next sync will start from: ${newestContactSeen}`);
 
   } catch (error) {
@@ -900,13 +950,21 @@ async function getSyncStatus() {
       { $sort: { count: -1 } }
     ]).toArray();
 
+    // Market name statistics
+    const marketStats = await contactsCol.aggregate([
+      { $group: { _id: "$custom_field.cf_report_name", count: { $sum: 1 } } },
+      { $sort: { count: -1 } },
+      { $limit: 10 }
+    ]).toArray();
+
     console.log('Current Sync Status:');
     if (state) {
       console.log(`   Last sync: ${state.lastSyncAt}`);
       console.log(`   Last completed: ${state.lastSyncCompleted}`);
       console.log(`   Last run stats: ${state.newRecords} new, ${state.updatedRecords} updated`);
       console.log(`   Conversations processed: ${state.conversationsProcessed || 0}`);
-      console.log(`   Ignored contacts: ${state.ignoredContacts || 0}`);
+      console.log(`   Ignored by email domain: ${state.ignoredByEmailDomain || 0}`);
+      console.log(`   Ignored by market name: ${state.ignoredByMarketName || 0}`);
     } else {
       console.log('   No sync history found - first run will get all contacts');
     }
@@ -917,6 +975,13 @@ async function getSyncStatus() {
     if (territoryStats.length > 0) {
       console.log('   Territory Distribution:');
       territoryStats.forEach(stat => {
+        console.log(`     ${stat._id || 'Unknown'}: ${stat.count} contacts`);
+      });
+    }
+
+    if (marketStats.length > 0) {
+      console.log('   Top Market Names:');
+      marketStats.forEach(stat => {
         console.log(`     ${stat._id || 'Unknown'}: ${stat.count} contacts`);
       });
     }
@@ -933,6 +998,7 @@ async function getSyncStatus() {
 async function initialize() {
   console.log('Starting Freshworks Contact Sync Service...');
   console.log(`Email domains to ignore: ${IGNORED_EMAIL_DOMAINS.join(', ')}`);
+  console.log('Only syncing contacts with valid market names (cf_report_name)');
   
   await getSyncStatus();
   
@@ -967,6 +1033,7 @@ initialize().catch(error => {
   console.error('Failed to initialize:', error);
   process.exit(1);
 });
+
 function getEmptyAnalytics(contact) {
   const createdDate = new Date(contact.created_at);
   const now = new Date();
