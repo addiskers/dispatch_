@@ -60,7 +60,7 @@ function calculateCRMAnalytics(contact) {
       email_replies: 0,
       call_answers: 0,
       call_duration_total: 0,
-      connected_call_duration_total: 0,  // Only for connected calls
+      connected_call_duration_total: 0, 
       avg_call_duration: 0,
       avg_connected_call_duration: 0
     },
@@ -139,7 +139,7 @@ function calculateCRMAnalytics(contact) {
       // Process phone call
       const callDate = new Date(conversation.created_at);
       const duration = conversation.call_duration || 0;
-      const isConnected = duration > 90 ; // Connected if > 45 seconds
+      const isConnected = duration > 90 ;
       
       allInteractions.push({
         date: callDate,

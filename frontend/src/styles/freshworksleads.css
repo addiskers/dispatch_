@@ -116,6 +116,56 @@
   cursor: default;
 }
 
+/* Multi-Select Filter Badge Styles */
+.badge {
+  font-size: 0.75rem;
+  font-weight: 500;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25rem;
+  margin-bottom: 0.25rem;
+  margin-right: 0.25rem;
+  border-radius: 4px;
+  padding: 0.35em 0.65em;
+}
+
+.badge .btn-close {
+  font-size: 0.6rem;
+  padding: 0;
+  width: 12px;
+  height: 12px;
+  opacity: 0.8;
+  transition: opacity 0.2s;
+}
+
+.badge .btn-close:hover {
+  opacity: 1;
+}
+
+.badge.bg-primary {
+  background-color: #0d6efd !important;
+}
+
+.badge.bg-info {
+  background-color: #0dcaf0 !important;
+}
+
+.badge.bg-warning {
+  background-color: #ffc107 !important;
+  color: #000 !important;
+}
+
+.badge.bg-success {
+  background-color: #198754 !important;
+}
+
+/* Multi-select dropdown improvements */
+.form-select option:disabled {
+  color: #6c757d;
+  background-color: #f8f9fa;
+  font-style: italic;
+}
+
 /* Filter badge enhancements */
 .badge.bg-primary {
   background-color: #0d6efd !important;
@@ -647,6 +697,16 @@
   .customize-footer {
     padding: 16px 20px;
   }
+
+  /* Mobile analytics adjustments */
+  .analytics-country-filter .btn-group {
+    flex-wrap: wrap;
+  }
+  
+  .analytics-country-filter .btn {
+    margin-bottom: 0.25rem;
+    font-size: 0.75rem;
+  }
 }
 
 /* Performance optimization */
@@ -658,7 +718,7 @@
   will-change: width;
 }
 
-/* Analytics Section Styles */
+/* Enhanced Analytics Section Styles */
 .analytics-section {
   background: linear-gradient(135deg, #f8f9fa 0%, #e9ecef 100%);
   border: 1px solid #dee2e6 !important;
@@ -707,6 +767,52 @@
   color: #6c757d !important;
 }
 
+/* Analytics Country Filter Styles */
+.analytics-country-filter {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+}
+
+.analytics-country-filter .form-label {
+  white-space: nowrap;
+  margin-bottom: 0;
+  font-size: 0.75rem;
+  color: #6c757d;
+}
+
+.analytics-country-filter .btn-group {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.25rem;
+}
+
+.analytics-country-filter .btn {
+  font-size: 0.7rem;
+  padding: 0.25rem 0.5rem;
+  border-radius: 4px;
+  white-space: nowrap;
+  transition: all 0.2s;
+}
+
+.analytics-country-filter .btn-primary {
+  background-color: #007bff;
+  border-color: #007bff;
+  box-shadow: 0 2px 4px rgba(0, 123, 255, 0.3);
+}
+
+.analytics-country-filter .btn-outline-primary {
+  color: #007bff;
+  border-color: #007bff;
+}
+
+.analytics-country-filter .btn-outline-primary:hover {
+  background-color: #007bff;
+  border-color: #007bff;
+  color: white;
+}
+
 /* Responsive adjustments for analytics */
 @media (max-width: 768px) {
   .analytics-section .col-md-3,
@@ -726,6 +832,11 @@
   
   .analytics-number {
     font-size: 1.25rem !important;
+  }
+
+  .analytics-country-filter {
+    flex-direction: column;
+    align-items: flex-start;
   }
 }
 
@@ -949,4 +1060,85 @@
   background: linear-gradient(135deg, #6c757d, #545b62) !important;
   border: none;
   color: white !important;
+}
+
+/* Sample Timing Cell Styles */
+.sample-timing-cell {
+  font-weight: 600;
+  padding: 0.25rem 0.5rem;
+  border-radius: 4px;
+  display: inline-block;
+  min-width: 40px;
+  text-align: center;
+}
+
+.sample-timing-cell.text-info {
+  background-color: rgba(23, 162, 184, 0.1);
+  color: #17a2b8 !important;
+}
+
+.sample-timing-cell.text-muted {
+  background-color: rgba(108, 117, 125, 0.1);
+}
+
+/* Analytics Number Styles */
+.analytics-number strong,
+.duration-cell {
+  font-family: 'SF Mono', 'Monaco', 'Inconsolata', 'Roboto Mono', monospace;
+  letter-spacing: 0.5px;
+}
+
+/* Country Flag Integration (Optional Enhancement) */
+.country-cell {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.country-flag {
+  width: 16px;
+  height: 12px;
+  border-radius: 2px;
+  object-fit: cover;
+}
+
+/* Enhanced Multi-Select Filter Animation */
+@keyframes slideInBadge {
+  from {
+    opacity: 0;
+    transform: scale(0.8);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+.badge {
+  animation: slideInBadge 0.2s ease-out;
+}
+
+/* Focus states for accessibility */
+.analytics-country-filter .btn:focus,
+.form-select:focus,
+.badge .btn-close:focus {
+  outline: 2px solid #007bff;
+  outline-offset: 2px;
+}
+
+/* Print styles */
+@media print {
+  .dashboard-header .btn,
+  .analytics-country-filter,
+  .pagination {
+    display: none !important;
+  }
+  
+  .analytics-section {
+    break-inside: avoid;
+  }
+  
+  .leads-table {
+    font-size: 0.8rem;
+  }
 }

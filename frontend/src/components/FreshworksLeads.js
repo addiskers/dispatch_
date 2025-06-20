@@ -13,7 +13,14 @@ const FreshworksLeads = () => {
     clientEmailsReceived: 0,
     avgCallDuration: '0',
     responseRate: '0.0',
-    samplesSentCount: 0
+    avgConnectedCallDuration: '0', 
+    samplesSentCount: 0,
+    countryBreakdown: {},
+    territoryBreakdown: {},
+    activeLeadCount: 0,
+    leadLevelBreakdown: {},
+    contactCategoryBreakdown: {},
+    priorityCountries: {}
   });
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
@@ -22,18 +29,21 @@ const FreshworksLeads = () => {
   const [totalPages, setTotalPages] = useState(1);
   const [totalCount, setTotalCount] = useState(0);
   const [sortConfig, setSortConfig] = useState({ key: 'created_at', direction: 'desc' });
+  
   const [filters, setFilters] = useState({
-    status: '',
-    owner: '',
-    territory: '',
-    leadLevel: '',
-    contactCategory: '',
-    customTags: '',
+    status: [],
+    owner: [],
+    territory: [],
+    leadLevel: [],
+    contactCategory: [],
+    customTags: [],
+    country: [],
     isActive: '',
-    dateFilter: '', // today, yesterday, week, month, custom
+    dateFilter: '',
     startDate: '',
     endDate: ''
   });
+
   const [filterOptions, setFilterOptions] = useState({
     statuses: [],
     owners: [],
@@ -41,14 +51,21 @@ const FreshworksLeads = () => {
     leadLevels: [],
     contactCategories: [],
     customTags: [],
+    countries: [],
     activeStatus: []
   });
+  
   const [showFilters, setShowFilters] = useState(false);
   const [showCustomDatePicker, setShowCustomDatePicker] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
   const [showColumnCustomizer, setShowColumnCustomizer] = useState(false);
   
-  // Column configuration - UPDATED with CRM analytics columns
+  const [analyticsCountryFilter, setAnalyticsCountryFilter] = useState([]);
+  const priorityCountries = [
+    'United States', 'United Kingdom', 'France', 'Italy', 
+    'Germany', 'Spain', 'Japan', 'Korea, Republic of'
+  ];
+  
   const [availableColumns] = useState({
     created_at: { label: 'Date', width: 120, visible: true },
     market_name: { label: 'Market Name', width: 150, visible: true },
@@ -60,15 +77,13 @@ const FreshworksLeads = () => {
     last_contacted_time: { label: 'Last Contact', width: 160, visible: true },
     owner_name: { label: 'Owner', width: 120, visible: true },
     email: { label: 'Email', width: 200, visible: false },
-    country: { label: 'Country', width: 120, visible: false },
+    country: { label: 'Country', width: 120, visible: true },
     territory: { label: 'Territory', width: 120, visible: false },
     last_contacted_mode: { label: 'Contact Mode', width: 130, visible: false },
     contact_category: { label: 'Contact Category', width: 140, visible: false },
     custom_tags: { label: 'Custom Tags', width: 140, visible: false },
     is_active: { label: 'Active Status', width: 120, visible: false },
     sample_sent_timing: { label: 'Sample Sent (Hours)', width: 150, visible: false },
-    
-    // NEW CRM Analytics columns
     last_email_received: { label: 'Last Email Received', width: 160, visible: false },
     first_email_with_attachment: { label: 'First Email w/ Attachment', width: 180, visible: false },
     total_touchpoints: { label: 'Total Touchpoints', width: 140, visible: false },
@@ -77,7 +92,7 @@ const FreshworksLeads = () => {
     outgoing_calls: { label: 'Outgoing Calls', width: 130, visible: false },
     connected_calls: { label: 'Connected Calls', width: 130, visible: false },
     not_connected_calls: { label: 'Not Connected Calls', width: 150, visible: false },
-    call_duration_total: { label: 'Total Call Duration', width: 150, visible: false }
+    avg_connected_call_duration: { label: 'Avg Connected Call Duration', width: 180, visible: false }
   });
   
   const [columnConfig, setColumnConfig] = useState(availableColumns);
@@ -153,7 +168,7 @@ const FreshworksLeads = () => {
 
   useEffect(() => {
     fetchContacts();
-  }, [currentPage, searchTerm, sortConfig, filters]);
+  }, [currentPage, searchTerm, sortConfig, filters, analyticsCountryFilter]);
 
   useEffect(() => {
     fetchFilterOptions();
@@ -206,16 +221,21 @@ const FreshworksLeads = () => {
         search: searchTerm,
         sortBy: sortConfig.key,
         sortOrder: sortConfig.direction,
-        status: filters.status,
-        owner: filters.owner,
-        territory: filters.territory,
-        leadLevel: filters.leadLevel,
-        contactCategory: filters.contactCategory,
-        customTags: filters.customTags,
+        // Send arrays as JSON strings
+        status: JSON.stringify(filters.status),
+        owner: JSON.stringify(filters.owner),
+        territory: JSON.stringify(filters.territory),
+        leadLevel: JSON.stringify(filters.leadLevel),
+        contactCategory: JSON.stringify(filters.contactCategory),
+        customTags: JSON.stringify(filters.customTags),
+        country: JSON.stringify(filters.country),
         isActive: filters.isActive,
         startDate: dateRange.startDate,
-        endDate: dateRange.endDate
+        endDate: dateRange.endDate,
+        analyticsCountryFilter: JSON.stringify(analyticsCountryFilter)
       });
+
+      console.log('Fetching with params:', Object.fromEntries(params));
 
       const response = await fetch(`${API_BASE_URL}/contacts/table?${params}`);
       const data = await response.json();
@@ -231,8 +251,15 @@ const FreshworksLeads = () => {
           avgSampleSentHours: '0.0',
           clientEmailsReceived: 0,
           avgCallDuration: '0',
+          avgConnectedCallDuration: '0',
           responseRate: '0.0',
-          samplesSentCount: 0
+          samplesSentCount: 0,
+          countryBreakdown: {},
+          territoryBreakdown: {},
+          activeLeadCount: 0,
+          leadLevelBreakdown: {},
+          contactCategoryBreakdown: {},
+          priorityCountries: {}
         });
         setTotalPages(data.pagination.totalPages);
         setTotalCount(data.pagination.totalCount);
@@ -240,6 +267,7 @@ const FreshworksLeads = () => {
         setError(data.message || 'Error fetching contacts');
       }
     } catch (err) {
+      console.error('Fetch error:', err);
       setError('Failed to fetch contacts');
     } finally {
       setLoading(false);
@@ -251,6 +279,7 @@ const FreshworksLeads = () => {
       const response = await fetch(`${API_BASE_URL}/contacts/filters`);
       const data = await response.json();
       if (data.success) {
+        console.log('Filter options received:', data.data);
         setFilterOptions({
           statuses: data.data.statuses || [],
           owners: data.data.owners || [],
@@ -258,6 +287,7 @@ const FreshworksLeads = () => {
           leadLevels: data.data.leadLevels || [],
           contactCategories: data.data.contactCategories || [],
           customTags: data.data.customTags || [],
+          countries: data.data.countries || [],
           activeStatus: data.data.activeStatus || []
         });
       }
@@ -279,20 +309,29 @@ const FreshworksLeads = () => {
     }));
   };
 
+  // Handle multi-select filter changes
   const handleFilterChange = (filterName, value) => {
     setFilters(prev => {
-      const newFilters = { ...prev, [filterName]: value };
+      const newFilters = { ...prev };
       
-      // Handle date filter changes
       if (filterName === 'dateFilter') {
+        newFilters[filterName] = value;
         if (value === 'custom') {
           setShowCustomDatePicker(true);
         } else {
           setShowCustomDatePicker(false);
-          // Clear custom date values when switching to preset filters
           newFilters.startDate = '';
           newFilters.endDate = '';
         }
+      } else if (['status', 'owner', 'territory', 'leadLevel', 'contactCategory', 'customTags', 'country'].includes(filterName)) {
+        const currentValues = newFilters[filterName] || [];
+        if (currentValues.includes(value)) {
+          newFilters[filterName] = currentValues.filter(v => v !== value);
+        } else {
+          newFilters[filterName] = [...currentValues, value];
+        }
+      } else {
+        newFilters[filterName] = value;
       }
       
       return newFilters;
@@ -309,12 +348,13 @@ const FreshworksLeads = () => {
 
   const clearFilters = () => {
     setFilters({ 
-      status: '', 
-      owner: '', 
-      territory: '', 
-      leadLevel: '',
-      contactCategory: '',
-      customTags: '',
+      status: [], 
+      owner: [], 
+      territory: [], 
+      leadLevel: [],
+      contactCategory: [],
+      customTags: [],
+      country: [],
       isActive: '',
       dateFilter: '',
       startDate: '',
@@ -323,6 +363,19 @@ const FreshworksLeads = () => {
     setSearchTerm('');
     setCurrentPage(1);
     setShowCustomDatePicker(false);
+    setAnalyticsCountryFilter([]);
+  };
+
+  const handleAnalyticsCountryFilter = (country) => {
+    console.log('Analytics country filter clicked:', country);
+    setAnalyticsCountryFilter(prev => {
+      const newFilter = prev.includes(country) 
+        ? prev.filter(c => c !== country)
+        : [...prev, country];
+      
+      console.log('New analytics country filter:', newFilter);
+      return newFilter;
+    });
   };
 
   // Get the display text for active date filter
@@ -338,7 +391,20 @@ const FreshworksLeads = () => {
     return option ? option.label : '';
   };
 
-  // Column customizer functions (keeping existing functionality)
+  const getSelectedFiltersText = (filterName) => {
+    const selected = filters[filterName] || [];
+    if (selected.length === 0) return '';
+    if (selected.length === 1) return selected[0];
+    return `${selected.length} selected`;
+  };
+
+  const getAllContactCategoryValues = () => {
+    if (analytics.contactCategoryBreakdown) {
+      return Object.keys(analytics.contactCategoryBreakdown);
+    }
+    return [];
+  };
+
   const toggleColumnVisibility = (columnKey) => {
     setTempColumnConfig(prev => ({
       ...prev,
@@ -541,7 +607,6 @@ const FreshworksLeads = () => {
         case 'is_active':
           return contact.is_active || 'No';
         case 'sample_sent_timing':
-          // Calculate sample sent timing for individual contact
           if (contact.created_at && contact.first_email_with_attachment) {
             const createdDate = new Date(contact.created_at);
             const sampleDate = new Date(contact.first_email_with_attachment);
@@ -550,7 +615,7 @@ const FreshworksLeads = () => {
           }
           return '-';
         
-        // NEW CRM Analytics fields
+        // CRM Analytics fields
         case 'last_email_received':
           return formatDateTime(contact.last_email_received);
         case 'first_email_with_attachment':
@@ -567,9 +632,8 @@ const FreshworksLeads = () => {
           return contact.connected_calls || 0;
         case 'not_connected_calls':
           return contact.not_connected_calls || 0;
-        case 'call_duration_total':
-          return contact.call_duration_formatted || formatDuration(contact.call_duration_total || 0);
-        
+        case 'avg_connected_call_duration':
+          return contact.avg_connected_call_duration_formatted || formatDuration(contact.avg_connected_call_duration || 0);
         default:
           return contact[columnKey] || '-';
       }
@@ -664,7 +728,6 @@ const FreshworksLeads = () => {
           </span>
         );
       
-      // CRM Analytics numeric fields
       case 'total_touchpoints':
       case 'outgoing_emails':
       case 'incoming_emails':
@@ -677,12 +740,12 @@ const FreshworksLeads = () => {
           </span>
         );
       
-      case 'call_duration_total':
-        return (
-          <span className="duration-cell" title={`Total: ${displayValue}`}>
-            {displayValue}
-          </span>
-        );
+      case 'avg_connected_call_duration':
+      return (
+        <span className="duration-cell" title={`Average connected call duration: ${displayValue}`}>
+          {displayValue}
+        </span>
+      );
       
       default:
         return (
@@ -732,14 +795,14 @@ const FreshworksLeads = () => {
     );
   }
 
+  // Calculate active filters count
   const activeFiltersCount = Object.values(filters).filter((value, index) => {
-    // Don't count startDate and endDate separately if dateFilter is set
     const keys = Object.keys(filters);
     const key = keys[index];
     if ((key === 'startDate' || key === 'endDate') && filters.dateFilter) {
       return false;
     }
-    return Boolean(value);
+    return Array.isArray(value) ? value.length > 0 : Boolean(value);
   }).length;
 
   return (
@@ -838,46 +901,98 @@ const FreshworksLeads = () => {
                   )}
                 </div>
 
+                {/* Multi-Select Filters */}
                 <div className="col-md-3">
                   <label className="form-label fw-bold text-muted small">STATUS</label>
                   <select
                     className="form-select"
-                    value={filters.status}
-                    onChange={(e) => handleFilterChange('status', e.target.value)}
+                    value=""
+                    onChange={(e) => e.target.value && handleFilterChange('status', e.target.value)}
                   >
-                    <option value="">All Status</option>
+                    <option value="">Select Status...</option>
                     {filterOptions.statuses.map(status => (
-                      <option key={status} value={status}>{status}</option>
+                      <option key={status} value={status} disabled={filters.status.includes(status)}>
+                        {status} {filters.status.includes(status) ? '✓' : ''}
+                      </option>
                     ))}
                   </select>
+                  {filters.status.length > 0 && (
+                    <div className="mt-1">
+                      {filters.status.map(status => (
+                        <span key={status} className="badge bg-primary me-1 mb-1">
+                          {status}
+                          <button 
+                            type="button" 
+                            className="btn-close btn-close-white ms-1" 
+                            style={{fontSize: '0.7rem'}}
+                            onClick={() => handleFilterChange('status', status)}
+                          ></button>
+                        </span>
+                      ))}
+                    </div>
+                  )}
                 </div>
 
                 <div className="col-md-3">
                   <label className="form-label fw-bold text-muted small">OWNER</label>
                   <select
                     className="form-select"
-                    value={filters.owner}
-                    onChange={(e) => handleFilterChange('owner', e.target.value)}
+                    value=""
+                    onChange={(e) => e.target.value && handleFilterChange('owner', e.target.value)}
                   >
-                    <option value="">All Owners</option>
+                    <option value="">Select Owner...</option>
                     {filterOptions.owners.map(owner => (
-                      <option key={owner} value={owner}>{owner}</option>
+                      <option key={owner} value={owner} disabled={filters.owner.includes(owner)}>
+                        {owner} {filters.owner.includes(owner) ? '✓' : ''}
+                      </option>
                     ))}
                   </select>
+                  {filters.owner.length > 0 && (
+                    <div className="mt-1">
+                      {filters.owner.map(owner => (
+                        <span key={owner} className="badge bg-primary me-1 mb-1">
+                          {owner}
+                          <button 
+                            type="button" 
+                            className="btn-close btn-close-white ms-1" 
+                            style={{fontSize: '0.7rem'}}
+                            onClick={() => handleFilterChange('owner', owner)}
+                          ></button>
+                        </span>
+                      ))}
+                    </div>
+                  )}
                 </div>
 
                 <div className="col-md-3">
-                  <label className="form-label fw-bold text-muted small">TERRITORY</label>
+                  <label className="form-label fw-bold text-muted small">COUNTRY</label>
                   <select
                     className="form-select"
-                    value={filters.territory}
-                    onChange={(e) => handleFilterChange('territory', e.target.value)}
+                    value=""
+                    onChange={(e) => e.target.value && handleFilterChange('country', e.target.value)}
                   >
-                    <option value="">All Territories</option>
-                    {filterOptions.territories.map(territory => (
-                      <option key={territory} value={territory}>{territory}</option>
+                    <option value="">Select Country...</option>
+                    {filterOptions.countries.map(country => (
+                      <option key={country} value={country} disabled={filters.country.includes(country)}>
+                        {country} {filters.country.includes(country) ? '✓' : ''}
+                      </option>
                     ))}
                   </select>
+                  {filters.country.length > 0 && (
+                    <div className="mt-1">
+                      {filters.country.map(country => (
+                        <span key={country} className="badge bg-info me-1 mb-1">
+                          {country}
+                          <button 
+                            type="button" 
+                            className="btn-close btn-close-white ms-1" 
+                            style={{fontSize: '0.7rem'}}
+                            onClick={() => handleFilterChange('country', country)}
+                          ></button>
+                        </span>
+                      ))}
+                    </div>
+                  )}
                 </div>
               </div>
 
@@ -911,48 +1026,99 @@ const FreshworksLeads = () => {
                 </div>
               )}
 
-              {/* Lead Level and Contact Category Filters */}
+              {/* Additional Multi-Select Filters */}
               <div className="row g-3 mt-2">
+                <div className="col-md-3">
+                  <label className="form-label fw-bold text-muted small">TERRITORY</label>
+                  <select
+                    className="form-select"
+                    value=""
+                    onChange={(e) => e.target.value && handleFilterChange('territory', e.target.value)}
+                  >
+                    <option value="">Select Territory...</option>
+                    {filterOptions.territories.map(territory => (
+                      <option key={territory} value={territory} disabled={filters.territory.includes(territory)}>
+                        {territory} {filters.territory.includes(territory) ? '✓' : ''}
+                      </option>
+                    ))}
+                  </select>
+                  {filters.territory.length > 0 && (
+                    <div className="mt-1">
+                      {filters.territory.map(territory => (
+                        <span key={territory} className="badge bg-warning me-1 mb-1">
+                          {territory}
+                          <button 
+                            type="button" 
+                            className="btn-close ms-1" 
+                            style={{fontSize: '0.7rem'}}
+                            onClick={() => handleFilterChange('territory', territory)}
+                          ></button>
+                        </span>
+                      ))}
+                    </div>
+                  )}
+                </div>
+
                 <div className="col-md-3">
                   <label className="form-label fw-bold text-muted small">LEAD LEVEL</label>
                   <select
                     className="form-select"
-                    value={filters.leadLevel}
-                    onChange={(e) => handleFilterChange('leadLevel', e.target.value)}
+                    value=""
+                    onChange={(e) => e.target.value && handleFilterChange('leadLevel', e.target.value)}
                   >
-                    <option value="">All Lead Levels</option>
+                    <option value="">Select Lead Level...</option>
                     {filterOptions.leadLevels.map(level => (
-                      <option key={level} value={level}>{level}</option>
+                      <option key={level} value={level} disabled={filters.leadLevel.includes(level)}>
+                        {level} {filters.leadLevel.includes(level) ? '✓' : ''}
+                      </option>
                     ))}
                   </select>
+                  {filters.leadLevel.length > 0 && (
+                    <div className="mt-1">
+                      {filters.leadLevel.map(level => (
+                        <span key={level} className="badge bg-danger me-1 mb-1">
+                          {level}
+                          <button 
+                            type="button" 
+                            className="btn-close btn-close-white ms-1" 
+                            style={{fontSize: '0.7rem'}}
+                            onClick={() => handleFilterChange('leadLevel', level)}
+                          ></button>
+                        </span>
+                      ))}
+                    </div>
+                  )}
                 </div>
 
                 <div className="col-md-3">
                   <label className="form-label fw-bold text-muted small">CONTACT CATEGORY</label>
                   <select
                     className="form-select"
-                    value={filters.contactCategory}
-                    onChange={(e) => handleFilterChange('contactCategory', e.target.value)}
+                    value=""
+                    onChange={(e) => e.target.value && handleFilterChange('contactCategory', e.target.value)}
                   >
-                    <option value="">All Categories</option>
+                    <option value="">Select Category...</option>
                     {filterOptions.contactCategories.map(category => (
-                      <option key={category} value={category}>{category}</option>
+                      <option key={category} value={category} disabled={filters.contactCategory.includes(category)}>
+                        {category} {filters.contactCategory.includes(category) ? '✓' : ''}
+                      </option>
                     ))}
                   </select>
-                </div>
-
-                <div className="col-md-3">
-                  <label className="form-label fw-bold text-muted small">CUSTOM TAGS</label>
-                  <select
-                    className="form-select"
-                    value={filters.customTags}
-                    onChange={(e) => handleFilterChange('customTags', e.target.value)}
-                  >
-                    <option value="">All Tags</option>
-                    {filterOptions.customTags.map(tag => (
-                      <option key={tag} value={tag}>{tag}</option>
-                    ))}
-                  </select>
+                  {filters.contactCategory.length > 0 && (
+                    <div className="mt-1">
+                      {filters.contactCategory.map(category => (
+                        <span key={category} className="badge bg-success me-1 mb-1">
+                          {category}
+                          <button 
+                            type="button" 
+                            className="btn-close btn-close-white ms-1" 
+                            style={{fontSize: '0.7rem'}}
+                            onClick={() => handleFilterChange('contactCategory', category)}
+                          ></button>
+                        </span>
+                      ))}
+                    </div>
+                  )}
                 </div>
 
                 <div className="col-md-3">
@@ -983,147 +1149,253 @@ const FreshworksLeads = () => {
           )}
         </div>
 
-        {/* Analytics Section - 4x4 Layout */}
         <div className={`analytics-section bg-light border rounded p-3 mb-3 ${loading ? 'loading' : ''}`}>
-          <div className="row g-3">
-            <div className="col-md-12 mb-2">
+        <div className="row g-3">
+          <div className="col-md-12 mb-2">
+            <div className="d-flex justify-content-between align-items-center">
               <h6 className="fw-bold text-primary mb-3">
-                📊 Analytics for All Filtered Results ({analytics.totalContacts.toLocaleString()} contacts)
+                📊 Analytics for All Filtered Results ({analytics.totalContacts?.toLocaleString() || 0} contacts)
                 {loading && <span className="spinner-border spinner-border-sm ms-2" role="status"></span>}
               </h6>
-            </div>
-            
-            {/* First Row - 4 Core Metrics */}
-            <div className="col-lg-3 col-md-6 col-sm-6">
-              <div className="analytics-card bg-white p-3 rounded border" title="Total number of contacts matching current filters">
-                <div className="d-flex align-items-center">
-                  <div className="analytics-icon bg-primary text-white rounded-circle p-2 me-3">
-                    👥
-                  </div>
-                  <div>
-                    <div className="analytics-number text-primary fw-bold fs-4">
-                      {loading ? '...' : (analytics.totalContacts || 0).toLocaleString()}
-                    </div>
-                    <div className="analytics-label text-muted small">Total Contacts</div>
-                  </div>
+              
+              {/* Analytics Country Filter */}
+              <div className="analytics-country-filter">
+                <label className="form-label fw-bold text-muted small me-2">FOCUS COUNTRIES:</label>
+                <div className="btn-group flex-wrap" role="group">
+                  {priorityCountries.map(country => (
+                    <button
+                      key={country}
+                      type="button"
+                      className={`btn btn-sm ${analyticsCountryFilter.includes(country) ? 'btn-primary' : 'btn-outline-primary'}`}
+                      onClick={() => handleAnalyticsCountryFilter(country)}
+                    >
+                      {country} {analytics.priorityCountries?.[country] ? `(${analytics.priorityCountries[country]})` : '(0)'}
+                    </button>
+                  ))}
                 </div>
               </div>
             </div>
-
-            <div className="col-lg-3 col-md-6 col-sm-6">
-              <div className="analytics-card bg-white p-3 rounded border" title="Average number of touchpoints per contact">
-                <div className="d-flex align-items-center">
-                  <div className="analytics-icon bg-info text-white rounded-circle p-2 me-3">
-                    🎯
+          </div>
+          
+          {/* First Row - Core Metrics */}
+          <div className="col-lg-3 col-md-6 col-sm-6">
+            <div className="analytics-card bg-white p-3 rounded border" title="Total number of contacts matching current filters">
+              <div className="d-flex align-items-center">
+                <div className="analytics-icon bg-primary text-white rounded-circle p-2 me-3">
+                  👥
+                </div>
+                <div>
+                  <div className="analytics-number text-primary fw-bold fs-4">
+                    {loading ? '...' : (analytics.totalContacts || 0).toLocaleString()}
                   </div>
-                  <div>
-                    <div className="analytics-number text-info fw-bold fs-4">
-                      {loading ? '...' : (analytics.avgTouchpoints || '0.0')}
-                    </div>
-                    <div className="analytics-label text-muted small">Avg Touchpoints</div>
-                  </div>
+                  <div className="analytics-label text-muted small">Total Contacts</div>
                 </div>
               </div>
             </div>
+          </div>
 
-            <div className="col-lg-3 col-md-6 col-sm-6">
-              <div className="analytics-card bg-white p-3 rounded border" title="Average emails sent per contact">
-                <div className="d-flex align-items-center">
-                  <div className="analytics-icon bg-success text-white rounded-circle p-2 me-3">
-                    📧
+          <div className="col-lg-3 col-md-6 col-sm-6">
+            <div className="analytics-card bg-white p-3 rounded border" title="Number of active/responsive leads">
+              <div className="d-flex align-items-center">
+                <div className="analytics-icon bg-success text-white rounded-circle p-2 me-3">
+                  ✅
+                </div>
+                <div>
+                  <div className="analytics-number text-success fw-bold fs-4">
+                    {loading ? '...' : (analytics.activeLeadCount || 0).toLocaleString()}
                   </div>
-                  <div>
-                    <div className="analytics-number text-success fw-bold fs-4">
-                      {loading ? '...' : (analytics.avgEmails || '0.0')}
-                    </div>
-                    <div className="analytics-label text-muted small">Avg Emails Sent</div>
-                  </div>
+                  <div className="analytics-label text-muted small">Active Leads</div>
                 </div>
               </div>
             </div>
+          </div>
 
-            <div className="col-lg-3 col-md-6 col-sm-6">
-              <div className="analytics-card bg-white p-3 rounded border" title="Average calls made per contact">
-                <div className="d-flex align-items-center">
-                  <div className="analytics-icon bg-purple text-white rounded-circle p-2 me-3" style={{background: 'linear-gradient(135deg, #6f42c1, #5a359a)'}}>
-                    📱
+          <div className="col-lg-3 col-md-6 col-sm-6">
+            <div className="analytics-card bg-white p-3 rounded border" title="Number of unique countries represented">
+              <div className="d-flex align-items-center">
+                <div className="analytics-icon bg-info text-white rounded-circle p-2 me-3">
+                  🌍
+                </div>
+                <div>
+                  <div className="analytics-number text-info fw-bold fs-4">
+                    {loading ? '...' : Object.keys(analytics.countryBreakdown || {}).length}
                   </div>
-                  <div>
-                    <div className="analytics-number fw-bold fs-4" style={{color: '#6f42c1'}}>
-                      {loading ? '...' : (analytics.avgCalls || '0.0')}
-                    </div>
-                    <div className="analytics-label text-muted small">Avg Calls Made</div>
-                  </div>
+                  <div className="analytics-label text-muted small">Countries</div>
                 </div>
               </div>
             </div>
+          </div>
 
-            {/* Second Row - 4 Additional Metrics */}
-            <div className="col-lg-3 col-md-6 col-sm-6">
-              <div className="analytics-card bg-white p-3 rounded border" title="Average connected calls per contact with call activity">
-                <div className="d-flex align-items-center">
-                  <div className="analytics-icon bg-warning text-white rounded-circle p-2 me-3">
-                    📞
+          <div className="col-lg-3 col-md-6 col-sm-6">
+            <div className="analytics-card bg-white p-3 rounded border" title="Number of unique territories represented">
+              <div className="d-flex align-items-center">
+                <div className="analytics-icon bg-warning text-white rounded-circle p-2 me-3">
+                  🏢
+                </div>
+                <div>
+                  <div className="analytics-number text-warning fw-bold fs-4">
+                    {loading ? '...' : Object.keys(analytics.territoryBreakdown || {}).length}
                   </div>
-                  <div>
-                    <div className="analytics-number text-warning fw-bold fs-4">
-                      {loading ? '...' : (analytics.avgConnectedCalls || '0.0')}
-                    </div>
-                    <div className="analytics-label text-muted small">Avg Connected Calls</div>
-                  </div>
+                  <div className="analytics-label text-muted small">Territories</div>
                 </div>
               </div>
             </div>
+          </div>
 
-            <div className="col-lg-3 col-md-6 col-sm-6">
-              <div className="analytics-card bg-white p-3 rounded border" title={`Average hours between contact creation and sample report sent (${analytics.samplesSentCount || 0} samples sent)`}>
-                <div className="d-flex align-items-center">
-                  <div className="analytics-icon bg-danger text-white rounded-circle p-2 me-3">
-                    📊
+          {/* Second Row - Category Breakdowns */}
+          <div className="col-lg-3 col-md-6 col-sm-6">
+            <div className="analytics-card bg-white p-3 rounded border" title={`Corporate contacts. Available categories: ${getAllContactCategoryValues().join(', ')}`}>
+              <div className="d-flex align-items-center">
+                <div className="analytics-icon bg-primary text-white rounded-circle p-2 me-3">
+                  🏢
+                </div>
+                <div>
+                  <div className="analytics-number text-primary fw-bold fs-4">
+                    {loading ? '...' : (() => {
+                      const breakdown = analytics.contactCategoryBreakdown || {};
+                      console.log('Contact category breakdown for Corporate:', breakdown);
+                      
+                      // Try different case variations
+                      const corporate = breakdown['Corporate'] || breakdown['corporate'] || 
+                                    breakdown['CORPORATE'] || breakdown['CORP'] || 
+                                    breakdown['Corp'] || 0;
+                      
+                      console.log('Corporate count found:', corporate);
+                      return corporate.toLocaleString();
+                    })()}
                   </div>
-                  <div>
-                    <div className="analytics-number text-danger fw-bold fs-4">
-                      {loading ? '...' : `${analytics.avgSampleSentHours || '0.0'}h`}
-                    </div>
-                    <div className="analytics-label text-muted small">Avg Sample Sent Timing</div>
-                  </div>
+                  <div className="analytics-label text-muted small">Corporate</div>
                 </div>
               </div>
             </div>
+          </div>
 
-            <div className="col-lg-3 col-md-6 col-sm-6">
-              <div className="analytics-card bg-white p-3 rounded border" title="Total client responses received">
-                <div className="d-flex align-items-center">
-                  <div className="analytics-icon bg-secondary text-white rounded-circle p-2 me-3">
-                    📨
+          <div className="col-lg-3 col-md-6 col-sm-6">
+            <div className="analytics-card bg-white p-3 rounded border" title="Generic contacts count">
+              <div className="d-flex align-items-center">
+                <div className="analytics-icon bg-success text-white rounded-circle p-2 me-3">
+                  📧
+                </div>
+                <div>
+                  <div className="analytics-number text-success fw-bold fs-4">
+                    {loading ? '...' : (() => {
+                      const breakdown = analytics.contactCategoryBreakdown || {};
+                      console.log('Contact category breakdown for Generic:', breakdown);
+                      
+                      // Try different case variations
+                      const generic = breakdown['Generic'] || breakdown['generic'] || 
+                                    breakdown['GENERIC'] || breakdown['GEN'] || 
+                                    breakdown['Gen'] || 0;
+                      
+                      console.log('Generic count found:', generic);
+                      return generic.toLocaleString();
+                    })()}
                   </div>
-                  <div>
-                    <div className="analytics-number text-secondary fw-bold fs-4">
-                      {loading ? '...' : (analytics.clientEmailsReceived || 0).toLocaleString()}
-                    </div>
-                    <div className="analytics-label text-muted small">Client Emails Received</div>
-                  </div>
+                  <div className="analytics-label text-muted small">Generic</div>
                 </div>
               </div>
             </div>
+          </div>
 
-            <div className="col-lg-3 col-md-6 col-sm-6">
-              <div className="analytics-card bg-white p-3 rounded border" title="Average call duration in seconds">
-                <div className="d-flex align-items-center">
-                  <div className="analytics-icon bg-dark text-white rounded-circle p-2 me-3">
-                    ⏱️
+          {/* Third Row - Response Rate and Sample Metrics */}
+          <div className="col-lg-3 col-md-6 col-sm-6">
+            <div className="analytics-card bg-white p-3 rounded border" title="Average number of touchpoints per contact">
+              <div className="d-flex align-items-center">
+                <div className="analytics-icon bg-info text-white rounded-circle p-2 me-3">
+                  🎯
+                </div>
+                <div>
+                  <div className="analytics-number text-info fw-bold fs-4">
+                    {loading ? '...' : (analytics.avgTouchpoints || '0.0')}
                   </div>
-                  <div>
-                    <div className="analytics-number text-dark fw-bold fs-4">
-                      {loading ? '...' : `${analytics.avgCallDuration || '0'}s`}
-                    </div>
-                    <div className="analytics-label text-muted small">Avg Call Duration</div>
+                  <div className="analytics-label text-muted small">Avg Touchpoints</div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div className="col-lg-3 col-md-6 col-sm-6">
+            <div className="analytics-card bg-white p-3 rounded border" title="Average emails sent per contact">
+              <div className="d-flex align-items-center">
+                <div className="analytics-icon bg-success text-white rounded-circle p-2 me-3">
+                  📧
+                </div>
+                <div>
+                  <div className="analytics-number text-success fw-bold fs-4">
+                    {loading ? '...' : (analytics.avgEmails || '0.0')}
                   </div>
+                  <div className="analytics-label text-muted small">Avg Emails Sent</div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div className="col-lg-3 col-md-6 col-sm-6">
+            <div className="analytics-card bg-white p-3 rounded border" title="Average calls made per contact">
+              <div className="d-flex align-items-center">
+                <div className="analytics-icon bg-purple text-white rounded-circle p-2 me-3" style={{background: 'linear-gradient(135deg, #6f42c1, #5a359a)'}}>
+                  📱
+                </div>
+                <div>
+                  <div className="analytics-number fw-bold fs-4" style={{color: '#6f42c1'}}>
+                    {loading ? '...' : (analytics.avgCalls || '0.0')}
+                  </div>
+                  <div className="analytics-label text-muted small">Avg Calls Made</div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div className="col-lg-3 col-md-6 col-sm-6">
+            <div className="analytics-card bg-white p-3 rounded border" title={`Average hours between contact creation and sample report sent (${analytics.samplesSentCount || 0} samples sent)`}>
+              <div className="d-flex align-items-center">
+                <div className="analytics-icon bg-danger text-white rounded-circle p-2 me-3">
+                  📊
+                </div>
+                <div>
+                  <div className="analytics-number text-danger fw-bold fs-4">
+                    {loading ? '...' : `${analytics.avgSampleSentHours || '0.0'}h`}
+                  </div>
+                  <div className="analytics-label text-muted small">Avg Sample Sent Timing</div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          {/* UPDATED: This card now uses avgConnectedCallDuration instead of avgCallDuration */}
+          <div className="col-lg-3 col-md-6 col-sm-6">
+            <div className="analytics-card bg-white p-3 rounded border" title="Average duration of connected calls only (excludes missed/unanswered calls)">
+              <div className="d-flex align-items-center">
+                <div className="analytics-icon bg-danger text-white rounded-circle p-2 me-3">
+                  ⏱️
+                </div>
+                <div>
+                  <div className="analytics-number text-danger fw-bold fs-4">
+                    {loading ? '...' : `${analytics.avgConnectedCallDuration || '0'}s`}
+                  </div>
+                  <div className="analytics-label text-muted small">Avg Connected Call Duration</div>
+                </div>
+              </div>
+            </div>
+          </div>
+          
+          <div className="col-lg-3 col-md-6 col-sm-6">
+            <div className="analytics-card bg-white p-3 rounded border" title="Response rate percentage">
+              <div className="d-flex align-items-center">
+                <div className="analytics-icon bg-secondary text-white rounded-circle p-2 me-3">
+                  📈
+                </div>
+                <div>
+                  <div className="analytics-number text-secondary fw-bold fs-4">
+                    {loading ? '...' : `${analytics.responseRate || '0.0'}%`}
+                  </div>
+                  <div className="analytics-label text-muted small">Response Rate</div>
                 </div>
               </div>
             </div>
           </div>
         </div>
+      </div>
 
         {/* Table */}
         <div className="table-responsive">
