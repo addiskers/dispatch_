@@ -10,11 +10,13 @@ const FreshworksLeads = () => {
     avgCalls: '0.0',              
     avgConnectedCalls: '0.0',
     avgSampleSentHours: '0.0',
+    avgFirstCallMinutes: '0.0', 
     clientEmailsReceived: 0,
     avgCallDuration: '0',
     responseRate: '0.0',
     avgConnectedCallDuration: '0', 
     samplesSentCount: 0,
+    firstCallsCount: 0, 
     countryBreakdown: {},
     territoryBreakdown: {},
     activeLeadCount: 0,
@@ -84,8 +86,9 @@ const FreshworksLeads = () => {
     custom_tags: { label: 'Custom Tags', width: 140, visible: false },
     is_active: { label: 'Active Status', width: 120, visible: false },
     sample_sent_timing: { label: 'Sample Sent (Hours)', width: 150, visible: false },
+    first_call_timing: { label: 'First Call (Minutes)', width: 150, visible: false }, 
     last_email_received: { label: 'Last Email Received', width: 160, visible: false },
-    first_email_with_attachment: { label: 'First Email w/ Attachment', width: 180, visible: false },
+    first_call_date: { label: 'First Call Date', width: 160, visible: false }, 
     total_touchpoints: { label: 'Total Touchpoints', width: 140, visible: false },
     outgoing_emails: { label: 'Outgoing Emails', width: 130, visible: false },
     incoming_emails: { label: 'Incoming Emails', width: 130, visible: false },
@@ -249,11 +252,13 @@ const FreshworksLeads = () => {
           avgCalls: '0.0',              
           avgConnectedCalls: '0.0',
           avgSampleSentHours: '0.0',
+          avgFirstCallMinutes: '0.0', 
           clientEmailsReceived: 0,
           avgCallDuration: '0',
           avgConnectedCallDuration: '0',
           responseRate: '0.0',
           samplesSentCount: 0,
+          firstCallsCount: 0, 
           countryBreakdown: {},
           territoryBreakdown: {},
           activeLeadCount: 0,
@@ -615,11 +620,20 @@ const FreshworksLeads = () => {
           }
           return '-';
         
+        // NEW: First call timing case
+        case 'first_call_timing':
+          if (contact.first_call_timing) {
+            return `${contact.first_call_timing}m`;
+          }
+          return '-';
+        
         // CRM Analytics fields
         case 'last_email_received':
           return formatDateTime(contact.last_email_received);
         case 'first_email_with_attachment':
           return formatDateTime(contact.first_email_with_attachment);
+        case 'first_call_date': // NEW FIELD
+          return formatDateTime(contact.first_call_date);
         case 'total_touchpoints':
           return contact.total_touchpoints || 0;
         case 'outgoing_emails':
@@ -639,122 +653,134 @@ const FreshworksLeads = () => {
       }
     };
 
-    const value = getValue();
-    const displayValue = value || '-';
+  const value = getValue();
+  const displayValue = value || '-';
 
-    switch (columnKey) {
-      case 'created_at':
-      case 'last_contacted_time':
-      case 'last_email_received':
-      case 'first_email_with_attachment':
-        return (
-          <span className="date-time-cell" title={displayValue}>
-            {displayValue}
-          </span>
-        );
-      
-      case 'market_name':
-      case 'company':
-        return (
-          <span className="report-name" title={displayValue}>
-            {displayValue}
-          </span>
-        );
-      
-      case 'display_name':
-        return (
-          <strong title={displayValue}>
-            {displayValue}
-          </strong>
-        );
-      
-      case 'status_name':
-        return (
-          <span 
-            className={`badge type-badge ${getStatusBadgeClass(contact.status_name)}`}
-            title={displayValue}
-          >
-            {displayValue}
-          </span>
-        );
-      
-      case 'lead_level':
-        return (
-          <span 
-            className={`badge type-badge ${getLeadLevelBadgeClass(contact.lead_level)}`}
-            title={displayValue}
-          >
-            {displayValue}
-          </span>
-        );
+  switch (columnKey) {
+    case 'created_at':
+    case 'last_contacted_time':
+    case 'last_email_received':
+    case 'first_email_with_attachment':
+    case 'first_call_date': // NEW CASE
+      return (
+        <span className="date-time-cell" title={displayValue}>
+          {displayValue}
+        </span>
+      );
+    
+    case 'market_name':
+    case 'company':
+      return (
+        <span className="report-name" title={displayValue}>
+          {displayValue}
+        </span>
+      );
+    
+    case 'display_name':
+      return (
+        <strong title={displayValue}>
+          {displayValue}
+        </strong>
+      );
+    
+    case 'status_name':
+      return (
+        <span 
+          className={`badge type-badge ${getStatusBadgeClass(contact.status_name)}`}
+          title={displayValue}
+        >
+          {displayValue}
+        </span>
+      );
+    
+    case 'lead_level':
+      return (
+        <span 
+          className={`badge type-badge ${getLeadLevelBadgeClass(contact.lead_level)}`}
+          title={displayValue}
+        >
+          {displayValue}
+        </span>
+      );
 
-      case 'contact_category':
-        return (
-          <span 
-            className={`badge category-badge ${getCategoryBadgeClass(contact.contact_category)}`}
-            title={displayValue}
-          >
-            {displayValue}
-          </span>
-        );
+    case 'contact_category':
+      return (
+        <span 
+          className={`badge category-badge ${getCategoryBadgeClass(contact.contact_category)}`}
+          title={displayValue}
+        >
+          {displayValue}
+        </span>
+      );
 
-      case 'custom_tags':
-        return (
-          <span 
-            className={`badge custom-tags-badge ${getCustomTagsBadgeClass(contact.custom_tags)}`}
-            title={displayValue}
-          >
-            {displayValue}
-          </span>
-        );
+    case 'custom_tags':
+      return (
+        <span 
+          className={`badge custom-tags-badge ${getCustomTagsBadgeClass(contact.custom_tags)}`}
+          title={displayValue}
+        >
+          {displayValue}
+        </span>
+      );
 
-      case 'is_active':
-        return (
-          <span 
-            className={`badge active-status-badge ${contact.is_active === 'Yes' ? 'bg-success' : 'bg-secondary'}`}
-            title={contact.is_active === 'Yes' ? 'Contact has responded via email or phone' : 'Contact has not responded yet'}
-          >
-            {contact.is_active === 'Yes' ? '✓ Active' : '✗ Inactive'}
-          </span>
-        );
+    case 'is_active':
+      return (
+        <span 
+          className={`badge active-status-badge ${contact.is_active === 'Yes' ? 'bg-success' : 'bg-secondary'}`}
+          title={contact.is_active === 'Yes' ? 'Contact has responded via email or phone' : 'Contact has not responded yet'}
+        >
+          {contact.is_active === 'Yes' ? '✓ Active' : '✗ Inactive'}
+        </span>
+      );
 
-      case 'sample_sent_timing':
-        return (
-          <span 
-            className={`sample-timing-cell ${displayValue === '-' ? 'text-muted' : 'text-info fw-bold'}`}
-            title={displayValue === '-' ? 'No sample sent yet' : `Sample sent ${displayValue} after contact creation`}
-          >
-            {displayValue}
-          </span>
-        );
-      
-      case 'total_touchpoints':
-      case 'outgoing_emails':
-      case 'incoming_emails':
-      case 'outgoing_calls':
-      case 'connected_calls':
-      case 'not_connected_calls':
-        return (
-          <span className="analytics-number" title={displayValue}>
-            <strong>{displayValue}</strong>
-          </span>
-        );
-      
-      case 'avg_connected_call_duration':
+    case 'sample_sent_timing':
+      return (
+        <span 
+          className={`sample-timing-cell ${displayValue === '-' ? 'text-muted' : 'text-info fw-bold'}`}
+          title={displayValue === '-' ? 'No sample sent yet' : `Sample sent ${displayValue} after contact creation`}
+        >
+          {displayValue}
+        </span>
+      );
+
+    // NEW: First call timing case
+    case 'first_call_timing':
+      return (
+        <span 
+          className={`first-call-timing-cell ${displayValue === '-' ? 'text-muted' : 'text-warning fw-bold'}`}
+          title={displayValue === '-' ? 'No call made yet' : `First call made ${displayValue} after contact creation`}
+        >
+          {displayValue}
+        </span>
+      );
+    
+    case 'total_touchpoints':
+    case 'outgoing_emails':
+    case 'incoming_emails':
+    case 'outgoing_calls':
+    case 'connected_calls':
+    case 'not_connected_calls':
+      return (
+        <span className="analytics-number" title={displayValue}>
+          <strong>{displayValue}</strong>
+        </span>
+      );
+    
+    case 'avg_connected_call_duration':
       return (
         <span className="duration-cell" title={`Average connected call duration: ${displayValue}`}>
           {displayValue}
         </span>
       );
-      
-      default:
-        return (
-          <span title={displayValue}>
-            {displayValue}
-          </span>
-        );
-    }
-  };
+    
+    default:
+      return (
+        <span title={displayValue}>
+          {displayValue}
+        </span>
+      );
+  }
+};
 
   const visibleColumns = columnOrder
     .filter(key => columnConfig[key]?.visible)
@@ -1227,16 +1253,16 @@ const FreshworksLeads = () => {
           </div>
 
           <div className="col-lg-3 col-md-6 col-sm-6">
-            <div className="analytics-card bg-white p-3 rounded border" title="Number of unique territories represented">
+            <div className="analytics-card bg-white p-3 rounded border" title={`Average minutes between contact creation and first call attempt (${analytics.firstCallsCount || 0} calls made)`}>
               <div className="d-flex align-items-center">
                 <div className="analytics-icon bg-warning text-white rounded-circle p-2 me-3">
-                  🏢
+                  📞
                 </div>
                 <div>
                   <div className="analytics-number text-warning fw-bold fs-4">
-                    {loading ? '...' : Object.keys(analytics.territoryBreakdown || {}).length}
+                    {loading ? '...' : `${analytics.avgFirstCallMinutes || '0.0'}m`}
                   </div>
-                  <div className="analytics-label text-muted small">Territories</div>
+                  <div className="analytics-label text-muted small">Avg First Call Timing</div>
                 </div>
               </div>
             </div>

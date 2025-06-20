@@ -251,7 +251,9 @@ const getContactsTable = async (req, res) => {
       dbSortField = 'crm_analytics.engagement.not_connected_calls';
     } else if (sortBy === 'call_duration_total') {
       dbSortField = 'crm_analytics.engagement.avg_connected_call_duration';
-    }
+    }else if (sortBy === 'first_call_timing') {
+    dbSortField = 'crm_analytics.first_call.date';
+  }
 
     // Get contacts with required fields for table INCLUDING CRM analytics
     const contacts = await Contact.find(query)
@@ -311,18 +313,31 @@ const getContactsTable = async (req, res) => {
       }
       return null;
     };
-
+    const calculateFirstCallTiming = (contact) => {
+      if (!contact.created_at || !contact.crm_analytics?.first_call?.date) {
+        return null;
+      }
+      
+      const createdDate = new Date(contact.created_at);
+      const firstCallDate = new Date(contact.crm_analytics.first_call.date);
+      
+      if (firstCallDate > createdDate) {
+        const minutesDelay = (firstCallDate - createdDate) / (1000 * 60);
+        return minutesDelay >= 0 && minutesDelay <= 525600 ? minutesDelay.toFixed(1) : null; // 365 days in minutes
+      }
+      return null;
+    };
     // Transform data for table view and double-check market_name
     const tableData = contacts
       .filter(contact => {
         const marketName = contact.custom_field?.cf_report_name;
         return marketName && 
-               marketName !== '-' && 
-               marketName !== '' && 
-               marketName !== 'NA' && 
-               marketName !== 'na' && 
-               marketName !== 'N/A' && 
-               marketName !== 'n/a';
+              marketName !== '-' && 
+              marketName !== '' && 
+              marketName !== 'NA' && 
+              marketName !== 'na' && 
+              marketName !== 'N/A' && 
+              marketName !== 'n/a';
       })
       .map(contact => ({
         id: contact.id,
@@ -338,6 +353,7 @@ const getContactsTable = async (req, res) => {
         custom_tags: formatValue(contact.custom_field?.cf_custom_tags),
         is_active: isContactActive(contact) ? 'Yes' : 'No',
         sample_sent_timing: calculateSampleSentTiming(contact),
+        first_call_timing: calculateFirstCallTiming(contact), // NEW FIELD
         status_name: formatValue(contact.status_name),
         owner_name: formatValue(contact.owner_name),
         created_at: contact.created_at,
@@ -347,6 +363,7 @@ const getContactsTable = async (req, res) => {
         // CRM Analytics fields
         last_email_received: contact.crm_analytics?.last_email_received?.date || null,
         first_email_with_attachment: contact.crm_analytics?.first_email_with_attachment?.date || null,
+        first_call_date: contact.crm_analytics?.first_call?.date || null, // NEW FIELD
         total_touchpoints: contact.crm_analytics?.engagement?.total_touchpoints || 0,
         outgoing_emails: contact.crm_analytics?.engagement?.outgoing_emails || 0,
         incoming_emails: contact.crm_analytics?.engagement?.incoming_emails || 0,
@@ -361,168 +378,186 @@ const getContactsTable = async (req, res) => {
       .lean();
 
     const calculateEnhancedAnalytics = (contacts, analyticsCountries) => {
-        if (!contacts || contacts.length === 0) {
-          return {
-            totalContacts: 0,
-            avgTouchpoints: '0.0',
-            avgEmails: '0.0',
-            avgCalls: '0.0',
-            avgConnectedCalls: '0.0',
-            avgSampleSentHours: '0.0',
-            clientEmailsReceived: 0,
-            avgCallDuration: '0',
-            avgConnectedCallDuration: '0',
-            responseRate: '0.0',
-            samplesSentCount: 0,
-            countryBreakdown: {},
-            territoryBreakdown: {},
-            activeLeadCount: 0,
-            leadLevelBreakdown: {},
-            contactCategoryBreakdown: {},
-            priorityCountries: {}
-          };
-        }
-
-        let analyticsContacts = contacts;
-        if (analyticsCountries && analyticsCountries.length > 0) {
-          console.log('Filtering analytics by countries:', analyticsCountries);
-          analyticsContacts = contacts.filter(contact => 
-            analyticsCountries.includes(contact.country)
-          );
-          console.log('Analytics contacts after country filter:', analyticsContacts.length);
-        }
-
-        let totalTouchpoints = 0;
-        let totalOutgoingEmails = 0;
-        let totalOutgoingCalls = 0;
-        let totalIncomingEmails = 0;
-        let totalConnectedCalls = 0;
-        let totalSampleSentHours = 0;
-        let validSampleSentCount = 0;
-        let totalCallDuration = 0;
-        let totalConnectedCallDuration = 0; 
-        let validCallDurationCount = 0;
-        let validConnectedCallDurationCount = 0; 
-        let contactsWithCalls = 0;
-        let activeLeadCount = 0;
-
-        // Breakdown objects (always based on ALL contacts, not filtered)
-        const countryBreakdown = {};
-        const territoryBreakdown = {};
-        const leadLevelBreakdown = {};
-        const contactCategoryBreakdown = {};
-        const priorityCountries = {};
-
-        // Initialize priority countries with ALL contacts
-        const priorityCountryList = [
-          'United States', 'United Kingdom', 'France', 'Italy', 
-          'Germany', 'Spain', 'Japan', 'Korea, Republic of'
-        ];
-        priorityCountryList.forEach(country => {
-          priorityCountries[country] = 0;
-        });
-
-        // Process ALL contacts for breakdowns
-        contacts.forEach(contact => {
-          const country = contact.country || 'Unknown';
-          countryBreakdown[country] = (countryBreakdown[country] || 0) + 1;
-          
-          // Priority countries tracking
-          if (priorityCountries.hasOwnProperty(country)) {
-            priorityCountries[country]++;
-          }
-
-          // Territory breakdown
-          const territory = contact.territory_name || 'Unassigned';
-          territoryBreakdown[territory] = (territoryBreakdown[territory] || 0) + 1;
-
-          // Lead level breakdown
-          const leadLevel = contact.custom_field?.cf_lead_level || 'Unassigned';
-          leadLevelBreakdown[leadLevel] = (leadLevelBreakdown[leadLevel] || 0) + 1;
-
-          const contactCategory = contact.custom_field?.cf_contact_category || 'Unassigned';
-          console.log(`Contact ${contact.id || 'unknown'} category: "${contactCategory}"`);
-          contactCategoryBreakdown[contactCategory] = (contactCategoryBreakdown[contactCategory] || 0) + 1;
-        });
-
-        console.log('Final contact category breakdown:', contactCategoryBreakdown);
-
-        // Process analytics-filtered contacts for metrics
-        analyticsContacts.forEach(contact => {
-          if (contact.crm_analytics?.engagement) {
-            const engagement = contact.crm_analytics.engagement;
-            
-            totalTouchpoints += engagement.total_touchpoints || 0;
-            totalOutgoingEmails += engagement.outgoing_emails || 0;
-            totalOutgoingCalls += engagement.outgoing_calls || 0;
-            
-            const connectedCalls = engagement.connected_calls || 0;
-            totalConnectedCalls += connectedCalls;
-            
-            if ((engagement.outgoing_calls || 0) > 0) {
-              contactsWithCalls++;
-            }
-            
-            totalIncomingEmails += engagement.incoming_emails || 0;
-            
-            // Calculate total call duration (all calls)
-            if (engagement.call_duration_total && engagement.call_duration_total > 0) {
-              totalCallDuration += engagement.call_duration_total;
-              validCallDurationCount++;
-            }
-
-            if (engagement.avg_connected_call_duration && engagement.avg_connected_call_duration > 0 && connectedCalls > 0) {
-              totalConnectedCallDuration += engagement.avg_connected_call_duration * connectedCalls;
-              validConnectedCallDurationCount += connectedCalls;
-            } else if (engagement.call_duration_total && engagement.call_duration_total > 0 && connectedCalls > 0) {
-              totalConnectedCallDuration += engagement.call_duration_total;
-              validConnectedCallDurationCount += connectedCalls;
-            }
-
-            // Check if contact is active
-            if ((engagement.incoming_emails || 0) > 0 || connectedCalls > 0) {
-              activeLeadCount++;
-            }
-          }
-          
-          // Sample sent timing
-          if (contact.created_at && contact.crm_analytics?.first_email_with_attachment?.date) {
-            const createdDate = new Date(contact.created_at);
-            const sampleSentDate = new Date(contact.crm_analytics.first_email_with_attachment.date);
-            
-            if (sampleSentDate > createdDate) {
-              const hoursDelay = (sampleSentDate - createdDate) / (1000 * 60 * 60);
-              if (hoursDelay >= 0 && hoursDelay <= 8760) { 
-                totalSampleSentHours += hoursDelay;
-                validSampleSentCount++;
-              }
-            }
-          }
-        });
-
-        // Calculate response rate
-        const responseRate = totalOutgoingEmails > 0 ? (totalIncomingEmails / totalOutgoingEmails) * 100 : 0;
-
+      if (!contacts || contacts.length === 0) {
         return {
-          totalContacts: analyticsContacts.length, // Use filtered count for this metric
-          avgTouchpoints: analyticsContacts.length > 0 ? (totalTouchpoints / analyticsContacts.length).toFixed(1) : '0.0',
-          avgEmails: analyticsContacts.length > 0 ? (totalOutgoingEmails / analyticsContacts.length).toFixed(1) : '0.0',
-          avgCalls: analyticsContacts.length > 0 ? (totalOutgoingCalls / analyticsContacts.length).toFixed(1) : '0.0',
-          avgConnectedCalls: contactsWithCalls > 0 ? (totalConnectedCalls / contactsWithCalls).toFixed(1) : '0.0',
-          avgSampleSentHours: validSampleSentCount > 0 ? (totalSampleSentHours / validSampleSentCount).toFixed(1) : '0.0',
-          clientEmailsReceived: totalIncomingEmails,
-          avgCallDuration: validCallDurationCount > 0 ? (totalCallDuration / validCallDurationCount).toFixed(0) : '0',
-          avgConnectedCallDuration: validConnectedCallDurationCount > 0 ? (totalConnectedCallDuration / validConnectedCallDurationCount).toFixed(0) : '0',
-          responseRate: responseRate.toFixed(1),
-          samplesSentCount: validSampleSentCount,
-          countryBreakdown,
-          territoryBreakdown,
-          activeLeadCount, 
-          leadLevelBreakdown,
-          contactCategoryBreakdown,
-          priorityCountries
+          totalContacts: 0,
+          avgTouchpoints: '0.0',
+          avgEmails: '0.0',
+          avgCalls: '0.0',
+          avgConnectedCalls: '0.0',
+          avgSampleSentHours: '0.0',
+          avgFirstCallMinutes: '0.0', // NEW FIELD
+          clientEmailsReceived: 0,
+          avgCallDuration: '0',
+          avgConnectedCallDuration: '0',
+          responseRate: '0.0',
+          samplesSentCount: 0,
+          firstCallsCount: 0, // NEW FIELD
+          countryBreakdown: {},
+          territoryBreakdown: {},
+          activeLeadCount: 0,
+          leadLevelBreakdown: {},
+          contactCategoryBreakdown: {},
+          priorityCountries: {}
         };
-      };
+      }
+
+  let analyticsContacts = contacts;
+  if (analyticsCountries && analyticsCountries.length > 0) {
+    console.log('Filtering analytics by countries:', analyticsCountries);
+    analyticsContacts = contacts.filter(contact => 
+      analyticsCountries.includes(contact.country)
+    );
+    console.log('Analytics contacts after country filter:', analyticsContacts.length);
+  }
+
+  let totalTouchpoints = 0;
+  let totalOutgoingEmails = 0;
+  let totalOutgoingCalls = 0;
+  let totalIncomingEmails = 0;
+  let totalConnectedCalls = 0;
+  let totalSampleSentHours = 0;
+  let totalFirstCallMinutes = 0; // NEW VARIABLE
+  let validSampleSentCount = 0;
+  let validFirstCallCount = 0; // NEW VARIABLE
+  let totalCallDuration = 0;
+  let totalConnectedCallDuration = 0; 
+  let validCallDurationCount = 0;
+  let validConnectedCallDurationCount = 0; 
+  let contactsWithCalls = 0;
+  let activeLeadCount = 0;
+
+  // Breakdown objects (always based on ALL contacts, not filtered)
+  const countryBreakdown = {};
+  const territoryBreakdown = {};
+  const leadLevelBreakdown = {};
+  const contactCategoryBreakdown = {};
+  const priorityCountries = {};
+
+  // Initialize priority countries with ALL contacts
+  const priorityCountryList = [
+    'United States', 'United Kingdom', 'France', 'Italy', 
+    'Germany', 'Spain', 'Japan', 'Korea, Republic of'
+  ];
+  priorityCountryList.forEach(country => {
+    priorityCountries[country] = 0;
+  });
+
+  // Process ALL contacts for breakdowns
+  contacts.forEach(contact => {
+    const country = contact.country || 'Unknown';
+    countryBreakdown[country] = (countryBreakdown[country] || 0) + 1;
+    
+    // Priority countries tracking
+    if (priorityCountries.hasOwnProperty(country)) {
+      priorityCountries[country]++;
+    }
+
+    // Territory breakdown
+    const territory = contact.territory_name || 'Unassigned';
+    territoryBreakdown[territory] = (territoryBreakdown[territory] || 0) + 1;
+
+    // Lead level breakdown
+    const leadLevel = contact.custom_field?.cf_lead_level || 'Unassigned';
+    leadLevelBreakdown[leadLevel] = (leadLevelBreakdown[leadLevel] || 0) + 1;
+
+    const contactCategory = contact.custom_field?.cf_contact_category || 'Unassigned';
+    contactCategoryBreakdown[contactCategory] = (contactCategoryBreakdown[contactCategory] || 0) + 1;
+  });
+
+  // Process analytics-filtered contacts for metrics
+  analyticsContacts.forEach(contact => {
+    // Basic engagement analytics
+    if (contact.crm_analytics?.engagement) {
+      const engagement = contact.crm_analytics.engagement;
+      
+      totalTouchpoints += engagement.total_touchpoints || 0;
+      totalOutgoingEmails += engagement.outgoing_emails || 0;
+      totalOutgoingCalls += engagement.outgoing_calls || 0;
+      
+      const connectedCalls = engagement.connected_calls || 0;
+      totalConnectedCalls += connectedCalls;
+      
+      if ((engagement.outgoing_calls || 0) > 0) {
+        contactsWithCalls++;
+      }
+      
+      totalIncomingEmails += engagement.incoming_emails || 0;
+      
+      // Calculate total call duration (all calls)
+      if (engagement.call_duration_total && engagement.call_duration_total > 0) {
+        totalCallDuration += engagement.call_duration_total;
+        validCallDurationCount++;
+      }
+
+      if (engagement.avg_connected_call_duration && engagement.avg_connected_call_duration > 0 && connectedCalls > 0) {
+        totalConnectedCallDuration += engagement.avg_connected_call_duration * connectedCalls;
+        validConnectedCallDurationCount += connectedCalls;
+      } else if (engagement.call_duration_total && engagement.call_duration_total > 0 && connectedCalls > 0) {
+        totalConnectedCallDuration += engagement.call_duration_total;
+        validConnectedCallDurationCount += connectedCalls;
+      }
+
+      // Check if contact is active
+      if ((engagement.incoming_emails || 0) > 0 || connectedCalls > 0) {
+        activeLeadCount++;
+      }
+    }
+    
+    // Sample sent timing
+    if (contact.created_at && contact.crm_analytics?.first_email_with_attachment?.date) {
+      const createdDate = new Date(contact.created_at);
+      const sampleSentDate = new Date(contact.crm_analytics.first_email_with_attachment.date);
+      
+      if (sampleSentDate > createdDate) {
+        const hoursDelay = (sampleSentDate - createdDate) / (1000 * 60 * 60);
+        if (hoursDelay >= 0 && hoursDelay <= 8760) { 
+          totalSampleSentHours += hoursDelay;
+          validSampleSentCount++;
+        }
+      }
+    }
+
+    // NEW: First call timing calculation
+    if (contact.created_at && contact.crm_analytics?.first_call?.date) {
+      const createdDate = new Date(contact.created_at);
+      const firstCallDate = new Date(contact.crm_analytics.first_call.date);
+      
+      if (firstCallDate > createdDate) {
+        const minutesDelay = (firstCallDate - createdDate) / (1000 * 60);
+        if (minutesDelay >= 0 && minutesDelay <= 525600) { // 365 days in minutes
+          totalFirstCallMinutes += minutesDelay;
+          validFirstCallCount++;
+        }
+      }
+    }
+  });
+
+  // Calculate response rate
+  const responseRate = totalOutgoingEmails > 0 ? (totalIncomingEmails / totalOutgoingEmails) * 100 : 0;
+
+  return {
+    totalContacts: analyticsContacts.length,
+    avgTouchpoints: analyticsContacts.length > 0 ? (totalTouchpoints / analyticsContacts.length).toFixed(1) : '0.0',
+    avgEmails: analyticsContacts.length > 0 ? (totalOutgoingEmails / analyticsContacts.length).toFixed(1) : '0.0',
+    avgCalls: analyticsContacts.length > 0 ? (totalOutgoingCalls / analyticsContacts.length).toFixed(1) : '0.0',
+    avgConnectedCalls: contactsWithCalls > 0 ? (totalConnectedCalls / contactsWithCalls).toFixed(1) : '0.0',
+    avgSampleSentHours: validSampleSentCount > 0 ? (totalSampleSentHours / validSampleSentCount).toFixed(1) : '0.0',
+    avgFirstCallMinutes: validFirstCallCount > 0 ? (totalFirstCallMinutes / validFirstCallCount).toFixed(1) : '0.0', // NEW FIELD
+    clientEmailsReceived: totalIncomingEmails,
+    avgCallDuration: validCallDurationCount > 0 ? (totalCallDuration / validCallDurationCount).toFixed(0) : '0',
+    avgConnectedCallDuration: validConnectedCallDurationCount > 0 ? (totalConnectedCallDuration / validConnectedCallDurationCount).toFixed(0) : '0',
+    responseRate: responseRate.toFixed(1),
+    samplesSentCount: validSampleSentCount,
+    firstCallsCount: validFirstCallCount, // NEW FIELD
+    countryBreakdown,
+    territoryBreakdown,
+    activeLeadCount, 
+    leadLevelBreakdown,
+    contactCategoryBreakdown,
+    priorityCountries
+  };
+};
 
     const analytics = calculateEnhancedAnalytics(allFilteredContacts, analyticsCountries);
 
