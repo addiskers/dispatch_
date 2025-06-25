@@ -120,6 +120,32 @@ const FreshworksLeads = () => {
     { value: 'custom', label: 'Custom Range' }
   ];
 
+  // Parse URL parameters and set filters
+  useEffect(() => {
+    const urlParams = new URLSearchParams(window.location.search);
+    const filtersFromUrl = {};
+    
+    for (const [key, value] of urlParams.entries()) {
+      try {
+        // Try to parse as JSON for array filters
+        const parsedValue = JSON.parse(value);
+        if (Array.isArray(parsedValue)) {
+          filtersFromUrl[key] = parsedValue;
+        } else {
+          filtersFromUrl[key] = value;
+        }
+      } catch (e) {
+        // If not valid JSON, treat as string
+        filtersFromUrl[key] = value;
+      }
+    }
+    
+    if (Object.keys(filtersFromUrl).length > 0) {
+      setFilters(prev => ({ ...prev, ...filtersFromUrl }));
+      setShowFilters(true); // Show filters if they're applied from URL
+    }
+  }, []);
+
   // Helper function to get date ranges
   const getDateRange = (filterType) => {
     const now = new Date();
@@ -369,6 +395,9 @@ const FreshworksLeads = () => {
     setCurrentPage(1);
     setShowCustomDatePicker(false);
     setAnalyticsCountryFilter([]);
+    
+    // Clear URL parameters
+    window.history.replaceState({}, document.title, window.location.pathname);
   };
 
   const handleAnalyticsCountryFilter = (country) => {

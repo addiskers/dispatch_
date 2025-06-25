@@ -1,10 +1,37 @@
-import React, { useState, useEffect } from 'react';
-import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, LineChart, Line, PieChart, Pie, Cell, ComposedChart, Area, AreaChart } from 'recharts';
+import React, { useState, useEffect, useRef } from 'react';
+import { 
+  BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, 
+  LineChart, Line, PieChart, Pie, Cell, ResponsiveContainer,
+  ComposedChart, Area, AreaChart
+} from 'recharts';
+import '../styles/Sale.css';
 
-const Sales = () => {
-  const [analyticsData, setAnalyticsData] = useState(null);
+const Sale = () => {
+  const [analyticsData, setAnalyticsData] = useState({
+    totalContacts: 0,
+    avgTouchpoints: '0.0',
+    avgEmails: '0.0',
+    avgCalls: '0.0',
+    avgConnectedCalls: '0.0',
+    avgSampleSentHours: '0.0',
+    avgFirstCallMinutes: '0.0',
+    clientEmailsReceived: 0,
+    avgCallDuration: '0',
+    responseRate: '0.0',
+    samplesSentCount: 0,
+    firstCallsCount: 0,
+    countryBreakdown: {},
+    territoryBreakdown: {},
+    activeLeadCount: 0,
+    leadLevelBreakdown: {},
+    contactCategoryBreakdown: {},
+    priorityCountries: {}
+  });
+
+  const [ownerAnalytics, setOwnerAnalytics] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
+  
   const [filters, setFilters] = useState({
     status: [],
     owner: [],
@@ -19,6 +46,24 @@ const Sales = () => {
     endDate: ''
   });
 
+  // Navigation function to redirect to FreshworksLeads with filters
+  const navigateToLeads = (additionalFilters = {}) => {
+    const combinedFilters = { ...filters, ...additionalFilters };
+    
+    // Create URL with filters as query parameters
+    const params = new URLSearchParams();
+    Object.entries(combinedFilters).forEach(([key, value]) => {
+      if (Array.isArray(value) && value.length > 0) {
+        params.set(key, JSON.stringify(value));
+      } else if (value && !Array.isArray(value)) {
+        params.set(key, value);
+      }
+    });
+    
+    // Navigate to freshworks leads page with filters
+    window.location.href = `/freshworks-leads?${params.toString()}`;
+  };
+
   const [filterOptions, setFilterOptions] = useState({
     statuses: [],
     owners: [],
@@ -30,10 +75,10 @@ const Sales = () => {
     activeStatus: []
   });
 
-  const [showFilters, setShowFilters] = useState(false);
-  const [showCustomDatePicker, setShowCustomDatePicker] = useState(false);
-  const [refreshing, setRefreshing] = useState(false);
   const [analyticsCountryFilter, setAnalyticsCountryFilter] = useState([]);
+  const [showFilters, setShowFilters] = useState(false);
+  const [refreshing, setRefreshing] = useState(false);
+  const [showCustomDatePicker, setShowCustomDatePicker] = useState(false);
 
   const API_BASE_URL = process.env.REACT_APP_API_URL || 'http://localhost:5000/api';
 
@@ -51,22 +96,11 @@ const Sales = () => {
     { value: 'custom', label: 'Custom Range' }
   ];
 
-  // Colors for charts
-  const COLORS = {
-    primary: '#3B82F6',
-    success: '#10B981',
-    warning: '#F59E0B',
-    danger: '#EF4444',
-    info: '#06B6D4',
-    purple: '#8B5CF6',
-    pink: '#EC4899',
-    indigo: '#6366F1'
-  };
-
-  const PIE_COLORS = ['#3B82F6', '#10B981', '#F59E0B', '#EF4444', '#8B5CF6', '#EC4899', '#06B6D4', '#6366F1'];
+  const COLORS = ['#3498db', '#e74c3c', '#2ecc71', '#f39c12', '#9b59b6', '#1abc9c', '#e67e22', '#34495e'];
+  const TERRITORY_COLORS = ['#3498db', '#e74c3c', '#2ecc71', '#f39c12', '#9b59b6', '#1abc9c', '#e67e22', '#34495e', '#16a085', '#c0392b', '#8e44ad', '#2980b9'];
 
   useEffect(() => {
-    fetchAnalyticsData();
+    fetchAnalytics();
     fetchFilterOptions();
   }, [filters, analyticsCountryFilter]);
 
@@ -102,7 +136,7 @@ const Sales = () => {
     }
   };
 
-  const fetchAnalyticsData = async () => {
+  const fetchAnalytics = async () => {
     try {
       setLoading(true);
       
@@ -115,7 +149,10 @@ const Sales = () => {
 
       const params = new URLSearchParams({
         page: 1,
-        limit: 1000, // Get more data for analytics
+        limit: 1000,
+        search: '',
+        sortBy: 'created_at',
+        sortOrder: 'desc',
         status: JSON.stringify(filters.status),
         owner: JSON.stringify(filters.owner),
         territory: JSON.stringify(filters.territory),
@@ -133,14 +170,14 @@ const Sales = () => {
       const data = await response.json();
 
       if (data.success) {
-        const processedData = processAnalyticsData(data.data, data.analytics);
-        setAnalyticsData(processedData);
+        setAnalyticsData(data.analytics || {});
+        generateOwnerAnalytics(data.data || []);
       } else {
-        setError(data.message || 'Error fetching analytics data');
+        setError(data.message || 'Error fetching analytics');
       }
     } catch (err) {
       console.error('Fetch error:', err);
-      setError('Failed to fetch analytics data');
+      setError('Failed to fetch analytics');
     } finally {
       setLoading(false);
     }
@@ -167,152 +204,83 @@ const Sales = () => {
     }
   };
 
-  const processAnalyticsData = (contacts, globalAnalytics) => {
-    // Group contacts by owner for detailed analytics
-    const ownerGroups = {};
+  const generateOwnerAnalytics = (contacts) => {
+    const ownerData = {};
+    const leadLevelByOwner = {};
     
     contacts.forEach(contact => {
       const owner = contact.owner_name || 'Unassigned';
-      if (!ownerGroups[owner]) {
-        ownerGroups[owner] = {
-          contacts: [],
+      if (!ownerData[owner]) {
+        ownerData[owner] = {
+          owner,
           totalContacts: 0,
-          activeContacts: 0,
-          inactiveContacts: 0,
+          activeLeads: 0,
+          inactiveLeads: 0,
           totalTouchpoints: 0,
           totalEmails: 0,
           totalCalls: 0,
-          totalConnectedCalls: 0,
-          samplesSent: 0,
-          firstCalls: 0,
-          sampleTimingSum: 0,
-          firstCallTimingSum: 0,
-          corporate: 0,
-          generic: 0,
-          other: 0,
+          sampleSentHours: [],
+          firstCallMinutes: [],
+          corporateLeads: 0,
+          genericLeads: 0,
+          responseRate: 0,
           incomingEmails: 0,
-          countries: {}
+          outgoingEmails: 0
         };
       }
-      
-      const group = ownerGroups[owner];
-      group.contacts.push(contact);
-      group.totalContacts++;
-      
-      // Active/Inactive tracking
-      if (contact.is_active === 'Yes') {
-        group.activeContacts++;
-      } else {
-        group.inactiveContacts++;
+
+      if (!leadLevelByOwner[owner]) {
+        leadLevelByOwner[owner] = {};
       }
       
-      // Engagement metrics
-      group.totalTouchpoints += contact.total_touchpoints || 0;
-      group.totalEmails += contact.outgoing_emails || 0;
-      group.totalCalls += contact.outgoing_calls || 0;
-      group.totalConnectedCalls += contact.connected_calls || 0;
-      group.incomingEmails += contact.incoming_emails || 0;
+      const data = ownerData[owner];
+      data.totalContacts++;
       
-      // Sample and call timing
+      if (contact.is_active === 'Yes') {
+        data.activeLeads++;
+      } else {
+        data.inactiveLeads++;
+      }
+      
+      data.totalTouchpoints += contact.total_touchpoints || 0;
+      data.totalEmails += contact.outgoing_emails || 0;
+      data.totalCalls += contact.outgoing_calls || 0;
+      data.incomingEmails += contact.incoming_emails || 0;
+      data.outgoingEmails += contact.outgoing_emails || 0;
+      
       if (contact.sample_sent_timing) {
-        group.samplesSent++;
-        group.sampleTimingSum += parseFloat(contact.sample_sent_timing) || 0;
+        data.sampleSentHours.push(parseFloat(contact.sample_sent_timing));
       }
       
       if (contact.first_call_timing) {
-        group.firstCalls++;
-        group.firstCallTimingSum += parseFloat(contact.first_call_timing) || 0;
+        data.firstCallMinutes.push(parseFloat(contact.first_call_timing));
       }
       
-      // Contact categories
       const category = contact.contact_category?.toLowerCase() || '';
       if (category.includes('corporate')) {
-        group.corporate++;
+        data.corporateLeads++;
       } else if (category.includes('generic')) {
-        group.generic++;
-      } else {
-        group.other++;
+        data.genericLeads++;
       }
-      
-      // Country tracking
-      const country = contact.country || 'Unknown';
-      group.countries[country] = (group.countries[country] || 0) + 1;
+
+      // Track lead levels by owner
+      const leadLevel = contact.lead_level || 'Unassigned';
+      leadLevelByOwner[owner][leadLevel] = (leadLevelByOwner[owner][leadLevel] || 0) + 1;
     });
-
-    // Convert to chart-friendly format
-    const ownerData = Object.entries(ownerGroups).map(([owner, data]) => ({
-      owner: owner.length > 15 ? owner.substring(0, 15) + '...' : owner,
-      fullOwner: owner,
-      totalContacts: data.totalContacts,
-      activeContacts: data.activeContacts,
-      inactiveContacts: data.inactiveContacts,
-      avgTouchpoints: data.totalContacts > 0 ? (data.totalTouchpoints / data.totalContacts).toFixed(1) : 0,
-      avgEmails: data.totalContacts > 0 ? (data.totalEmails / data.totalContacts).toFixed(1) : 0,
-      avgCalls: data.totalContacts > 0 ? (data.totalCalls / data.totalContacts).toFixed(1) : 0,
-      avgConnectedCalls: data.totalCalls > 0 ? (data.totalConnectedCalls / data.totalCalls).toFixed(1) : 0,
-      avgSampleTiming: data.samplesSent > 0 ? (data.sampleTimingSum / data.samplesSent).toFixed(1) : 0,
-      avgFirstCallTiming: data.firstCalls > 0 ? (data.firstCallTimingSum / data.firstCalls).toFixed(1) : 0,
-      corporate: data.corporate,
-      generic: data.generic,
-      other: data.other,
-      responseRate: data.totalEmails > 0 ? ((data.incomingEmails / data.totalEmails) * 100).toFixed(1) : 0,
-      countries: data.countries
-    })).sort((a, b) => b.totalContacts - a.totalContacts);
-
-    // Category breakdown for pie chart
-    const categoryData = [
-      { name: 'Corporate', value: globalAnalytics.contactCategoryBreakdown?.Corporate || 0, color: COLORS.primary },
-      { name: 'Generic', value: globalAnalytics.contactCategoryBreakdown?.Generic || 0, color: COLORS.success },
-      { name: 'Test', value: globalAnalytics.contactCategoryBreakdown?.Test || 0, color: COLORS.warning },
-      { name: 'Invalid', value: globalAnalytics.contactCategoryBreakdown?.Invalid || 0, color: COLORS.danger },
-      { name: 'Student', value: globalAnalytics.contactCategoryBreakdown?.Student || 0, color: COLORS.info },
-      { name: 'Other', value: globalAnalytics.contactCategoryBreakdown?.Other || 0, color: COLORS.purple }
-    ].filter(item => item.value > 0);
-
-    // Country breakdown for pie chart
-    const countryData = Object.entries(globalAnalytics.countryBreakdown || {})
-      .map(([country, count]) => ({
-        name: country.length > 12 ? country.substring(0, 12) + '...' : country,
-        fullName: country,
-        value: count
-      }))
-      .sort((a, b) => b.value - a.value)
-      .slice(0, 8); // Top 8 countries
-
-    // Territory breakdown
-    const territoryData = Object.entries(globalAnalytics.territoryBreakdown || {})
-      .map(([territory, count]) => ({
-        name: territory === 'Unassigned' ? 'Unassigned' : (territory.length > 10 ? territory.substring(0, 10) + '...' : territory),
-        fullName: territory,
-        value: count
-      }))
-      .sort((a, b) => b.value - a.value);
-
-    // Lead level breakdown
-    const leadLevelData = Object.entries(globalAnalytics.leadLevelBreakdown || {})
-      .map(([level, count]) => ({
-        name: level,
-        value: count,
-        color: level.toLowerCase().includes('hot') ? COLORS.danger :
-               level.toLowerCase().includes('warm') ? COLORS.warning :
-               level.toLowerCase().includes('cold') ? COLORS.info : COLORS.purple
-      }))
-      .sort((a, b) => b.value - a.value);
-
-    return {
-      globalAnalytics,
-      ownerData,
-      categoryData,
-      countryData,
-      territoryData,
-      leadLevelData
-    };
-  };
-
-  const handleRefresh = async () => {
-    setRefreshing(true);
-    await fetchAnalyticsData();
-    setTimeout(() => setRefreshing(false), 500);
+    
+    // Calculate averages and response rates
+    const ownerStats = Object.values(ownerData).map(data => ({
+      ...data,
+      avgTouchpoints: data.totalContacts > 0 ? (data.totalTouchpoints / data.totalContacts).toFixed(1) : '0.0',
+      avgEmails: data.totalContacts > 0 ? (data.totalEmails / data.totalContacts).toFixed(1) : '0.0',
+      avgCalls: data.totalContacts > 0 ? (data.totalCalls / data.totalContacts).toFixed(1) : '0.0',
+      avgSampleHours: data.sampleSentHours.length > 0 ? (data.sampleSentHours.reduce((a, b) => a + b, 0) / data.sampleSentHours.length).toFixed(1) : '0.0',
+      avgFirstCallMinutes: data.firstCallMinutes.length > 0 ? (data.firstCallMinutes.reduce((a, b) => a + b, 0) / data.firstCallMinutes.length).toFixed(1) : '0.0',
+      responseRate: data.outgoingEmails > 0 ? ((data.incomingEmails / data.outgoingEmails) * 100).toFixed(1) : '0.0',
+      leadLevels: leadLevelByOwner[data.owner] || {}
+    }));
+    
+    setOwnerAnalytics(ownerStats);
   };
 
   const handleFilterChange = (filterName, value) => {
@@ -344,7 +312,23 @@ const Sales = () => {
   };
 
   const handleCustomDateChange = (dateType, value) => {
-    setFilters(prev => ({ ...prev, [dateType]: value }));
+    setFilters(prev => ({
+      ...prev,
+      [dateType]: value
+    }));
+  };
+
+  // Get the display text for active date filter
+  const getDateFilterDisplayText = () => {
+    if (!filters.dateFilter) return '';
+    
+    const option = dateFilterOptions.find(opt => opt.value === filters.dateFilter);
+    if (filters.dateFilter === 'custom' && (filters.startDate || filters.endDate)) {
+      const start = filters.startDate ? new Date(filters.startDate).toLocaleDateString() : '';
+      const end = filters.endDate ? new Date(filters.endDate).toLocaleDateString() : '';
+      return `Custom: ${start} - ${end}`;
+    }
+    return option ? option.label : '';
   };
 
   const clearFilters = () => {
@@ -353,8 +337,14 @@ const Sales = () => {
       contactCategory: [], customTags: [], country: [],
       isActive: '', dateFilter: '', startDate: '', endDate: ''
     });
-    setShowCustomDatePicker(false);
     setAnalyticsCountryFilter([]);
+    setShowCustomDatePicker(false);
+  };
+
+  const handleRefresh = async () => {
+    setRefreshing(true);
+    await fetchAnalytics();
+    setTimeout(() => setRefreshing(false), 500);
   };
 
   const handleAnalyticsCountryFilter = (country) => {
@@ -366,22 +356,73 @@ const Sales = () => {
     });
   };
 
-  const getDateFilterDisplayText = () => {
-    if (!filters.dateFilter) return '';
-    const option = dateFilterOptions.find(opt => opt.value === filters.dateFilter);
-    if (filters.dateFilter === 'custom' && (filters.startDate || filters.endDate)) {
-      const start = filters.startDate ? new Date(filters.startDate).toLocaleDateString() : '';
-      const end = filters.endDate ? new Date(filters.endDate).toLocaleDateString() : '';
-      return `Custom: ${start} - ${end}`;
+  // Enhanced tooltip formatter
+  const formatTooltip = (value, name, props) => {
+    if (name.includes('Rate') || name.includes('Percentage')) {
+      return [`${value}%`, name];
     }
-    return option ? option.label : '';
+    if (name.includes('Hours')) {
+      return [`${value}h`, name];
+    }
+    if (name.includes('Minutes')) {
+      return [`${value}m`, name];
+    }
+    return [value, name];
   };
 
-  const getSelectedFiltersText = (filterName) => {
-    const selected = filters[filterName] || [];
-    if (selected.length === 0) return '';
-    if (selected.length === 1) return selected[0];
-    return `${selected.length} selected`;
+  // Prepare chart data with better formatting
+  const categoryData = Object.entries(analyticsData.contactCategoryBreakdown || {}).map(([category, count]) => ({
+    name: category || 'Unknown', // Use 'name' instead of 'category' for proper labeling
+    category: category || 'Unknown',
+    count,
+    percentage: analyticsData.totalContacts > 0 ? ((count / analyticsData.totalContacts) * 100).toFixed(1) : 0
+  }));
+
+  const territoryData = Object.entries(analyticsData.territoryBreakdown || {})
+    .sort(([,a], [,b]) => b - a)
+    .map(([territory, count], index) => ({
+      territory: territory || 'Unassigned',
+      count,
+      fill: TERRITORY_COLORS[index % TERRITORY_COLORS.length] // Add different color for each bar
+    }));
+
+  const leadLevelData = Object.entries(analyticsData.leadLevelBreakdown || {}).map(([level, count]) => ({
+    level: level || 'Unassigned',
+    count
+  }));
+
+  // Prepare lead level data by owner
+  const leadLevelByOwnerData = ownerAnalytics.map(owner => {
+    const ownerData = { owner: owner.owner };
+    Object.entries(owner.leadLevels || {}).forEach(([level, count]) => {
+      ownerData[level] = count;
+    });
+    return ownerData;
+  });
+
+  // Get all unique lead levels for the stacked chart
+  const allLeadLevels = [...new Set(ownerAnalytics.flatMap(owner => Object.keys(owner.leadLevels || {})))];
+
+  // Custom label for pie charts showing numbers
+  const renderCustomizedLabel = ({ cx, cy, midAngle, innerRadius, outerRadius, count, name }) => {
+    const RADIAN = Math.PI / 180;
+    const radius = innerRadius + (outerRadius - innerRadius) * 0.5;
+    const x = cx + radius * Math.cos(-midAngle * RADIAN);
+    const y = cy + radius * Math.sin(-midAngle * RADIAN);
+
+    return (
+      <text 
+        x={x} 
+        y={y} 
+        fill="white" 
+        textAnchor={x > cx ? 'start' : 'end'} 
+        dominantBaseline="central"
+        fontSize="12"
+        fontWeight="bold"
+      >
+        {count}
+      </text>
+    );
   };
 
   const activeFiltersCount = Object.values(filters).filter((value, index) => {
@@ -393,569 +434,667 @@ const Sales = () => {
     return Array.isArray(value) ? value.length > 0 : Boolean(value);
   }).length;
 
-  if (loading && !analyticsData) {
+  if (loading && !analyticsData.totalContacts) {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 p-6">
-        <div className="max-w-7xl mx-auto">
-          <div className="bg-white rounded-xl shadow-lg p-8">
-            <div className="text-center">
-              <div className="inline-block animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mb-4"></div>
-              <h5 className="text-gray-600">Loading sales analytics...</h5>
-            </div>
-          </div>
+      <div className="loading-container">
+        <div className="loading-content">
+          <div className="spinner"></div>
+          <h3>Loading Sales Analytics...</h3>
         </div>
       </div>
     );
   }
-
-  if (error) {
-    return (
-      <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 p-6">
-        <div className="max-w-7xl mx-auto">
-          <div className="bg-red-50 border border-red-200 rounded-xl p-6">
-            <div className="text-red-800">
-              <h4 className="text-lg font-semibold mb-2">Error!</h4>
-              <p>{error}</p>
-            </div>
-          </div>
-        </div>
-      </div>
-    );
-  }
-
-  const { globalAnalytics, ownerData, categoryData, countryData, territoryData, leadLevelData } = analyticsData || {};
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 p-6">
-      <div className="max-w-7xl mx-auto space-y-6">
-        {/* Header */}
-        <div className="bg-white rounded-xl shadow-lg p-6">
-          <div className="flex justify-between items-center mb-6">
-            <div>
-              <h1 className="text-3xl font-bold text-gray-900 mb-2">📊 Sales Analytics Dashboard</h1>
-              <p className="text-gray-600">
-                {loading ? 'Loading...' : 
-                  `${globalAnalytics?.totalContacts?.toLocaleString() || 0} total contacts analyzed • ${ownerData?.length || 0} sales owners`
-                }
-              </p>
-            </div>
-            <div className="flex gap-3">
-              <button 
-                onClick={() => setShowFilters(!showFilters)}
-                className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors flex items-center gap-2"
-              >
-                🔽 Filters
-                {activeFiltersCount > 0 && (
-                  <span className="bg-blue-800 text-white text-xs px-2 py-1 rounded-full">{activeFiltersCount}</span>
-                )}
-              </button>
-              <button 
-                onClick={handleRefresh}
-                className="px-4 py-2 bg-gray-600 text-white rounded-lg hover:bg-gray-700 transition-colors flex items-center gap-2"
-                disabled={refreshing}
-              >
-                <span className={`${refreshing ? 'animate-spin' : ''}`}>⟳</span>
-                Refresh
-              </button>
-            </div>
+    <div className="sales-dashboard">
+      {/* Header */}
+      <div className="header-card">
+        <div className="header-content">
+          <div className="header-info">
+            <h1 className="main-title">📊 Sales Analytics Dashboard</h1>
+            <p className="subtitle">
+              {analyticsData.totalContacts?.toLocaleString() || 0} total contacts • Interactive insights and metrics
+            </p>
           </div>
+          <div className="header-actions">
+            <button 
+              onClick={handleRefresh}
+              disabled={refreshing}
+              className={`refresh-btn ${refreshing ? 'refreshing' : ''}`}
+            >
+              {refreshing ? '🔄 Refreshing...' : '🔄 Refresh'}
+            </button>
+          </div>
+        </div>
 
-          {/* Filters */}
-          {showFilters && (
-            <div className="bg-gray-50 rounded-lg p-4 space-y-4">
-              <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-                {/* Date Filter */}
-                <div>
-                  <label className="block text-sm font-semibold text-gray-700 mb-2">DATE RANGE</label>
-                  <select
-                    className="w-full p-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                    value={filters.dateFilter}
-                    onChange={(e) => handleFilterChange('dateFilter', e.target.value)}
-                  >
-                    {dateFilterOptions.map(option => (
-                      <option key={option.value} value={option.value}>{option.label}</option>
-                    ))}
-                  </select>
-                  {filters.dateFilter && (
-                    <small className="text-gray-500 block mt-1">{getDateFilterDisplayText()}</small>
-                  )}
-                </div>
+        {/* Filters */}
+        <div className="filters-section">
+          <button 
+            onClick={() => setShowFilters(!showFilters)}
+            className={`filters-toggle ${showFilters ? 'active' : ''}`}
+          >
+            🔽 Filters {activeFiltersCount > 0 && `(${activeFiltersCount})`}
+          </button>
+        </div>
 
-                {/* Owner Filter */}
-                <div>
-                  <label className="block text-sm font-semibold text-gray-700 mb-2">OWNER</label>
-                  <select
-                    className="w-full p-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                    value=""
-                    onChange={(e) => e.target.value && handleFilterChange('owner', e.target.value)}
-                  >
-                    <option value="">Select Owner...</option>
-                    {filterOptions.owners.map(owner => (
-                      <option key={owner} value={owner} disabled={filters.owner.includes(owner)}>
-                        {owner} {filters.owner.includes(owner) ? '✓' : ''}
-                      </option>
-                    ))}
-                  </select>
-                  {filters.owner.length > 0 && (
-                    <div className="mt-2 flex flex-wrap gap-1">
-                      {filters.owner.map(owner => (
-                        <span key={owner} className="inline-flex items-center px-2 py-1 rounded-md text-xs font-medium bg-blue-100 text-blue-800">
-                          {owner}
-                          <button 
-                            type="button" 
-                            className="ml-1 text-blue-600 hover:text-blue-800"
-                            onClick={() => handleFilterChange('owner', owner)}
-                          >
-                            ×
-                          </button>
-                        </span>
-                      ))}
-                    </div>
-                  )}
-                </div>
-
-                {/* Status Filter */}
-                <div>
-                  <label className="block text-sm font-semibold text-gray-700 mb-2">STATUS</label>
-                  <select
-                    className="w-full p-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                    value=""
-                    onChange={(e) => e.target.value && handleFilterChange('status', e.target.value)}
-                  >
-                    <option value="">Select Status...</option>
-                    {filterOptions.statuses.map(status => (
-                      <option key={status} value={status} disabled={filters.status.includes(status)}>
-                        {status} {filters.status.includes(status) ? '✓' : ''}
-                      </option>
-                    ))}
-                  </select>
-                  {filters.status.length > 0 && (
-                    <div className="mt-2 flex flex-wrap gap-1">
-                      {filters.status.map(status => (
-                        <span key={status} className="inline-flex items-center px-2 py-1 rounded-md text-xs font-medium bg-green-100 text-green-800">
-                          {status}
-                          <button 
-                            type="button" 
-                            className="ml-1 text-green-600 hover:text-green-800"
-                            onClick={() => handleFilterChange('status', status)}
-                          >
-                            ×
-                          </button>
-                        </span>
-                      ))}
-                    </div>
-                  )}
-                </div>
-
-                {/* Country Filter */}
-                <div>
-                  <label className="block text-sm font-semibold text-gray-700 mb-2">COUNTRY</label>
-                  <select
-                    className="w-full p-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                    value=""
-                    onChange={(e) => e.target.value && handleFilterChange('country', e.target.value)}
-                  >
-                    <option value="">Select Country...</option>
-                    {filterOptions.countries.map(country => (
-                      <option key={country} value={country} disabled={filters.country.includes(country)}>
-                        {country} {filters.country.includes(country) ? '✓' : ''}
-                      </option>
-                    ))}
-                  </select>
-                  {filters.country.length > 0 && (
-                    <div className="mt-2 flex flex-wrap gap-1">
-                      {filters.country.map(country => (
-                        <span key={country} className="inline-flex items-center px-2 py-1 rounded-md text-xs font-medium bg-purple-100 text-purple-800">
-                          {country}
-                          <button 
-                            type="button" 
-                            className="ml-1 text-purple-600 hover:text-purple-800"
-                            onClick={() => handleFilterChange('country', country)}
-                          >
-                            ×
-                          </button>
-                        </span>
-                      ))}
-                    </div>
-                  )}
-                </div>
-              </div>
-
-              {/* Analytics Country Filter */}
-              <div>
-                <label className="block text-sm font-semibold text-gray-700 mb-2">FOCUS COUNTRIES FOR ANALYTICS:</label>
-                <div className="flex flex-wrap gap-2">
-                  {priorityCountries.map(country => (
-                    <button
-                      key={country}
-                      type="button"
-                      className={`px-3 py-1 rounded-lg text-sm font-medium transition-colors ${
-                        analyticsCountryFilter.includes(country) 
-                          ? 'bg-blue-600 text-white' 
-                          : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
-                      }`}
-                      onClick={() => handleAnalyticsCountryFilter(country)}
-                    >
-                      {country} ({globalAnalytics?.priorityCountries?.[country] || 0})
-                    </button>
+        {showFilters && (
+          <div className="filters-container">
+            <div className="filters-grid">
+              {/* Date Filter */}
+              <div className="filter-group">
+                <label className="filter-label">DATE RANGE</label>
+                <select
+                  value={filters.dateFilter}
+                  onChange={(e) => handleFilterChange('dateFilter', e.target.value)}
+                  className="filter-select"
+                >
+                  {dateFilterOptions.map(option => (
+                    <option key={option.value} value={option.value}>{option.label}</option>
                   ))}
-                </div>
+                </select>
+                {filters.dateFilter && (
+                  <small className="filter-display-text">
+                    {getDateFilterDisplayText()}
+                  </small>
+                )}
               </div>
 
-              {/* Custom Date Range */}
-              {showCustomDatePicker && (
-                <div className="bg-white p-4 border border-gray-200 rounded-lg">
-                  <div className="grid grid-cols-2 gap-4">
-                    <div>
-                      <label className="block text-sm font-semibold text-gray-700 mb-1">START DATE</label>
-                      <input
-                        type="date"
-                        className="w-full p-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                        value={filters.startDate ? filters.startDate.split('T')[0] : ''}
-                        onChange={(e) => {
-                          const date = e.target.value ? `${e.target.value}T00:00:00.000Z` : '';
-                          handleCustomDateChange('startDate', date);
-                        }}
-                      />
-                    </div>
-                    <div>
-                      <label className="block text-sm font-semibold text-gray-700 mb-1">END DATE</label>
-                      <input
-                        type="date"
-                        className="w-full p-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                        value={filters.endDate ? filters.endDate.split('T')[0] : ''}
-                        onChange={(e) => {
-                          const date = e.target.value ? `${e.target.value}T23:59:59.999Z` : '';
-                          handleCustomDateChange('endDate', date);
-                        }}
-                      />
-                    </div>
+              {/* Owner Filter */}
+              <div className="filter-group">
+                <label className="filter-label">OWNER</label>
+                <select
+                  value=""
+                  onChange={(e) => e.target.value && handleFilterChange('owner', e.target.value)}
+                  className="filter-select"
+                >
+                  <option value="">Select Owner...</option>
+                  {filterOptions.owners.map(owner => (
+                    <option key={owner} value={owner} disabled={filters.owner.includes(owner)}>
+                      {owner} {filters.owner.includes(owner) ? '✓' : ''}
+                    </option>
+                  ))}
+                </select>
+                {filters.owner.length > 0 && (
+                  <div className="selected-filters">
+                    {filters.owner.map(owner => (
+                      <span key={owner} className="selected-filter-tag">
+                        {owner}
+                        <button onClick={() => handleFilterChange('owner', owner)}>×</button>
+                      </span>
+                    ))}
+                  </div>
+                )}
+              </div>
+
+              {/* Territory Filter */}
+              <div className="filter-group">
+                <label className="filter-label">TERRITORY</label>
+                <select
+                  value=""
+                  onChange={(e) => e.target.value && handleFilterChange('territory', e.target.value)}
+                  className="filter-select"
+                >
+                  <option value="">Select Territory...</option>
+                  {filterOptions.territories.map(territory => (
+                    <option key={territory} value={territory} disabled={filters.territory.includes(territory)}>
+                      {territory} {filters.territory.includes(territory) ? '✓' : ''}
+                    </option>
+                  ))}
+                </select>
+                {filters.territory.length > 0 && (
+                  <div className="selected-filters">
+                    {filters.territory.map(territory => (
+                      <span key={territory} className="selected-filter-tag">
+                        {territory}
+                        <button onClick={() => handleFilterChange('territory', territory)}>×</button>
+                      </span>
+                    ))}
+                  </div>
+                )}
+              </div>
+
+              {/* Country Filter */}
+              <div className="filter-group">
+                <label className="filter-label">COUNTRY</label>
+                <select
+                  value=""
+                  onChange={(e) => e.target.value && handleFilterChange('country', e.target.value)}
+                  className="filter-select"
+                >
+                  <option value="">Select Country...</option>
+                  {filterOptions.countries.map(country => (
+                    <option key={country} value={country} disabled={filters.country.includes(country)}>
+                      {country} {filters.country.includes(country) ? '✓' : ''}
+                    </option>
+                  ))}
+                </select>
+                {filters.country.length > 0 && (
+                  <div className="selected-filters">
+                    {filters.country.map(country => (
+                      <span key={country} className="selected-filter-tag">
+                        {country}
+                        <button onClick={() => handleFilterChange('country', country)}>×</button>
+                      </span>
+                    ))}
+                  </div>
+                )}
+              </div>
+
+              {/* Lead Level Filter */}
+              <div className="filter-group">
+                <label className="filter-label">LEAD LEVEL</label>
+                <select
+                  value=""
+                  onChange={(e) => e.target.value && handleFilterChange('leadLevel', e.target.value)}
+                  className="filter-select"
+                >
+                  <option value="">Select Lead Level...</option>
+                  {filterOptions.leadLevels.map(level => (
+                    <option key={level} value={level} disabled={filters.leadLevel.includes(level)}>
+                      {level} {filters.leadLevel.includes(level) ? '✓' : ''}
+                    </option>
+                  ))}
+                </select>
+                {filters.leadLevel.length > 0 && (
+                  <div className="selected-filters">
+                    {filters.leadLevel.map(level => (
+                      <span key={level} className="selected-filter-tag">
+                        {level}
+                        <button onClick={() => handleFilterChange('leadLevel', level)}>×</button>
+                      </span>
+                    ))}
+                  </div>
+                )}
+              </div>
+
+              {/* Contact Category Filter */}
+              <div className="filter-group">
+                <label className="filter-label">CONTACT CATEGORY</label>
+                <select
+                  value=""
+                  onChange={(e) => e.target.value && handleFilterChange('contactCategory', e.target.value)}
+                  className="filter-select"
+                >
+                  <option value="">Select Category...</option>
+                  {filterOptions.contactCategories.map(category => (
+                    <option key={category} value={category} disabled={filters.contactCategory.includes(category)}>
+                      {category} {filters.contactCategory.includes(category) ? '✓' : ''}
+                    </option>
+                  ))}
+                </select>
+                {filters.contactCategory.length > 0 && (
+                  <div className="selected-filters">
+                    {filters.contactCategory.map(category => (
+                      <span key={category} className="selected-filter-tag">
+                        {category}
+                        <button onClick={() => handleFilterChange('contactCategory', category)}>×</button>
+                      </span>
+                    ))}
+                  </div>
+                )}
+              </div>
+
+              {/* Active Status Filter */}
+              <div className="filter-group">
+                <label className="filter-label">ACTIVE STATUS</label>
+                <select
+                  value={filters.isActive}
+                  onChange={(e) => handleFilterChange('isActive', e.target.value)}
+                  className="filter-select"
+                >
+                  <option value="">All Contacts</option>
+                  <option value="yes">Active (Responded)</option>
+                  <option value="no">Not Active (No Response)</option>
+                </select>
+              </div>
+            </div>
+
+            {/* Custom Date Range Picker */}
+            {showCustomDatePicker && (
+              <div className="custom-date-picker">
+                <div className="date-picker-row">
+                  <div className="date-picker-group">
+                    <label className="filter-label">START DATE</label>
+                    <input
+                      type="date"
+                      value={filters.startDate ? filters.startDate.split('T')[0] : ''}
+                      onChange={(e) => {
+                        const date = e.target.value ? `${e.target.value}T00:00:00.000Z` : '';
+                        handleCustomDateChange('startDate', date);
+                      }}
+                      className="filter-select"
+                    />
+                  </div>
+                  <div className="date-picker-group">
+                    <label className="filter-label">END DATE</label>
+                    <input
+                      type="date"
+                      value={filters.endDate ? filters.endDate.split('T')[0] : ''}
+                      onChange={(e) => {
+                        const date = e.target.value ? `${e.target.value}T23:59:59.999Z` : '';
+                        handleCustomDateChange('endDate', date);
+                      }}
+                      className="filter-select"
+                    />
                   </div>
                 </div>
-              )}
+              </div>
+            )}
 
-              {activeFiltersCount > 0 && (
-                <div>
-                  <button 
-                    onClick={clearFilters}
-                    className="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors text-sm"
+            {/* Priority Countries Filter */}
+            <div className="priority-countries">
+              <label className="filter-label">FOCUS COUNTRIES:</label>
+              <div className="country-buttons">
+                {priorityCountries.map(country => (
+                  <button
+                    key={country}
+                    onClick={() => handleAnalyticsCountryFilter(country)}
+                    className={`country-btn ${analyticsCountryFilter.includes(country) ? 'active' : ''}`}
                   >
-                    Clear all filters
+                    {country} ({analyticsData.priorityCountries?.[country] || 0})
                   </button>
-                </div>
-              )}
-            </div>
-          )}
-        </div>
-
-        {/* Key Metrics Cards */}
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-          <div className="bg-white rounded-xl shadow-lg p-6">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm font-medium text-gray-600">Total Contacts</p>
-                <p className="text-3xl font-bold text-blue-600">{globalAnalytics?.totalContacts?.toLocaleString() || 0}</p>
-              </div>
-              <div className="p-3 bg-blue-100 rounded-full">
-                <span className="text-2xl">👥</span>
-              </div>
-            </div>
-          </div>
-
-          <div className="bg-white rounded-xl shadow-lg p-6">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm font-medium text-gray-600">Active Leads</p>
-                <p className="text-3xl font-bold text-green-600">{globalAnalytics?.activeLeadCount?.toLocaleString() || 0}</p>
-              </div>
-              <div className="p-3 bg-green-100 rounded-full">
-                <span className="text-2xl">✅</span>
-              </div>
-            </div>
-          </div>
-
-          <div className="bg-white rounded-xl shadow-lg p-6">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm font-medium text-gray-600">Response Rate</p>
-                <p className="text-3xl font-bold text-purple-600">{globalAnalytics?.responseRate || '0.0'}%</p>
-              </div>
-              <div className="p-3 bg-purple-100 rounded-full">
-                <span className="text-2xl">📈</span>
-              </div>
-            </div>
-          </div>
-
-          <div className="bg-white rounded-xl shadow-lg p-6">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm font-medium text-gray-600">Avg Touchpoints</p>
-                <p className="text-3xl font-bold text-orange-600">{globalAnalytics?.avgTouchpoints || '0.0'}</p>
-              </div>
-              <div className="p-3 bg-orange-100 rounded-full">
-                <span className="text-2xl">🎯</span>
-              </div>
-            </div>
-          </div>
-        </div>
-
-        {/* Charts Row 1 */}
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-          {/* Contacts by Owner Bar Chart */}
-          <div className="bg-white rounded-xl shadow-lg p-6">
-            <h3 className="text-xl font-bold text-gray-900 mb-4">📊 Contacts by Owner</h3>
-            <div className="h-80">
-              <ResponsiveContainer width="100%" height="100%">
-                <ComposedChart data={ownerData?.slice(0, 10) || []}>
-                  <CartesianGrid strokeDasharray="3 3" />
-                  <XAxis dataKey="owner" angle={-45} textAnchor="end" height={100} />
-                  <YAxis />
-                  <Tooltip content={({ active, payload, label }) => {
-                    if (active && payload && payload.length) {
-                      const data = payload[0].payload;
-                      return (
-                        <div className="bg-white p-3 border border-gray-300 rounded-lg shadow-lg">
-                          <p className="font-semibold">{data.fullOwner}</p>
-                          <p className="text-blue-600">Total: {data.totalContacts}</p>
-                          <p className="text-green-600">Active: {data.activeContacts}</p>
-                          <p className="text-red-600">Inactive: {data.inactiveContacts}</p>
-                          <p className="text-purple-600">Response Rate: {data.responseRate}%</p>
-                        </div>
-                      );
-                    }
-                    return null;
-                  }} />
-                  <Legend />
-                  <Bar dataKey="totalContacts" fill={COLORS.primary} name="Total Contacts" />
-                  <Bar dataKey="activeContacts" fill={COLORS.success} name="Active" />
-                  <Bar dataKey="inactiveContacts" fill={COLORS.danger} name="Inactive" />
-                </ComposedChart>
-              </ResponsiveContainer>
-            </div>
-          </div>
-
-          {/* Performance Metrics by Owner */}
-          <div className="bg-white rounded-xl shadow-lg p-6">
-            <h3 className="text-xl font-bold text-gray-900 mb-4">📈 Performance by Owner</h3>
-            <div className="h-80">
-              <ResponsiveContainer width="100%" height="100%">
-                <LineChart data={ownerData?.slice(0, 8) || []}>
-                  <CartesianGrid strokeDasharray="3 3" />
-                  <XAxis dataKey="owner" angle={-45} textAnchor="end" height={100} />
-                  <YAxis />
-                  <Tooltip content={({ active, payload, label }) => {
-                    if (active && payload && payload.length) {
-                      const data = payload[0].payload;
-                      return (
-                        <div className="bg-white p-3 border border-gray-300 rounded-lg shadow-lg">
-                          <p className="font-semibold">{data.fullOwner}</p>
-                          <p className="text-blue-600">Avg Touchpoints: {data.avgTouchpoints}</p>
-                          <p className="text-green-600">Avg Emails: {data.avgEmails}</p>
-                          <p className="text-orange-600">Avg Calls: {data.avgCalls}</p>
-                          <p className="text-purple-600">Response Rate: {data.responseRate}%</p>
-                        </div>
-                      );
-                    }
-                    return null;
-                  }} />
-                  <Legend />
-                  <Line type="monotone" dataKey="avgTouchpoints" stroke={COLORS.primary} name="Avg Touchpoints" strokeWidth={2} />
-                  <Line type="monotone" dataKey="responseRate" stroke={COLORS.success} name="Response Rate %" strokeWidth={2} />
-                  <Line type="monotone" dataKey="avgEmails" stroke={COLORS.warning} name="Avg Emails" strokeWidth={2} />
-                </LineChart>
-              </ResponsiveContainer>
-            </div>
-          </div>
-        </div>
-
-        {/* Charts Row 2 */}
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-          {/* Contact Categories Pie Chart */}
-          <div className="bg-white rounded-xl shadow-lg p-6">
-            <h3 className="text-xl font-bold text-gray-900 mb-4">🏢 Contact Categories</h3>
-            <div className="h-64">
-              <ResponsiveContainer width="100%" height="100%">
-                <PieChart>
-                  <Pie
-                    data={categoryData || []}
-                    cx="50%"
-                    cy="50%"
-                    labelLine={false}
-                    label={({ name, percent }) => `${name} ${(percent * 100).toFixed(0)}%`}
-                    outerRadius={80}
-                    fill="#8884d8"
-                    dataKey="value"
-                  >
-                    {(categoryData || []).map((entry, index) => (
-                      <Cell key={`cell-${index}`} fill={PIE_COLORS[index % PIE_COLORS.length]} />
-                    ))}
-                  </Pie>
-                  <Tooltip />
-                </PieChart>
-              </ResponsiveContainer>
-            </div>
-          </div>
-
-          {/* Countries Distribution */}
-          <div className="bg-white rounded-xl shadow-lg p-6">
-            <h3 className="text-xl font-bold text-gray-900 mb-4">🌍 Top Countries</h3>
-            <div className="h-64">
-              <ResponsiveContainer width="100%" height="100%">
-                <BarChart data={countryData?.slice(0, 6) || []} layout="horizontal">
-                  <CartesianGrid strokeDasharray="3 3" />
-                  <XAxis type="number" />
-                  <YAxis type="category" dataKey="name" width={80} />
-                  <Tooltip content={({ active, payload }) => {
-                    if (active && payload && payload.length) {
-                      const data = payload[0].payload;
-                      return (
-                        <div className="bg-white p-3 border border-gray-300 rounded-lg shadow-lg">
-                          <p className="font-semibold">{data.fullName}</p>
-                          <p className="text-blue-600">Contacts: {data.value}</p>
-                        </div>
-                      );
-                    }
-                    return null;
-                  }} />
-                  <Bar dataKey="value" fill={COLORS.info} />
-                </BarChart>
-              </ResponsiveContainer>
-            </div>
-          </div>
-
-          {/* Lead Levels */}
-          <div className="bg-white rounded-xl shadow-lg p-6">
-            <h3 className="text-xl font-bold text-gray-900 mb-4">🌡️ Lead Levels</h3>
-            <div className="h-64">
-              <ResponsiveContainer width="100%" height="100%">
-                <PieChart>
-                  <Pie
-                    data={leadLevelData || []}
-                    cx="50%"
-                    cy="50%"
-                    labelLine={false}
-                    label={({ name, percent }) => `${name} ${(percent * 100).toFixed(0)}%`}
-                    outerRadius={80}
-                    fill="#8884d8"
-                    dataKey="value"
-                  >
-                    {(leadLevelData || []).map((entry, index) => (
-                      <Cell key={`cell-${index}`} fill={entry.color || PIE_COLORS[index % PIE_COLORS.length]} />
-                    ))}
-                  </Pie>
-                  <Tooltip />
-                </PieChart>
-              </ResponsiveContainer>
-            </div>
-          </div>
-        </div>
-
-        {/* Timing Analytics */}
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-          {/* Sample Timing by Owner */}
-          <div className="bg-white rounded-xl shadow-lg p-6">
-            <h3 className="text-xl font-bold text-gray-900 mb-4">📊 Avg Sample Timing by Owner (Hours)</h3>
-            <div className="h-80">
-              <ResponsiveContainer width="100%" height="100%">
-                <BarChart data={ownerData?.filter(d => d.avgSampleTiming > 0).slice(0, 8) || []}>
-                  <CartesianGrid strokeDasharray="3 3" />
-                  <XAxis dataKey="owner" angle={-45} textAnchor="end" height={100} />
-                  <YAxis />
-                  <Tooltip content={({ active, payload }) => {
-                    if (active && payload && payload.length) {
-                      const data = payload[0].payload;
-                      return (
-                        <div className="bg-white p-3 border border-gray-300 rounded-lg shadow-lg">
-                          <p className="font-semibold">{data.fullOwner}</p>
-                          <p className="text-orange-600">Avg Sample Timing: {data.avgSampleTiming} hours</p>
-                          <p className="text-blue-600">Total Contacts: {data.totalContacts}</p>
-                        </div>
-                      );
-                    }
-                    return null;
-                  }} />
-                  <Bar dataKey="avgSampleTiming" fill={COLORS.warning} />
-                </BarChart>
-              </ResponsiveContainer>
-            </div>
-          </div>
-
-          {/* First Call Timing by Owner */}
-          <div className="bg-white rounded-xl shadow-lg p-6">
-            <h3 className="text-xl font-bold text-gray-900 mb-4">📞 Avg First Call Timing by Owner (Minutes)</h3>
-            <div className="h-80">
-              <ResponsiveContainer width="100%" height="100%">
-                <BarChart data={ownerData?.filter(d => d.avgFirstCallTiming > 0).slice(0, 8) || []}>
-                  <CartesianGrid strokeDasharray="3 3" />
-                  <XAxis dataKey="owner" angle={-45} textAnchor="end" height={100} />
-                  <YAxis />
-                  <Tooltip content={({ active, payload }) => {
-                    if (active && payload && payload.length) {
-                      const data = payload[0].payload;
-                      return (
-                        <div className="bg-white p-3 border border-gray-300 rounded-lg shadow-lg">
-                          <p className="font-semibold">{data.fullOwner}</p>
-                          <p className="text-purple-600">Avg First Call: {data.avgFirstCallTiming} minutes</p>
-                          <p className="text-blue-600">Total Contacts: {data.totalContacts}</p>
-                        </div>
-                      );
-                    }
-                    return null;
-                  }} />
-                  <Bar dataKey="avgFirstCallTiming" fill={COLORS.purple} />
-                </BarChart>
-              </ResponsiveContainer>
-            </div>
-          </div>
-        </div>
-
-        {/* Owner Detailed Table */}
-        <div className="bg-white rounded-xl shadow-lg p-6">
-          <h3 className="text-xl font-bold text-gray-900 mb-4">👥 Detailed Owner Performance</h3>
-          <div className="overflow-x-auto">
-            <table className="min-w-full divide-y divide-gray-200">
-              <thead className="bg-gray-50">
-                <tr>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Owner</th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Total</th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Active</th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Corporate</th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Generic</th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Avg Touchpoints</th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Response Rate</th>
-                </tr>
-              </thead>
-              <tbody className="bg-white divide-y divide-gray-200">
-                {(ownerData || []).map((owner, index) => (
-                  <tr key={index} className="hover:bg-gray-50">
-                    <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">{owner.fullOwner}</td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{owner.totalContacts}</td>
-                    <td className="px-6 py-4 whitespace-nowrap">
-                      <span className="inline-flex px-2 py-1 text-xs font-semibold rounded-full bg-green-100 text-green-800">
-                        {owner.activeContacts}
-                      </span>
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{owner.corporate}</td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{owner.generic}</td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{owner.avgTouchpoints}</td>
-                    <td className="px-6 py-4 whitespace-nowrap">
-                      <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${
-                        parseFloat(owner.responseRate) > 10 ? 'bg-green-100 text-green-800' :
-                        parseFloat(owner.responseRate) > 5 ? 'bg-yellow-100 text-yellow-800' :
-                        'bg-red-100 text-red-800'
-                      }`}>
-                        {owner.responseRate}%
-                      </span>
-                    </td>
-                  </tr>
                 ))}
-              </tbody>
-            </table>
+              </div>
+            </div>
+
+            {activeFiltersCount > 0 && (
+              <button onClick={clearFilters} className="clear-filters-btn">
+                Clear All Filters
+              </button>
+            )}
           </div>
+        )}
+      </div>
+
+      {/* Key Metrics Cards */}
+      <div className="metrics-grid">
+        {[
+          { icon: '👥', label: 'Total Contacts', value: analyticsData.totalContacts?.toLocaleString() || 0, color: '#3498db' },
+          { icon: '✅', label: 'Active Leads', value: analyticsData.activeLeadCount?.toLocaleString() || 0, color: '#27ae60' },
+          { icon: '📧', label: 'Avg Emails/Contact', value: analyticsData.avgEmails || '0.0', color: '#e67e22' },
+          { icon: '📞', label: 'Avg Calls/Contact', value: analyticsData.avgCalls || '0.0', color: '#9b59b6' },
+          { icon: '📊', label: 'Response Rate', value: `${analyticsData.responseRate || '0.0'}%`, color: '#e74c3c' },
+          { icon: '⏱️', label: 'Avg Sample Time', value: `${analyticsData.avgSampleSentHours || '0.0'}h`, color: '#f39c12' },
+          { icon: '📱', label: 'Avg First Call Time', value: `${analyticsData.avgFirstCallMinutes || '0.0'}m`, color: '#1abc9c' },
+          { icon: '📈', label: 'Samples Sent', value: analyticsData.samplesSentCount?.toLocaleString() || 0, color: '#34495e' }
+        ].map((metric, index) => (
+          <div key={index} className="metric-card">
+            <div className="metric-icon">{metric.icon}</div>
+            <div className="metric-value" style={{ color: metric.color }}>
+              {metric.value}
+            </div>
+            <div className="metric-label">{metric.label}</div>
+          </div>
+        ))}
+      </div>
+
+      {/* Charts Grid */}
+      <div className="charts-grid">
+        
+        {/* Owner Analytics Bar Chart (removed avg touchpoints line) */}
+        <div className="chart-container resizable">
+          <div className="chart-header">
+            <h3>📊 Performance by Owner</h3>
+          </div>
+          <ResponsiveContainer width="100%" height={350}>
+            <BarChart 
+              data={ownerAnalytics} 
+              margin={{ top: 20, right: 30, left: 20, bottom: 60 }}
+              onClick={(data) => {
+                if (data && data.activeLabel) {
+                  navigateToLeads({ owner: [data.activeLabel] });
+                }
+              }}
+            >
+              <CartesianGrid strokeDasharray="3 3" stroke="#ecf0f1" />
+              <XAxis 
+                dataKey="owner" 
+                angle={-45} 
+                textAnchor="end" 
+                height={100}
+                fontSize={10}
+                stroke="#7f8c8d"
+              />
+              <YAxis stroke="#7f8c8d" />
+              <Tooltip 
+                formatter={formatTooltip}
+                contentStyle={{ 
+                  backgroundColor: '#2c3e50', 
+                  border: 'none', 
+                  borderRadius: '8px', 
+                  color: 'white' 
+                }}
+              />
+              <Legend />
+              <Bar 
+                dataKey="totalContacts" 
+                fill="#3498db" 
+                name="Total Contacts" 
+                radius={[2, 2, 0, 0]}
+                style={{ cursor: 'pointer' }}
+              />
+              <Bar 
+                dataKey="activeLeads" 
+                fill="#27ae60" 
+                name="Active Leads" 
+                radius={[2, 2, 0, 0]}
+                style={{ cursor: 'pointer' }}
+              />
+            </BarChart>
+          </ResponsiveContainer>
+        </div>
+
+        {/* New Avg Touchpoint Stacked Bar Chart (Calls + Emails) */}
+        <div className="chart-container resizable">
+          <div className="chart-header">
+            <h3>📊 Avg Touchpoints by Owner (Calls + Emails)</h3>
+          </div>
+          <ResponsiveContainer width="100%" height={350}>
+            <BarChart 
+              data={ownerAnalytics} 
+              margin={{ top: 20, right: 30, left: 20, bottom: 60 }}
+              onClick={(data) => {
+                if (data && data.activeLabel) {
+                  navigateToLeads({ owner: [data.activeLabel] });
+                }
+              }}
+            >
+              <CartesianGrid strokeDasharray="3 3" stroke="#ecf0f1" />
+              <XAxis 
+                dataKey="owner" 
+                angle={-45} 
+                textAnchor="end" 
+                height={100}
+                fontSize={10}
+                stroke="#7f8c8d"
+              />
+              <YAxis stroke="#7f8c8d" />
+              <Tooltip 
+                formatter={formatTooltip}
+                contentStyle={{ 
+                  backgroundColor: '#2c3e50', 
+                  border: 'none', 
+                  borderRadius: '8px', 
+                  color: 'white' 
+                }}
+              />
+              <Legend />
+              <Bar 
+                dataKey="avgCalls" 
+                stackId="touchpoints" 
+                fill="#9b59b6" 
+                name="Avg Calls" 
+                radius={[0, 0, 0, 0]}
+                style={{ cursor: 'pointer' }}
+              />
+              <Bar 
+                dataKey="avgEmails" 
+                stackId="touchpoints" 
+                fill="#e67e22" 
+                name="Avg Emails" 
+                radius={[2, 2, 0, 0]}
+                style={{ cursor: 'pointer' }}
+              />
+            </BarChart>
+          </ResponsiveContainer>
+        </div>
+
+        {/* Contact Categories Pie Chart (fixed labels) */}
+        <div className="chart-container resizable">
+          <div className="chart-header">
+            <h3>🏢 Contact Categories</h3>
+          </div>
+          <ResponsiveContainer width="100%" height={350}>
+            <PieChart>
+              <Pie
+                data={categoryData}
+                cx="50%"
+                cy="50%"
+                labelLine={false}
+                label={renderCustomizedLabel}
+                outerRadius={100}
+                fill="#8884d8"
+                dataKey="count"
+                nameKey="name"
+                onClick={(data) => {
+                  if (data && data.name) {
+                    navigateToLeads({ contactCategory: [data.name] });
+                  }
+                }}
+                style={{ cursor: 'pointer' }}
+              >
+                {categoryData.map((entry, index) => (
+                  <Cell 
+                    key={`cell-${index}`} 
+                    fill={COLORS[index % COLORS.length]}
+                    style={{ cursor: 'pointer' }}
+                  />
+                ))}
+              </Pie>
+              <Tooltip formatter={(value, name) => [value, 'Count']} />
+              <Legend />
+            </PieChart>
+          </ResponsiveContainer>
+        </div>
+
+        {/* Response Rate by Owner */}
+        <div className="chart-container resizable">
+          <div className="chart-header">
+            <h3>📈 Response Rate by Owner</h3>
+          </div>
+          <ResponsiveContainer width="100%" height={350}>
+            <BarChart 
+              data={ownerAnalytics} 
+              margin={{ top: 20, right: 30, left: 20, bottom: 60 }}
+              onClick={(data) => {
+                if (data && data.activeLabel) {
+                  navigateToLeads({ owner: [data.activeLabel] });
+                }
+              }}
+            >
+              <CartesianGrid strokeDasharray="3 3" stroke="#ecf0f1" />
+              <XAxis 
+                dataKey="owner" 
+                angle={-45} 
+                textAnchor="end" 
+                height={100}
+                fontSize={10}
+                stroke="#7f8c8d"
+              />
+              <YAxis domain={[0, 'dataMax + 10']} stroke="#7f8c8d" />
+              <Tooltip formatter={(value) => [`${value}%`, 'Response Rate']} />
+              <Legend />
+              <Bar 
+                dataKey="responseRate" 
+                fill="#e74c3c" 
+                name="Response Rate %" 
+                radius={[4, 4, 0, 0]}
+                style={{ cursor: 'pointer' }}
+              />
+            </BarChart>
+          </ResponsiveContainer>
+        </div>
+
+        {/* Sample Timing by Owner */}
+        <div className="chart-container resizable">
+          <div className="chart-header">
+            <h3>⏰ Avg Sample Timing by Owner</h3>
+          </div>
+          <ResponsiveContainer width="100%" height={350}>
+            <AreaChart data={ownerAnalytics} margin={{ top: 20, right: 30, left: 20, bottom: 60 }}>
+              <CartesianGrid strokeDasharray="3 3" stroke="#ecf0f1" />
+              <XAxis 
+                dataKey="owner" 
+                angle={-45} 
+                textAnchor="end" 
+                height={100}
+                fontSize={10}
+                stroke="#7f8c8d"
+              />
+              <YAxis stroke="#7f8c8d" />
+              <Tooltip formatter={(value) => [`${value} hours`, 'Avg Sample Timing']} />
+              <Area 
+                type="monotone" 
+                dataKey="avgSampleHours" 
+                stroke="#f39c12" 
+                fill="#f39c12" 
+                fillOpacity={0.6}
+                strokeWidth={2}
+              />
+            </AreaChart>
+          </ResponsiveContainer>
+        </div>
+
+        {/* First Call Timing by Owner */}
+        <div className="chart-container resizable">
+          <div className="chart-header">
+            <h3>📞 Avg First Call Timing by Owner</h3>
+          </div>
+          <ResponsiveContainer width="100%" height={350}>
+            <LineChart data={ownerAnalytics} margin={{ top: 20, right: 30, left: 20, bottom: 60 }}>
+              <CartesianGrid strokeDasharray="3 3" stroke="#ecf0f1" />
+              <XAxis 
+                dataKey="owner" 
+                angle={-45} 
+                textAnchor="end" 
+                height={100}
+                fontSize={10}
+                stroke="#7f8c8d"
+              />
+              <YAxis stroke="#7f8c8d" />
+              <Tooltip formatter={(value) => [`${value} minutes`, 'Avg First Call Timing']} />
+              <Legend />
+              <Line 
+                type="monotone" 
+                dataKey="avgFirstCallMinutes" 
+                stroke="#9b59b6" 
+                strokeWidth={3}
+                dot={{ fill: '#9b59b6', strokeWidth: 2, r: 4 }}
+                activeDot={{ r: 6, fill: '#9b59b6' }}
+              />
+            </LineChart>
+          </ResponsiveContainer>
+        </div>
+
+        {/* Lead Levels Distribution by Owner (NEW) */}
+        <div className="chart-container resizable">
+          <div className="chart-header">
+            <h3>🌡️ Lead Levels Distribution by Owner</h3>
+          </div>
+          <ResponsiveContainer width="100%" height={350}>
+            <BarChart 
+              data={leadLevelByOwnerData} 
+              margin={{ top: 20, right: 30, left: 20, bottom: 60 }}
+              onClick={(data) => {
+                if (data && data.activeLabel) {
+                  navigateToLeads({ owner: [data.activeLabel] });
+                }
+              }}
+            >
+              <CartesianGrid strokeDasharray="3 3" stroke="#ecf0f1" />
+              <XAxis 
+                dataKey="owner" 
+                angle={-45} 
+                textAnchor="end" 
+                height={100}
+                fontSize={10}
+                stroke="#7f8c8d"
+              />
+              <YAxis stroke="#7f8c8d" />
+              <Tooltip />
+              <Legend />
+              {allLeadLevels.map((level, index) => (
+                <Bar 
+                  key={level}
+                  dataKey={level} 
+                  stackId="leadLevels"
+                  fill={COLORS[index % COLORS.length]} 
+                  name={level}
+                  style={{ cursor: 'pointer' }}
+                />
+              ))}
+            </BarChart>
+          </ResponsiveContainer>
+        </div>
+
+        {/* Territory Distribution - Different Colors */}
+        <div className="chart-container resizable">
+          <div className="chart-header">
+            <h3>🗺️ Territory Distribution</h3>
+          </div>
+          <ResponsiveContainer width="100%" height={350}>
+            <BarChart 
+              data={territoryData} 
+              margin={{ top: 20, right: 30, left: 20, bottom: 60 }}
+              onClick={(data) => {
+                if (data && data.activeLabel) {
+                  navigateToLeads({ territory: [data.activeLabel] });
+                }
+              }}
+            >
+              <CartesianGrid strokeDasharray="3 3" stroke="#ecf0f1" />
+              <XAxis 
+                dataKey="territory" 
+                angle={-45} 
+                textAnchor="end" 
+                height={100}
+                fontSize={10}
+                stroke="#7f8c8d"
+              />
+              <YAxis stroke="#7f8c8d" />
+              <Tooltip />
+              <Bar dataKey="count" radius={[4, 4, 0, 0]} style={{ cursor: 'pointer' }}>
+                {territoryData.map((entry, index) => (
+                  <Cell 
+                    key={`cell-${index}`} 
+                    fill={entry.fill}
+                    style={{ cursor: 'pointer' }}
+                  />
+                ))}
+              </Bar>
+            </BarChart>
+          </ResponsiveContainer>
+        </div>
+      </div>
+
+      {/* Owner Details Table */}
+      <div className="table-container">
+        <h3>👥 Detailed Owner Analytics</h3>
+        <div className="table-wrapper">
+          <table className="analytics-table">
+            <thead>
+              <tr>
+                <th>Owner</th>
+                <th>Total</th>
+                <th>Active</th>
+                <th>Corporate</th>
+                <th>Generic</th>
+                <th>Avg Touchpoints</th>
+                <th>Response Rate</th>
+                <th>Avg Sample Time</th>
+                <th>Avg Call Time</th>
+              </tr>
+            </thead>
+            <tbody>
+              {ownerAnalytics.map((owner, index) => (
+                <tr key={index}>
+                  <td className="owner-name">{owner.owner}</td>
+                  <td>{owner.totalContacts}</td>
+                  <td className="active-count">{owner.activeLeads}</td>
+                  <td className="corporate-count">{owner.corporateLeads}</td>
+                  <td className="generic-count">{owner.genericLeads}</td>
+                  <td>{owner.avgTouchpoints}</td>
+                  <td className="response-rate">{owner.responseRate}%</td>
+                  <td className="sample-time">{owner.avgSampleHours}h</td>
+                  <td className="call-time">{owner.avgFirstCallMinutes}m</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
         </div>
       </div>
     </div>
   );
 };
 
-export default Sales;
+export default Sale;
