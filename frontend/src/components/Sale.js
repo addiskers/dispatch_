@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
+import { useNavigate } from 'react-router-dom'; // Add this import
 import { 
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, 
   LineChart, Line, PieChart, Pie, Cell, ResponsiveContainer,
@@ -7,6 +8,7 @@ import {
 import '../styles/Sale.css';
 
 const Sale = () => {
+  const navigate = useNavigate(); // Add this hook
   const [analyticsData, setAnalyticsData] = useState({
     totalContacts: 0,
     avgTouchpoints: '0.0',
@@ -46,22 +48,18 @@ const Sale = () => {
     endDate: ''
   });
 
-  // Navigation function to redirect to FreshworksLeads with filters
+  // Updated navigation function using React Router
   const navigateToLeads = (additionalFilters = {}) => {
     const combinedFilters = { ...filters, ...additionalFilters };
     
-    // Create URL with filters as query parameters
-    const params = new URLSearchParams();
-    Object.entries(combinedFilters).forEach(([key, value]) => {
-      if (Array.isArray(value) && value.length > 0) {
-        params.set(key, JSON.stringify(value));
-      } else if (value && !Array.isArray(value)) {
-        params.set(key, value);
-      }
+    // Navigate to dashboard with state to show FreshworksLeads
+    navigate('/', { 
+      state: { 
+        selectedSection: 'Freshworks Leads',
+        filters: combinedFilters,
+        fromAnalytics: true 
+      } 
     });
-    
-    // Navigate to freshworks leads page with filters
-    window.location.href = `/freshworks-leads?${params.toString()}`;
   };
 
   const [filterOptions, setFilterOptions] = useState({
@@ -731,7 +729,7 @@ const Sale = () => {
       {/* Charts Grid */}
       <div className="charts-grid">
         
-        {/* Owner Analytics Bar Chart (removed avg touchpoints line) */}
+        {/* Owner Analytics Bar Chart */}
         <div className="chart-container resizable">
           <div className="chart-header">
             <h3>📊 Performance by Owner</h3>
@@ -740,11 +738,6 @@ const Sale = () => {
             <BarChart 
               data={ownerAnalytics} 
               margin={{ top: 20, right: 30, left: 20, bottom: 60 }}
-              onClick={(data) => {
-                if (data && data.activeLabel) {
-                  navigateToLeads({ owner: [data.activeLabel] });
-                }
-              }}
             >
               <CartesianGrid strokeDasharray="3 3" stroke="#ecf0f1" />
               <XAxis 
@@ -771,6 +764,7 @@ const Sale = () => {
                 fill="#3498db" 
                 name="Total Contacts" 
                 radius={[2, 2, 0, 0]}
+                onClick={(data) => navigateToLeads({ owner: [data.owner] })}
                 style={{ cursor: 'pointer' }}
               />
               <Bar 
@@ -778,6 +772,7 @@ const Sale = () => {
                 fill="#27ae60" 
                 name="Active Leads" 
                 radius={[2, 2, 0, 0]}
+                onClick={(data) => navigateToLeads({ owner: [data.owner], isActive: 'yes' })}
                 style={{ cursor: 'pointer' }}
               />
             </BarChart>
@@ -793,11 +788,6 @@ const Sale = () => {
             <BarChart 
               data={ownerAnalytics} 
               margin={{ top: 20, right: 30, left: 20, bottom: 60 }}
-              onClick={(data) => {
-                if (data && data.activeLabel) {
-                  navigateToLeads({ owner: [data.activeLabel] });
-                }
-              }}
             >
               <CartesianGrid strokeDasharray="3 3" stroke="#ecf0f1" />
               <XAxis 
@@ -825,6 +815,7 @@ const Sale = () => {
                 fill="#9b59b6" 
                 name="Avg Calls" 
                 radius={[0, 0, 0, 0]}
+                onClick={(data) => navigateToLeads({ owner: [data.owner] })}
                 style={{ cursor: 'pointer' }}
               />
               <Bar 
@@ -833,13 +824,14 @@ const Sale = () => {
                 fill="#e67e22" 
                 name="Avg Emails" 
                 radius={[2, 2, 0, 0]}
+                onClick={(data) => navigateToLeads({ owner: [data.owner] })}
                 style={{ cursor: 'pointer' }}
               />
             </BarChart>
           </ResponsiveContainer>
         </div>
 
-        {/* Contact Categories Pie Chart (fixed labels) */}
+        {/* Contact Categories Pie Chart */}
         <div className="chart-container resizable">
           <div className="chart-header">
             <h3>🏢 Contact Categories</h3>
@@ -856,17 +848,12 @@ const Sale = () => {
                 fill="#8884d8"
                 dataKey="count"
                 nameKey="name"
-                onClick={(data) => {
-                  if (data && data.name) {
-                    navigateToLeads({ contactCategory: [data.name] });
-                  }
-                }}
-                style={{ cursor: 'pointer' }}
               >
                 {categoryData.map((entry, index) => (
                   <Cell 
                     key={`cell-${index}`} 
                     fill={COLORS[index % COLORS.length]}
+                    onClick={() => navigateToLeads({ contactCategory: [entry.name] })}
                     style={{ cursor: 'pointer' }}
                   />
                 ))}
@@ -886,11 +873,6 @@ const Sale = () => {
             <BarChart 
               data={ownerAnalytics} 
               margin={{ top: 20, right: 30, left: 20, bottom: 60 }}
-              onClick={(data) => {
-                if (data && data.activeLabel) {
-                  navigateToLeads({ owner: [data.activeLabel] });
-                }
-              }}
             >
               <CartesianGrid strokeDasharray="3 3" stroke="#ecf0f1" />
               <XAxis 
@@ -909,6 +891,7 @@ const Sale = () => {
                 fill="#e74c3c" 
                 name="Response Rate %" 
                 radius={[4, 4, 0, 0]}
+                onClick={(data) => navigateToLeads({ owner: [data.owner] })}
                 style={{ cursor: 'pointer' }}
               />
             </BarChart>
@@ -976,7 +959,7 @@ const Sale = () => {
           </ResponsiveContainer>
         </div>
 
-        {/* Lead Levels Distribution by Owner (NEW) */}
+        {/* Lead Levels Distribution by Owner */}
         <div className="chart-container resizable">
           <div className="chart-header">
             <h3>🌡️ Lead Levels Distribution by Owner</h3>
@@ -985,11 +968,6 @@ const Sale = () => {
             <BarChart 
               data={leadLevelByOwnerData} 
               margin={{ top: 20, right: 30, left: 20, bottom: 60 }}
-              onClick={(data) => {
-                if (data && data.activeLabel) {
-                  navigateToLeads({ owner: [data.activeLabel] });
-                }
-              }}
             >
               <CartesianGrid strokeDasharray="3 3" stroke="#ecf0f1" />
               <XAxis 
@@ -1010,6 +988,7 @@ const Sale = () => {
                   stackId="leadLevels"
                   fill={COLORS[index % COLORS.length]} 
                   name={level}
+                  onClick={(data) => navigateToLeads({ owner: [data.owner], leadLevel: [level] })}
                   style={{ cursor: 'pointer' }}
                 />
               ))}
@@ -1026,11 +1005,6 @@ const Sale = () => {
             <BarChart 
               data={territoryData} 
               margin={{ top: 20, right: 30, left: 20, bottom: 60 }}
-              onClick={(data) => {
-                if (data && data.activeLabel) {
-                  navigateToLeads({ territory: [data.activeLabel] });
-                }
-              }}
             >
               <CartesianGrid strokeDasharray="3 3" stroke="#ecf0f1" />
               <XAxis 
@@ -1043,11 +1017,12 @@ const Sale = () => {
               />
               <YAxis stroke="#7f8c8d" />
               <Tooltip />
-              <Bar dataKey="count" radius={[4, 4, 0, 0]} style={{ cursor: 'pointer' }}>
+              <Bar dataKey="count" radius={[4, 4, 0, 0]}>
                 {territoryData.map((entry, index) => (
                   <Cell 
                     key={`cell-${index}`} 
                     fill={entry.fill}
+                    onClick={() => navigateToLeads({ territory: [entry.territory] })}
                     style={{ cursor: 'pointer' }}
                   />
                 ))}

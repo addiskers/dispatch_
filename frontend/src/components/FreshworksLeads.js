@@ -1,7 +1,10 @@
 import React, { useState, useEffect, useRef } from 'react';
+import { useLocation, useNavigate } from 'react-router-dom'; // Add these imports
 import '../styles/freshworksleads.css';
 
-const FreshworksLeads = () => {
+const FreshworksLeads = ({ initialFilters = {} }) => {
+  const location = useLocation(); // Add this hook
+  const navigate = useNavigate(); // Add this hook
   const [contacts, setContacts] = useState([]);
   const [analytics, setAnalytics] = useState({
     totalContacts: 0,
@@ -108,6 +111,9 @@ const FreshworksLeads = () => {
   const [tempColumnConfig, setTempColumnConfig] = useState(availableColumns);
   const [tempColumnOrder, setTempColumnOrder] = useState(Object.keys(availableColumns));
 
+  // Add ref to track if filters were already initialized
+  const filtersInitialized = useRef(false);
+
   const API_BASE_URL = process.env.REACT_APP_API_URL || 'http://localhost:5000/api';
 
   // Date filter options
@@ -120,31 +126,34 @@ const FreshworksLeads = () => {
     { value: 'custom', label: 'Custom Range' }
   ];
 
-  // Parse URL parameters and set filters
+  // Handle navigation state from Sale.js
   useEffect(() => {
-    const urlParams = new URLSearchParams(window.location.search);
-    const filtersFromUrl = {};
-    
-    for (const [key, value] of urlParams.entries()) {
-      try {
-        // Try to parse as JSON for array filters
-        const parsedValue = JSON.parse(value);
-        if (Array.isArray(parsedValue)) {
-          filtersFromUrl[key] = parsedValue;
-        } else {
-          filtersFromUrl[key] = value;
-        }
-      } catch (e) {
-        // If not valid JSON, treat as string
-        filtersFromUrl[key] = value;
-      }
+    if (location.state?.filters && location.state?.fromAnalytics && !filtersInitialized.current) {
+      console.log('Applying filters from navigation:', location.state.filters);
+      setFilters(prev => ({
+        ...prev,
+        ...location.state.filters
+      }));
+      setShowFilters(true);
+      filtersInitialized.current = true;
+      
+      // Clear the location state to prevent re-applying on refresh
+      navigate(location.pathname, { replace: true, state: {} });
     }
-    
-    if (Object.keys(filtersFromUrl).length > 0) {
-      setFilters(prev => ({ ...prev, ...filtersFromUrl }));
-      setShowFilters(true); // Show filters if they're applied from URL
+  }, [location.state, navigate, location.pathname]);
+
+  // Apply initial filters (if provided as props)
+  useEffect(() => {
+    if (initialFilters && Object.keys(initialFilters).length > 0) {
+      console.log('Applying initial filters:', initialFilters);
+      setFilters(prev => ({ 
+        ...prev, 
+        ...initialFilters 
+      }));
+      setShowFilters(true);
+      filtersInitialized.current = true;
     }
-  }, []);
+  }, [initialFilters]);
 
   // Helper function to get date ranges
   const getDateRange = (filterType) => {
@@ -211,8 +220,16 @@ const FreshworksLeads = () => {
     if (savedConfig) {
       try {
         const parsed = JSON.parse(savedConfig);
-        setColumnConfig(parsed);
-        setTempColumnConfig(parsed);
+        // Merge saved config with available columns to ensure all properties exist
+        const mergedConfig = {};
+        Object.keys(availableColumns).forEach(key => {
+          mergedConfig[key] = {
+            ...availableColumns[key],
+            ...(parsed[key] || {})
+          };
+        });
+        setColumnConfig(mergedConfig);
+        setTempColumnConfig(mergedConfig);
       } catch (e) {
         console.error('Failed to parse saved column config:', e);
       }
@@ -221,8 +238,16 @@ const FreshworksLeads = () => {
     if (savedOrder) {
       try {
         const parsedOrder = JSON.parse(savedOrder);
-        setColumnOrder(parsedOrder);
-        setTempColumnOrder(parsedOrder);
+        // Ensure all columns are in the order
+        const validOrder = parsedOrder.filter(key => availableColumns[key]);
+        // Add any missing columns to the end
+        Object.keys(availableColumns).forEach(key => {
+          if (!validOrder.includes(key)) {
+            validOrder.push(key);
+          }
+        });
+        setColumnOrder(validOrder);
+        setTempColumnOrder(validOrder);
       } catch (e) {
         console.error('Failed to parse saved column order:', e);
       }
@@ -395,9 +420,7 @@ const FreshworksLeads = () => {
     setCurrentPage(1);
     setShowCustomDatePicker(false);
     setAnalyticsCountryFilter([]);
-    
-    // Clear URL parameters
-    window.history.replaceState({}, document.title, window.location.pathname);
+    filtersInitialized.current = false;
   };
 
   const handleAnalyticsCountryFilter = (country) => {
@@ -524,18 +547,21 @@ const FreshworksLeads = () => {
       const diff = moveEvent.clientX - startX;
       const newWidth = Math.max(80, startWidth + diff);
       
-      setColumnConfig(prev => ({
-        ...prev,
-        [columnKey]: {
-          ...prev[columnKey],
-          width: newWidth
-        }
-      }));
+      setColumnConfig(prev => {
+        const updated = {
+          ...prev,
+          [columnKey]: {
+            ...prev[columnKey],
+            width: newWidth
+          }
+        };
+        // Save to localStorage on each move for real-time persistence
+        localStorage.setItem('freshworks-column-config', JSON.stringify(updated));
+        return updated;
+      });
     };
 
     const handleMouseUp = () => {
-      localStorage.setItem('freshworks-column-config', JSON.stringify(columnConfig));
-      
       document.removeEventListener('mousemove', handleMouseMove);
       document.removeEventListener('mouseup', handleMouseUp);
       document.body.style.cursor = 'default';
@@ -872,6 +898,10 @@ const FreshworksLeads = () => {
                 {loading ? 'Loading...' : 
                   `${totalCount.toLocaleString()} total filtered • Showing ${contacts.length} on page ${currentPage} of ${totalPages}`
                 }
+                {/* Show indicator if filters were applied from navigation */}
+                {location.state?.fromAnalytics && (
+                  <span className="badge bg-info ms-2">Filtered from Analytics</span>
+                )}
               </p>
             </div>
             <div className="d-flex gap-2">

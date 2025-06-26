@@ -1,4 +1,5 @@
 import React, { useState } from "react";
+import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
 import Login from "./components/Login";
 import SalesDashboard from "./components/SalesDashboard";
 import UploaderDashboard from "./components/UploaderDashboard";
@@ -12,7 +13,7 @@ import '@fortawesome/fontawesome-free/css/all.min.css';
 function App() {
   const [token, setToken] = useState(localStorage.getItem("token") || "");
   const [role, setRole] = useState(localStorage.getItem("role") || "");
-  const [testMode, setTestMode] = useState(false); // Add state for test mode
+  const [testMode, setTestMode] = useState(false);
 
   function handleLoginSuccess(token, role) {
     setToken(token);
@@ -28,7 +29,6 @@ function App() {
     localStorage.removeItem("role");
   }
 
-  // Function to toggle test mode
   function toggleTestMode() {
     setTestMode(!testMode);
   }
@@ -50,41 +50,47 @@ function App() {
 
   if (!token) {
     return (
-      <div>
-        <Login onLoginSuccess={handleLoginSuccess} />
-        <button 
-          onClick={toggleTestMode}
-          style={{position: 'fixed', bottom: '10px', right: '10px'}}
-        >
-          Test Market Dashboard
-        </button>
-      </div>
+      <Router>
+        <Routes>
+          <Route path="*" element={
+            <div>
+              <Login onLoginSuccess={handleLoginSuccess} />
+              <button 
+                onClick={toggleTestMode}
+                style={{position: 'fixed', bottom: '10px', right: '10px'}}
+              >
+                Test Market Dashboard
+              </button>
+            </div>
+          } />
+        </Routes>
+      </Router>
     );
   }
 
-  let dashboard;
-  if (role === "sales") {
-    dashboard = <SalesDashboard token={token} onLogout={handleLogout} />;
-  } else if (role === "uploader") {
-    dashboard = <UploaderDashboard token={token} onLogout={handleLogout} />;
-  } else if (role === "accounts") {
-    dashboard = <AccountsDashboard token={token} onLogout={handleLogout} />;
-  } else if (role === "superadmin") {
-    dashboard = <SuperAdminDashboard token={token} onLogout={handleLogout} />; 
-  } else {
-    dashboard = <div>Unknown role. <button onClick={handleLogout}>Logout</button></div>;
-  }
-
   return (
-    <div>
-      {dashboard}
+    <Router>
+      <Routes>
+        {/* Main dashboard routes */}
+        <Route path="/" element={
+          role === "sales" ? <SalesDashboard token={token} onLogout={handleLogout} userRole="sales" /> :
+          role === "uploader" ? <UploaderDashboard token={token} onLogout={handleLogout} /> :
+          role === "accounts" ? <AccountsDashboard token={token} onLogout={handleLogout} /> :
+          role === "superadmin" ? <SuperAdminDashboard token={token} onLogout={handleLogout} userRole="superadmin" /> :
+          <div>Unknown role. <button onClick={handleLogout}>Logout</button></div>
+        } />
+        
+        {/* Redirect any unknown routes to home */}
+        <Route path="*" element={<Navigate to="/" replace />} />
+      </Routes>
+      
       <button 
         onClick={toggleTestMode}
         style={{position: 'fixed', bottom: '10px', right: '10px'}}
       >
         Test Market Dashboard
       </button>
-    </div>
+    </Router>
   );
 }
 
