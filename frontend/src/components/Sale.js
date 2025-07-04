@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { useNavigate } from 'react-router-dom'; // Add this import
+import { useNavigate } from 'react-router-dom'; 
 import { 
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, 
   LineChart, Line, PieChart, Pie, Cell, ResponsiveContainer,
@@ -8,7 +8,7 @@ import {
 import '../styles/Sale.css';
 
 const Sale = () => {
-  const navigate = useNavigate(); // Add this hook
+  const navigate = useNavigate(); 
   const [analyticsData, setAnalyticsData] = useState({
     totalContacts: 0,
     avgTouchpoints: '0.0',
@@ -48,11 +48,9 @@ const Sale = () => {
     endDate: ''
   });
 
-  // Updated navigation function using React Router
   const navigateToLeads = (additionalFilters = {}) => {
     const combinedFilters = { ...filters, ...additionalFilters };
     
-    // Navigate to dashboard with state to show FreshworksLeads
     navigate('/', { 
       state: { 
         selectedSection: 'Freshworks Leads',
@@ -354,7 +352,6 @@ const Sale = () => {
     });
   };
 
-  // Enhanced tooltip formatter
   const formatTooltip = (value, name, props) => {
     if (name.includes('Rate') || name.includes('Percentage')) {
       return [`${value}%`, name];
@@ -381,7 +378,7 @@ const Sale = () => {
     .map(([territory, count], index) => ({
       territory: territory || 'Unassigned',
       count,
-      fill: TERRITORY_COLORS[index % TERRITORY_COLORS.length] // Add different color for each bar
+      fill: TERRITORY_COLORS[index % TERRITORY_COLORS.length] 
     }));
 
   const leadLevelData = Object.entries(analyticsData.leadLevelBreakdown || {}).map(([level, count]) => ({
@@ -398,10 +395,7 @@ const Sale = () => {
     return ownerData;
   });
 
-  // Get all unique lead levels for the stacked chart
   const allLeadLevels = [...new Set(ownerAnalytics.flatMap(owner => Object.keys(owner.leadLevels || {})))];
-
-  // Custom label for pie charts showing numbers
   const renderCustomizedLabel = ({ cx, cy, midAngle, innerRadius, outerRadius, count, name }) => {
     const RADIAN = Math.PI / 180;
     const radius = innerRadius + (outerRadius - innerRadius) * 0.5;
@@ -460,7 +454,7 @@ const Sale = () => {
               disabled={refreshing}
               className={`refresh-btn ${refreshing ? 'refreshing' : ''}`}
             >
-              {refreshing ? '🔄 Refreshing...' : '🔄 Refresh'}
+              {refreshing ? '⟳ Refreshing...' : '⟳ Refresh'}
             </button>
           </div>
         </div>

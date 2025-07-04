@@ -8,6 +8,7 @@ import ContractPage from "./ContractPage";
 import MultipleFileUpload from "./MultipleFileUpload";
 import FreshworksLeads from "./FreshworksLeads"; 
 import Sale from "./Sale";
+import GIIForm from "./GIIForm";
 import "../styles/superAdminDashboard.css";
 
 function SuperAdminDashboard({ token, onLogout }) {
@@ -18,14 +19,12 @@ function SuperAdminDashboard({ token, onLogout }) {
   const [navigationFilters, setNavigationFilters] = useState(null);
   const sidebarRef = useRef(null);
 
-  // Handle navigation state from analytics
   useEffect(() => {
     if (location.state?.selectedSection) {
       setSelectedSection(location.state.selectedSection);
       if (location.state.filters) {
         setNavigationFilters(location.state.filters);
       }
-      // Clear the location state
       navigate(location.pathname, { replace: true, state: {} });
     }
   }, [location.state, navigate, location.pathname]);
@@ -63,6 +62,8 @@ function SuperAdminDashboard({ token, onLogout }) {
         return <FreshworksLeads initialFilters={navigationFilters} />; 
       case "Analytics":
         return <Sale />;
+      case "GII":
+        return <GIIForm token={token} />;
       default:
         return <ManageAccessSection token={token} />;
     }
@@ -73,6 +74,7 @@ function SuperAdminDashboard({ token, onLogout }) {
     { name: "Leads", section: "Leads" },
     { name: "Freshworks Leads", section: "Freshworks Leads" },
     { name: "Analytics", section: "Analytics" },
+    { name: "GII", section: "GII" },
     { name: "Contracts", section: "Contracts" },
     { name: "Upload", section: "Uploads" },
     { name: "Sample", section: "Sample" },
@@ -85,12 +87,14 @@ function SuperAdminDashboard({ token, onLogout }) {
     } else {
       setSelectedSection(section);
       setIsSidebarOpen(false);
-      // Clear navigation filters when manually selecting a different section
       if (section !== "Freshworks Leads") {
         setNavigationFilters(null);
       }
     }
   };
+
+  // Check if current section should have no padding (Sales/Analytics/GII)
+  const shouldRemovePadding = selectedSection === "Analytics" || selectedSection === "GII";
 
   return (
     <div className="dashboard-container">
@@ -126,7 +130,7 @@ function SuperAdminDashboard({ token, onLogout }) {
       </div>
       
       <div 
-        className="content" 
+        className={`content ${shouldRemovePadding ? 'no-padding' : ''}`}
         onClick={() => window.innerWidth <= 768 && setIsSidebarOpen(false)}
       >
         {renderSection()}

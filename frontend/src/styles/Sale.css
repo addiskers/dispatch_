@@ -2,7 +2,7 @@
 .sales-dashboard {
   padding: 1.5rem;
   font-family: 'Inter', 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  background: linear-gradient(135deg, #f4f5f7e7  0%, #e1e4e8 100%);
   min-height: 100vh;
   color: #2c3e50;
 }
@@ -58,12 +58,12 @@
   margin-bottom: 1rem;
 }
 
-.header-info .main-title {
+.header-info .main-title {  
   margin: 0;
   color: #2c3e50;
   font-size: 2rem;
   font-weight: 700;
-  background: linear-gradient(135deg, #667eea, #764ba2);
+  background: linear-gradient(135deg, #000000, #060606);
   -webkit-background-clip: text;
   -webkit-text-fill-color: transparent;
   background-clip: text;
@@ -71,8 +71,9 @@
 
 .header-info .subtitle {
   margin: 0.5rem 0 0 0;
-  color: #7f8c8d;
+  color: #0c0c0c;
   font-size: 1rem;
+  
 }
 
 .header-actions {
@@ -82,19 +83,19 @@
 
 .refresh-btn {
   padding: 0.6rem 1.2rem;
-  background: linear-gradient(135deg, #3498db, #2980b9);
+  background: #000000;
   color: white;
   border: none;
   border-radius: 8px;
   cursor: pointer;
-  font-weight: 600;
+  font-weight: 500;
   transition: all 0.3s ease;
   box-shadow: 0 4px 15px rgba(52, 152, 219, 0.3);
 }
 
 .refresh-btn:hover:not(.refreshing) {
   transform: translateY(-2px);
-  box-shadow: 0 6px 20px rgba(52, 152, 219, 0.4);
+  box-shadow: 0 6px 20px rgb(255, 255, 255);
 }
 
 .refresh-btn.refreshing {

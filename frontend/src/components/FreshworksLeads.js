@@ -1,10 +1,10 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { useLocation, useNavigate } from 'react-router-dom'; // Add these imports
+import { useLocation, useNavigate } from 'react-router-dom'; 
 import '../styles/freshworksleads.css';
 
 const FreshworksLeads = ({ initialFilters = {} }) => {
-  const location = useLocation(); // Add this hook
-  const navigate = useNavigate(); // Add this hook
+  const location = useLocation(); 
+  const navigate = useNavigate(); 
   const [contacts, setContacts] = useState([]);
   const [analytics, setAnalytics] = useState({
     totalContacts: 0,
@@ -81,6 +81,7 @@ const FreshworksLeads = ({ initialFilters = {} }) => {
     lead_level: { label: 'Lead Category', width: 130, visible: true },
     last_contacted_time: { label: 'Last Contact', width: 160, visible: true },
     owner_name: { label: 'Owner', width: 120, visible: true },
+    request_sample: { label: 'Request Sample', width: 140, visible: true }, // NEW COLUMN
     email: { label: 'Email', width: 200, visible: false },
     country: { label: 'Country', width: 120, visible: true },
     territory: { label: 'Territory', width: 120, visible: false },
@@ -107,11 +108,9 @@ const FreshworksLeads = ({ initialFilters = {} }) => {
   const [dragOverColumn, setDragOverColumn] = useState(null);
   const [searchColumns, setSearchColumns] = useState('');
   
-  // Temporary states for customizer
   const [tempColumnConfig, setTempColumnConfig] = useState(availableColumns);
   const [tempColumnOrder, setTempColumnOrder] = useState(Object.keys(availableColumns));
 
-  // Add ref to track if filters were already initialized
   const filtersInitialized = useRef(false);
 
   const API_BASE_URL = process.env.REACT_APP_API_URL || 'http://localhost:5000/api';
@@ -126,6 +125,28 @@ const FreshworksLeads = ({ initialFilters = {} }) => {
     { value: 'custom', label: 'Custom Range' }
   ];
 
+  // Handle Request Sample button click
+  const handleRequestSample = async (contact) => {
+    try {
+      // Add your API call here to handle sample request
+      console.log('Requesting sample for contact:', contact);
+      
+      // Show confirmation
+      if (window.confirm(`Request sample for ${contact.display_name} at ${contact.company}?`)) {
+        // You can add an API call here
+        // await fetch(`${API_BASE_URL}/contacts/${contact.id}/request-sample`, {
+        //   method: 'POST',
+        //   headers: { 'Content-Type': 'application/json' }
+        // });
+        
+        alert(`Sample request sent for ${contact.display_name}!`);
+      }
+    } catch (error) {
+      console.error('Error requesting sample:', error);
+      alert('Error sending sample request. Please try again.');
+    }
+  };
+
   // Handle navigation state from Sale.js
   useEffect(() => {
     if (location.state?.filters && location.state?.fromAnalytics && !filtersInitialized.current) {
@@ -136,8 +157,6 @@ const FreshworksLeads = ({ initialFilters = {} }) => {
       }));
       setShowFilters(true);
       filtersInitialized.current = true;
-      
-      // Clear the location state to prevent re-applying on refresh
       navigate(location.pathname, { replace: true, state: {} });
     }
   }, [location.state, navigate, location.pathname]);
@@ -220,7 +239,6 @@ const FreshworksLeads = ({ initialFilters = {} }) => {
     if (savedConfig) {
       try {
         const parsed = JSON.parse(savedConfig);
-        // Merge saved config with available columns to ensure all properties exist
         const mergedConfig = {};
         Object.keys(availableColumns).forEach(key => {
           mergedConfig[key] = {
@@ -238,9 +256,7 @@ const FreshworksLeads = ({ initialFilters = {} }) => {
     if (savedOrder) {
       try {
         const parsedOrder = JSON.parse(savedOrder);
-        // Ensure all columns are in the order
         const validOrder = parsedOrder.filter(key => availableColumns[key]);
-        // Add any missing columns to the end
         Object.keys(availableColumns).forEach(key => {
           if (!validOrder.includes(key)) {
             validOrder.push(key);
@@ -258,7 +274,6 @@ const FreshworksLeads = ({ initialFilters = {} }) => {
     try {
       setLoading(true);
       
-      // Get date range based on filter
       let dateRange = { startDate: '', endDate: '' };
       if (filters.dateFilter && filters.dateFilter !== 'custom') {
         dateRange = getDateRange(filters.dateFilter);
@@ -275,7 +290,6 @@ const FreshworksLeads = ({ initialFilters = {} }) => {
         search: searchTerm,
         sortBy: sortConfig.key,
         sortOrder: sortConfig.direction,
-        // Send arrays as JSON strings
         status: JSON.stringify(filters.status),
         owner: JSON.stringify(filters.owner),
         territory: JSON.stringify(filters.territory),
@@ -494,7 +508,7 @@ const FreshworksLeads = ({ initialFilters = {} }) => {
     setShowColumnCustomizer(false);
   };
 
-  // Drag and drop functionality (keeping existing)
+  // Drag and drop functionality 
   const handleDragStart = (e, columnKey) => {
     setDraggedColumn(columnKey);
     e.dataTransfer.effectAllowed = 'move';
@@ -555,7 +569,6 @@ const FreshworksLeads = ({ initialFilters = {} }) => {
             width: newWidth
           }
         };
-        // Save to localStorage on each move for real-time persistence
         localStorage.setItem('freshworks-column-config', JSON.stringify(updated));
         return updated;
       });
@@ -652,6 +665,24 @@ const FreshworksLeads = ({ initialFilters = {} }) => {
   };
 
   const renderCellContent = (columnKey, contact) => {
+    // Handle the new Request Sample button column
+    if (columnKey === 'request_sample') {
+      return (
+        <button
+          className="btn btn-sm btn-primary request-sample-btn"
+          onClick={() => handleRequestSample(contact)}
+          title={`Request sample for ${contact.display_name}`}
+          style={{
+            fontSize: '0.75rem',
+            padding: '0.25rem 0.5rem',
+            whiteSpace: 'nowrap'
+          }}
+        >
+          📋 Request Sample
+        </button>
+      );
+    }
+
     const getValue = () => {
       switch (columnKey) {
         case 'created_at':
@@ -675,7 +706,6 @@ const FreshworksLeads = ({ initialFilters = {} }) => {
           }
           return '-';
         
-        // NEW: First call timing case
         case 'first_call_timing':
           if (contact.first_call_timing) {
             return `${contact.first_call_timing}m`;
@@ -687,7 +717,7 @@ const FreshworksLeads = ({ initialFilters = {} }) => {
           return formatDateTime(contact.last_email_received);
         case 'first_email_with_attachment':
           return formatDateTime(contact.first_email_with_attachment);
-        case 'first_call_date': // NEW FIELD
+        case 'first_call_date': 
           return formatDateTime(contact.first_call_date);
         case 'total_touchpoints':
           return contact.total_touchpoints || 0;
@@ -716,7 +746,7 @@ const FreshworksLeads = ({ initialFilters = {} }) => {
     case 'last_contacted_time':
     case 'last_email_received':
     case 'first_email_with_attachment':
-    case 'first_call_date': // NEW CASE
+    case 'first_call_date': 
       return (
         <span className="date-time-cell" title={displayValue}>
           {displayValue}
@@ -798,7 +828,6 @@ const FreshworksLeads = ({ initialFilters = {} }) => {
         </span>
       );
 
-    // NEW: First call timing case
     case 'first_call_timing':
       return (
         <span 
@@ -917,7 +946,7 @@ const FreshworksLeads = ({ initialFilters = {} }) => {
               </button>
               <button 
                 onClick={handleRefresh}
-                className="btn btn-outline-primary refresh-btn"
+                className="btn btn-outline-primary refresh-btn-lead"
                 disabled={refreshing}
               >
                 <span className={`refresh-icon ${refreshing ? 'rotating' : ''}`}>⟳</span>
@@ -1367,7 +1396,6 @@ const FreshworksLeads = ({ initialFilters = {} }) => {
                       const breakdown = analytics.contactCategoryBreakdown || {};
                       console.log('Contact category breakdown for Generic:', breakdown);
                       
-                      // Try different case variations
                       const generic = breakdown['Generic'] || breakdown['generic'] || 
                                     breakdown['GENERIC'] || breakdown['GEN'] || 
                                     breakdown['Gen'] || 0;
@@ -1447,7 +1475,7 @@ const FreshworksLeads = ({ initialFilters = {} }) => {
             </div>
           </div>
 
-          {/* UPDATED: This card now uses avgConnectedCallDuration instead of avgCallDuration */}
+          {/*  This card now uses avgConnectedCallDuration instead of avgCallDuration */}
           <div className="col-lg-3 col-md-6 col-sm-6">
             <div className="analytics-card bg-white p-3 rounded border" title="Average duration of connected calls only (excludes missed/unanswered calls)">
               <div className="d-flex align-items-center">
@@ -1500,18 +1528,23 @@ const FreshworksLeads = ({ initialFilters = {} }) => {
                   >
                     <div 
                       className="header-content"
-                      onClick={() => handleSort(columnKey)}
+                      onClick={() => columnKey !== 'request_sample' && handleSort(columnKey)}
                       title={config.label}
+                      style={{ cursor: columnKey === 'request_sample' ? 'default' : 'pointer' }}
                     >
                       <span className="header-text">{config.label}</span>
-                      <span className="sort-icon">{getSortIcon(columnKey)}</span>
+                      {columnKey !== 'request_sample' && (
+                        <span className="sort-icon">{getSortIcon(columnKey)}</span>
+                      )}
                     </div>
-                    <div 
-                      className="resize-handle"
-                      onMouseDown={(e) => handleMouseDown(e, columnKey)}
-                      onClick={(e) => e.stopPropagation()}
-                      title="Drag to resize column"
-                    />
+                    {columnKey !== 'request_sample' && (
+                      <div 
+                        className="resize-handle"
+                        onMouseDown={(e) => handleMouseDown(e, columnKey)}
+                        onClick={(e) => e.stopPropagation()}
+                        title="Drag to resize column"
+                      />
+                    )}
                   </th>
                 ))}
               </tr>

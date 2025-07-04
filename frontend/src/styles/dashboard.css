@@ -2,21 +2,21 @@
 .container {
     margin-top: 20px;
     padding: 20px;
-    background-color: #f8f9fa; /* Light gray background */
-    border-radius: 10px; /* Rounded corners */
-    box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1); /* Subtle shadow */
+    background-color: #f8f9fa; 
+    border-radius: 10px; 
+    box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1); 
   }
   
   /* Headings */
   h2 {
     font-size: 24px;
-    color: #343a40; /* Dark gray */
+    color: #343a40; 
     margin-bottom: 20px;
   }
   
   h3 {
     font-size: 20px;
-    color: #495057; /* Medium gray */
+    color: #495057; 
     margin-top: 20px;
   }
   
@@ -26,13 +26,13 @@
   }
   
   button:hover {
-    opacity: 0.9; /* Slight opacity change on hover */
+    opacity: 0.9;
   }
   
   /* Logout Button */
   button.logout {
     float: right;
-    background-color: #dc3545; /* Red for danger */
+    background-color: #dc3545;
     color: #fff;
     border: none;
     padding: 10px 20px;
@@ -40,7 +40,7 @@
   }
   
   button.logout:hover {
-    background-color: #c82333; /* Slightly darker red */
+    background-color: #c82333;
   }
   
   /* Tables */
@@ -51,7 +51,7 @@
   }
   
   table thead th {
-    background-color: #007bff; /* Blue header */
+    background-color: #dfe1e3; 
     color: white;
     text-align: left;
     padding: 10px;
