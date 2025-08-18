@@ -27,48 +27,37 @@ const Sale = () => {
     activeLeadCount: 0,
     leadLevelBreakdown: {},
     contactCategoryBreakdown: {},
-    priorityCountries: {}
+    priorityCountries: {},
+    dealsWonBreakdown: {}, // Expected from API: { "Owner Name": count, ... } for contacts with status "Won"
   });
 
   const [ownerAnalytics, setOwnerAnalytics] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
+
+  const [rawContacts, setRawContacts] = useState([]);
+  const [leadsOverTime, setLeadsOverTime] = useState([]);
+
+  const [customChartConfig, setCustomChartConfig] = useState({
+    groupBy: 'leadLevel',
+    metric: 'totalContacts',
+  });
+  const [customChartData, setCustomChartData] = useState([]);
   
   const [filters, setFilters] = useState({
-    status: [],
-    owner: [],
-    territory: [],
-    leadLevel: [],
-    contactCategory: [],
-    customTags: [],
-    country: [],
-    isActive: '',
-    dateFilter: '',
-    startDate: '',
-    endDate: ''
+    status: [], owner: [], territory: [], leadLevel: [],
+    contactCategory: [], customTags: [], country: [],
+    isActive: '', dateFilter: '', startDate: '', endDate: ''
   });
 
   const navigateToLeads = (additionalFilters = {}) => {
     const combinedFilters = { ...filters, ...additionalFilters };
-    
-    navigate('/', { 
-      state: { 
-        selectedSection: 'Freshworks Leads',
-        filters: combinedFilters,
-        fromAnalytics: true 
-      } 
-    });
+    navigate('/', { state: { selectedSection: 'Freshworks Leads', filters: combinedFilters, fromAnalytics: true } });
   };
 
   const [filterOptions, setFilterOptions] = useState({
-    statuses: [],
-    owners: [],
-    territories: [],
-    leadLevels: [],
-    contactCategories: [],
-    customTags: [],
-    countries: [],
-    activeStatus: []
+    statuses: [], owners: [], territories: [], leadLevels: [],
+    contactCategories: [], customTags: [], countries: [], activeStatus: []
   });
 
   const [analyticsCountryFilter, setAnalyticsCountryFilter] = useState([]);
@@ -84,12 +73,9 @@ const Sale = () => {
   ];
 
   const dateFilterOptions = [
-    { value: '', label: 'All Time' },
-    { value: 'today', label: 'Today' },
-    { value: 'yesterday', label: 'Yesterday' },
-    { value: 'week', label: 'Last 7 Days' },
-    { value: 'month', label: 'Last 30 Days' },
-    { value: 'custom', label: 'Custom Range' }
+    { value: '', label: 'All Time' }, { value: 'today', label: 'Today' },
+    { value: 'yesterday', label: 'Yesterday' }, { value: 'week', label: 'Last 7 Days' },
+    { value: 'month', label: 'Last 30 Days' }, { value: 'custom', label: 'Custom Range' }
   ];
 
   const COLORS = ['#3498db', '#e74c3c', '#2ecc71', '#f39c12', '#9b59b6', '#1abc9c', '#e67e22', '#34495e'];
@@ -99,6 +85,13 @@ const Sale = () => {
     fetchAnalytics();
     fetchFilterOptions();
   }, [filters, analyticsCountryFilter]);
+
+  useEffect(() => {
+    if (rawContacts.length > 0) {
+      generateCustomChartData();
+    }
+  }, [customChartConfig, rawContacts]);
+
 
   const getDateRange = (filterType) => {
     const now = new Date();
@@ -135,14 +128,10 @@ const Sale = () => {
   const fetchAnalytics = async () => {
     try {
       setLoading(true);
-      
       let dateRange = { startDate: '', endDate: '' };
-      if (filters.dateFilter && filters.dateFilter !== 'custom') {
-        dateRange = getDateRange(filters.dateFilter);
-      } else if (filters.dateFilter === 'custom') {
-        dateRange = { startDate: filters.startDate, endDate: filters.endDate };
-      }
-
+      if (filters.dateFilter && filters.dateFilter !== 'custom') dateRange = getDateRange(filters.dateFilter);
+      else if (filters.dateFilter === 'custom') dateRange = { startDate: filters.startDate, endDate: filters.endDate };
+      
       const params = new URLSearchParams({
         page: 1,
         limit: 1000,
@@ -167,6 +156,8 @@ const Sale = () => {
 
       if (data.success) {
         setAnalyticsData(data.analytics || {});
+        setRawContacts(data.data || []);
+        setLeadsOverTime(data.analytics.leadsOverTime || []);
         generateOwnerAnalytics(data.data || []);
       } else {
         setError(data.message || 'Error fetching analytics');
@@ -259,12 +250,10 @@ const Sale = () => {
         data.genericLeads++;
       }
 
-      // Track lead levels by owner
       const leadLevel = contact.lead_level || 'Unassigned';
       leadLevelByOwner[owner][leadLevel] = (leadLevelByOwner[owner][leadLevel] || 0) + 1;
     });
     
-    // Calculate averages and response rates
     const ownerStats = Object.values(ownerData).map(data => ({
       ...data,
       avgTouchpoints: data.totalContacts > 0 ? (data.totalTouchpoints / data.totalContacts).toFixed(1) : '0.0',
@@ -277,8 +266,59 @@ const Sale = () => {
     }));
     
     setOwnerAnalytics(ownerStats);
-  };
+   
+  }; 
 
+  const generateCustomChartData = () => {
+    const { groupBy, metric } = customChartConfig;
+
+    const keyMap = {
+      'leadLevel': 'lead_level',
+      'country': 'country',
+      'contactCategory': 'contact_category',
+      'owner': 'owner_name',
+      'territory': 'territory',
+      'isActive': 'is_active',
+    };
+    const groupByKey = keyMap[groupBy];
+
+    const groupedData = rawContacts.reduce((acc, contact) => {
+      const key = contact[groupByKey] || 'Unassigned';
+      if (!acc[key]) {
+        acc[key] = { items: [] };
+      }
+      acc[key].items.push(contact);
+      return acc;
+    }, {});
+
+    const chartData = Object.entries(groupedData).map(([key, group]) => {
+      const dataPoint = { name: key };
+      const itemCount = group.items.length;
+      
+      switch (metric) {
+        case 'totalContacts':
+          dataPoint.value = itemCount;
+          break;
+        case 'activeLeads':
+          dataPoint.value = group.items.filter(c => c.is_active === 'Yes').length;
+          break;
+        case 'avgEmails':
+          const totalEmails = group.items.reduce((sum, c) => sum + (c.outgoing_emails || 0), 0);
+          dataPoint.value = itemCount > 0 ? parseFloat((totalEmails / itemCount).toFixed(1)) : 0;
+          break;
+        case 'avgCalls':
+          const totalCalls = group.items.reduce((sum, c) => sum + (c.outgoing_calls || 0), 0);
+          dataPoint.value = itemCount > 0 ? parseFloat((totalCalls / itemCount).toFixed(1)) : 0;
+          break;
+        default:
+          dataPoint.value = 0;
+      }
+      return dataPoint;
+    }).sort((a, b) => b.value - a.value);
+
+    setCustomChartData(chartData);
+  };
+  
   const handleFilterChange = (filterName, value) => {
     setFilters(prev => {
       const newFilters = { ...prev };
@@ -314,7 +354,6 @@ const Sale = () => {
     }));
   };
 
-  // Get the display text for active date filter
   const getDateFilterDisplayText = () => {
     if (!filters.dateFilter) return '';
     
@@ -326,6 +365,7 @@ const Sale = () => {
     }
     return option ? option.label : '';
   };
+
 
   const clearFilters = () => {
     setFilters({ 
@@ -365,38 +405,16 @@ const Sale = () => {
     return [value, name];
   };
 
-  // Prepare chart data with better formatting
-  const categoryData = Object.entries(analyticsData.contactCategoryBreakdown || {}).map(([category, count]) => ({
-    name: category || 'Unknown', // Use 'name' instead of 'category' for proper labeling
-    category: category || 'Unknown',
-    count,
-    percentage: analyticsData.totalContacts > 0 ? ((count / analyticsData.totalContacts) * 100).toFixed(1) : 0
-  }));
-
-  const territoryData = Object.entries(analyticsData.territoryBreakdown || {})
-    .sort(([,a], [,b]) => b - a)
-    .map(([territory, count], index) => ({
-      territory: territory || 'Unassigned',
-      count,
-      fill: TERRITORY_COLORS[index % TERRITORY_COLORS.length] 
-    }));
-
-  const leadLevelData = Object.entries(analyticsData.leadLevelBreakdown || {}).map(([level, count]) => ({
-    level: level || 'Unassigned',
-    count
-  }));
-
-  // Prepare lead level data by owner
-  const leadLevelByOwnerData = ownerAnalytics.map(owner => {
-    const ownerData = { owner: owner.owner };
-    Object.entries(owner.leadLevels || {}).forEach(([level, count]) => {
-      ownerData[level] = count;
-    });
-    return ownerData;
-  });
-
+  const categoryData = Object.entries(analyticsData.contactCategoryBreakdown || {}).map(([name, count]) => ({ name: name || 'Unknown', count }));
+  const territoryData = Object.entries(analyticsData.territoryBreakdown || {}).sort(([,a], [,b]) => b - a).map(([territory, count], index) => ({ territory: territory || 'Unassigned', count, fill: TERRITORY_COLORS[index % TERRITORY_COLORS.length] }));
+  const leadLevelData = Object.entries(analyticsData.leadLevelBreakdown || {}).map(([level, count]) => ({ level: level || 'Unassigned', count }));
+  const leadLevelByOwnerData = ownerAnalytics.map(owner => { const ownerData = { owner: owner.owner }; Object.entries(owner.leadLevels || {}).forEach(([level, count]) => { ownerData[level] = count; }); return ownerData; });
   const allLeadLevels = [...new Set(ownerAnalytics.flatMap(owner => Object.keys(owner.leadLevels || {})))];
-  const renderCustomizedLabel = ({ cx, cy, midAngle, innerRadius, outerRadius, count, name }) => {
+  const dealsWonData = Object.entries(analyticsData.dealsWonBreakdown || {}).map(([owner, count]) => ({ owner: owner || 'Unassigned', count })).sort((a,b) => b.count - a.count);
+  const allOwnersInTimeSeries = leadsOverTime.length > 0 ? Object.keys(leadsOverTime[0]).filter(key => key !== 'date') : [];
+
+
+  const renderCustomizedLabel = ({ cx, cy, midAngle, innerRadius, outerRadius, count }) => {
     const RADIAN = Math.PI / 180;
     const radius = innerRadius + (outerRadius - innerRadius) * 0.5;
     const x = cx + radius * Math.cos(-midAngle * RADIAN);
@@ -437,9 +455,20 @@ const Sale = () => {
     );
   }
 
+  const customChartOptions = {
+    groupBy: [
+      { value: 'leadLevel', label: 'Lead Level' }, { value: 'country', label: 'Country' },
+      { value: 'contactCategory', label: 'Contact Category' }, { value: 'owner', label: 'Owner' },
+      { value: 'territory', label: 'Territory' }, { value: 'isActive', label: 'Active Status' },
+    ],
+    metric: [
+      { value: 'totalContacts', label: 'Total Contacts' }, { value: 'activeLeads', label: 'Active Leads' },
+      { value: 'avgEmails', label: 'Average Emails' }, { value: 'avgCalls', label: 'Average Calls' },
+    ],
+  };
+
   return (
     <div className="sales-dashboard">
-      {/* Header */}
       <div className="header-card">
         <div className="header-content">
           <div className="header-info">
@@ -459,7 +488,6 @@ const Sale = () => {
           </div>
         </div>
 
-        {/* Filters */}
         <div className="filters-section">
           <button 
             onClick={() => setShowFilters(!showFilters)}
@@ -472,33 +500,19 @@ const Sale = () => {
         {showFilters && (
           <div className="filters-container">
             <div className="filters-grid">
-              {/* Date Filter */}
               <div className="filter-group">
                 <label className="filter-label">DATE RANGE</label>
-                <select
-                  value={filters.dateFilter}
-                  onChange={(e) => handleFilterChange('dateFilter', e.target.value)}
-                  className="filter-select"
-                >
+                <select value={filters.dateFilter} onChange={(e) => handleFilterChange('dateFilter', e.target.value)} className="filter-select">
                   {dateFilterOptions.map(option => (
                     <option key={option.value} value={option.value}>{option.label}</option>
                   ))}
                 </select>
-                {filters.dateFilter && (
-                  <small className="filter-display-text">
-                    {getDateFilterDisplayText()}
-                  </small>
-                )}
+                {filters.dateFilter && (<small className="filter-display-text">{getDateFilterDisplayText()}</small>)}
               </div>
 
-              {/* Owner Filter */}
               <div className="filter-group">
                 <label className="filter-label">OWNER</label>
-                <select
-                  value=""
-                  onChange={(e) => e.target.value && handleFilterChange('owner', e.target.value)}
-                  className="filter-select"
-                >
+                <select value="" onChange={(e) => e.target.value && handleFilterChange('owner', e.target.value)} className="filter-select">
                   <option value="">Select Owner...</option>
                   {filterOptions.owners.map(owner => (
                     <option key={owner} value={owner} disabled={filters.owner.includes(owner)}>
@@ -509,23 +523,15 @@ const Sale = () => {
                 {filters.owner.length > 0 && (
                   <div className="selected-filters">
                     {filters.owner.map(owner => (
-                      <span key={owner} className="selected-filter-tag">
-                        {owner}
-                        <button onClick={() => handleFilterChange('owner', owner)}>×</button>
-                      </span>
+                      <span key={owner} className="selected-filter-tag">{owner}<button onClick={() => handleFilterChange('owner', owner)}>×</button></span>
                     ))}
                   </div>
                 )}
               </div>
 
-              {/* Territory Filter */}
               <div className="filter-group">
                 <label className="filter-label">TERRITORY</label>
-                <select
-                  value=""
-                  onChange={(e) => e.target.value && handleFilterChange('territory', e.target.value)}
-                  className="filter-select"
-                >
+                <select value="" onChange={(e) => e.target.value && handleFilterChange('territory', e.target.value)} className="filter-select">
                   <option value="">Select Territory...</option>
                   {filterOptions.territories.map(territory => (
                     <option key={territory} value={territory} disabled={filters.territory.includes(territory)}>
@@ -536,23 +542,15 @@ const Sale = () => {
                 {filters.territory.length > 0 && (
                   <div className="selected-filters">
                     {filters.territory.map(territory => (
-                      <span key={territory} className="selected-filter-tag">
-                        {territory}
-                        <button onClick={() => handleFilterChange('territory', territory)}>×</button>
-                      </span>
+                      <span key={territory} className="selected-filter-tag">{territory}<button onClick={() => handleFilterChange('territory', territory)}>×</button></span>
                     ))}
                   </div>
                 )}
               </div>
 
-              {/* Country Filter */}
               <div className="filter-group">
                 <label className="filter-label">COUNTRY</label>
-                <select
-                  value=""
-                  onChange={(e) => e.target.value && handleFilterChange('country', e.target.value)}
-                  className="filter-select"
-                >
+                <select value="" onChange={(e) => e.target.value && handleFilterChange('country', e.target.value)} className="filter-select">
                   <option value="">Select Country...</option>
                   {filterOptions.countries.map(country => (
                     <option key={country} value={country} disabled={filters.country.includes(country)}>
@@ -563,23 +561,15 @@ const Sale = () => {
                 {filters.country.length > 0 && (
                   <div className="selected-filters">
                     {filters.country.map(country => (
-                      <span key={country} className="selected-filter-tag">
-                        {country}
-                        <button onClick={() => handleFilterChange('country', country)}>×</button>
-                      </span>
+                      <span key={country} className="selected-filter-tag">{country}<button onClick={() => handleFilterChange('country', country)}>×</button></span>
                     ))}
                   </div>
                 )}
               </div>
 
-              {/* Lead Level Filter */}
               <div className="filter-group">
                 <label className="filter-label">LEAD LEVEL</label>
-                <select
-                  value=""
-                  onChange={(e) => e.target.value && handleFilterChange('leadLevel', e.target.value)}
-                  className="filter-select"
-                >
+                <select value="" onChange={(e) => e.target.value && handleFilterChange('leadLevel', e.target.value)} className="filter-select">
                   <option value="">Select Lead Level...</option>
                   {filterOptions.leadLevels.map(level => (
                     <option key={level} value={level} disabled={filters.leadLevel.includes(level)}>
@@ -590,23 +580,15 @@ const Sale = () => {
                 {filters.leadLevel.length > 0 && (
                   <div className="selected-filters">
                     {filters.leadLevel.map(level => (
-                      <span key={level} className="selected-filter-tag">
-                        {level}
-                        <button onClick={() => handleFilterChange('leadLevel', level)}>×</button>
-                      </span>
+                      <span key={level} className="selected-filter-tag">{level}<button onClick={() => handleFilterChange('leadLevel', level)}>×</button></span>
                     ))}
                   </div>
                 )}
               </div>
 
-              {/* Contact Category Filter */}
               <div className="filter-group">
                 <label className="filter-label">CONTACT CATEGORY</label>
-                <select
-                  value=""
-                  onChange={(e) => e.target.value && handleFilterChange('contactCategory', e.target.value)}
-                  className="filter-select"
-                >
+                <select value="" onChange={(e) => e.target.value && handleFilterChange('contactCategory', e.target.value)} className="filter-select">
                   <option value="">Select Category...</option>
                   {filterOptions.contactCategories.map(category => (
                     <option key={category} value={category} disabled={filters.contactCategory.includes(category)}>
@@ -617,23 +599,15 @@ const Sale = () => {
                 {filters.contactCategory.length > 0 && (
                   <div className="selected-filters">
                     {filters.contactCategory.map(category => (
-                      <span key={category} className="selected-filter-tag">
-                        {category}
-                        <button onClick={() => handleFilterChange('contactCategory', category)}>×</button>
-                      </span>
+                      <span key={category} className="selected-filter-tag">{category}<button onClick={() => handleFilterChange('contactCategory', category)}>×</button></span>
                     ))}
                   </div>
                 )}
               </div>
 
-              {/* Active Status Filter */}
               <div className="filter-group">
                 <label className="filter-label">ACTIVE STATUS</label>
-                <select
-                  value={filters.isActive}
-                  onChange={(e) => handleFilterChange('isActive', e.target.value)}
-                  className="filter-select"
-                >
+                <select value={filters.isActive} onChange={(e) => handleFilterChange('isActive', e.target.value)} className="filter-select">
                   <option value="">All Contacts</option>
                   <option value="yes">Active (Responded)</option>
                   <option value="no">Not Active (No Response)</option>
@@ -641,64 +615,37 @@ const Sale = () => {
               </div>
             </div>
 
-            {/* Custom Date Range Picker */}
             {showCustomDatePicker && (
               <div className="custom-date-picker">
                 <div className="date-picker-row">
                   <div className="date-picker-group">
                     <label className="filter-label">START DATE</label>
-                    <input
-                      type="date"
-                      value={filters.startDate ? filters.startDate.split('T')[0] : ''}
-                      onChange={(e) => {
-                        const date = e.target.value ? `${e.target.value}T00:00:00.000Z` : '';
-                        handleCustomDateChange('startDate', date);
-                      }}
-                      className="filter-select"
-                    />
+                    <input type="date" value={filters.startDate ? filters.startDate.split('T')[0] : ''} onChange={(e) => { const date = e.target.value ? `${e.target.value}T00:00:00.000Z` : ''; handleCustomDateChange('startDate', date); }} className="filter-select" />
                   </div>
                   <div className="date-picker-group">
                     <label className="filter-label">END DATE</label>
-                    <input
-                      type="date"
-                      value={filters.endDate ? filters.endDate.split('T')[0] : ''}
-                      onChange={(e) => {
-                        const date = e.target.value ? `${e.target.value}T23:59:59.999Z` : '';
-                        handleCustomDateChange('endDate', date);
-                      }}
-                      className="filter-select"
-                    />
+                    <input type="date" value={filters.endDate ? filters.endDate.split('T')[0] : ''} onChange={(e) => { const date = e.target.value ? `${e.target.value}T23:59:59.999Z` : ''; handleCustomDateChange('endDate', date); }} className="filter-select" />
                   </div>
                 </div>
               </div>
             )}
 
-            {/* Priority Countries Filter */}
             <div className="priority-countries">
               <label className="filter-label">FOCUS COUNTRIES:</label>
               <div className="country-buttons">
                 {priorityCountries.map(country => (
-                  <button
-                    key={country}
-                    onClick={() => handleAnalyticsCountryFilter(country)}
-                    className={`country-btn ${analyticsCountryFilter.includes(country) ? 'active' : ''}`}
-                  >
+                  <button key={country} onClick={() => handleAnalyticsCountryFilter(country)} className={`country-btn ${analyticsCountryFilter.includes(country) ? 'active' : ''}`}>
                     {country} ({analyticsData.priorityCountries?.[country] || 0})
                   </button>
                 ))}
               </div>
             </div>
 
-            {activeFiltersCount > 0 && (
-              <button onClick={clearFilters} className="clear-filters-btn">
-                Clear All Filters
-              </button>
-            )}
+            {activeFiltersCount > 0 && (<button onClick={clearFilters} className="clear-filters-btn">Clear All Filters</button>)}
           </div>
         )}
       </div>
 
-      {/* Key Metrics Cards */}
       <div className="metrics-grid">
         {[
           { icon: '👥', label: 'Total Contacts', value: analyticsData.totalContacts?.toLocaleString() || 0, color: '#3498db' },
@@ -712,354 +659,234 @@ const Sale = () => {
         ].map((metric, index) => (
           <div key={index} className="metric-card">
             <div className="metric-icon">{metric.icon}</div>
-            <div className="metric-value" style={{ color: metric.color }}>
-              {metric.value}
-            </div>
+            <div className="metric-value" style={{ color: metric.color }}>{metric.value}</div>
             <div className="metric-label">{metric.label}</div>
           </div>
         ))}
       </div>
-
-      {/* Charts Grid */}
+      
       <div className="charts-grid">
+        <div className="chart-container resizable">
+          <div className="chart-header"><h3>📊 Performance by Owner</h3></div>
+          <ResponsiveContainer width="100%" height={350}>
+            <BarChart data={ownerAnalytics} margin={{ top: 20, right: 30, left: 20, bottom: 60 }}>
+              <CartesianGrid strokeDasharray="3 3" stroke="#ecf0f1" />
+              <XAxis dataKey="owner" angle={-45} textAnchor="end" height={100} fontSize={10} stroke="#7f8c8d" />
+              <YAxis stroke="#7f8c8d" />
+              <Tooltip formatter={formatTooltip} contentStyle={{ backgroundColor: '#2c3e50', border: 'none', borderRadius: '8px', color: 'white' }} />
+              <Legend />
+              <Bar dataKey="totalContacts" fill="#3498db" name="Total Contacts" radius={[2, 2, 0, 0]} onClick={(data) => navigateToLeads({ owner: [data.owner] })} style={{ cursor: 'pointer' }} />
+              <Bar dataKey="activeLeads" fill="#27ae60" name="Active Leads" radius={[2, 2, 0, 0]} onClick={(data) => navigateToLeads({ owner: [data.owner], isActive: 'yes' })} style={{ cursor: 'pointer' }} />
+            </BarChart>
+          </ResponsiveContainer>
+        </div>
         
-        {/* Owner Analytics Bar Chart */}
         <div className="chart-container resizable">
-          <div className="chart-header">
-            <h3>📊 Performance by Owner</h3>
-          </div>
+          <div className="chart-header"><h3>📊 Avg Touchpoints by Owner (Calls + Emails)</h3></div>
           <ResponsiveContainer width="100%" height={350}>
-            <BarChart 
-              data={ownerAnalytics} 
-              margin={{ top: 20, right: 30, left: 20, bottom: 60 }}
-            >
+            <BarChart data={ownerAnalytics} margin={{ top: 20, right: 30, left: 20, bottom: 60 }}>
               <CartesianGrid strokeDasharray="3 3" stroke="#ecf0f1" />
-              <XAxis 
-                dataKey="owner" 
-                angle={-45} 
-                textAnchor="end" 
-                height={100}
-                fontSize={10}
-                stroke="#7f8c8d"
-              />
+              <XAxis dataKey="owner" angle={-45} textAnchor="end" height={100} fontSize={10} stroke="#7f8c8d" />
               <YAxis stroke="#7f8c8d" />
-              <Tooltip 
-                formatter={formatTooltip}
-                contentStyle={{ 
-                  backgroundColor: '#2c3e50', 
-                  border: 'none', 
-                  borderRadius: '8px', 
-                  color: 'white' 
-                }}
-              />
+              <Tooltip formatter={formatTooltip} contentStyle={{ backgroundColor: '#2c3e50', border: 'none', borderRadius: '8px', color: 'white' }} />
               <Legend />
-              <Bar 
-                dataKey="totalContacts" 
-                fill="#3498db" 
-                name="Total Contacts" 
-                radius={[2, 2, 0, 0]}
-                onClick={(data) => navigateToLeads({ owner: [data.owner] })}
-                style={{ cursor: 'pointer' }}
-              />
-              <Bar 
-                dataKey="activeLeads" 
-                fill="#27ae60" 
-                name="Active Leads" 
-                radius={[2, 2, 0, 0]}
-                onClick={(data) => navigateToLeads({ owner: [data.owner], isActive: 'yes' })}
-                style={{ cursor: 'pointer' }}
-              />
+              <Bar dataKey="avgCalls" stackId="touchpoints" fill="#9b59b6" name="Avg Calls" radius={[0, 0, 0, 0]} onClick={(data) => navigateToLeads({ owner: [data.owner] })} style={{ cursor: 'pointer' }} />
+              <Bar dataKey="avgEmails" stackId="touchpoints" fill="#e67e22" name="Avg Emails" radius={[2, 2, 0, 0]} onClick={(data) => navigateToLeads({ owner: [data.owner] })} style={{ cursor: 'pointer' }} />
             </BarChart>
           </ResponsiveContainer>
         </div>
-
-        {/* New Avg Touchpoint Stacked Bar Chart (Calls + Emails) */}
+        
         <div className="chart-container resizable">
-          <div className="chart-header">
-            <h3>📊 Avg Touchpoints by Owner (Calls + Emails)</h3>
-          </div>
-          <ResponsiveContainer width="100%" height={350}>
-            <BarChart 
-              data={ownerAnalytics} 
-              margin={{ top: 20, right: 30, left: 20, bottom: 60 }}
-            >
-              <CartesianGrid strokeDasharray="3 3" stroke="#ecf0f1" />
-              <XAxis 
-                dataKey="owner" 
-                angle={-45} 
-                textAnchor="end" 
-                height={100}
-                fontSize={10}
-                stroke="#7f8c8d"
-              />
-              <YAxis stroke="#7f8c8d" />
-              <Tooltip 
-                formatter={formatTooltip}
-                contentStyle={{ 
-                  backgroundColor: '#2c3e50', 
-                  border: 'none', 
-                  borderRadius: '8px', 
-                  color: 'white' 
-                }}
-              />
-              <Legend />
-              <Bar 
-                dataKey="avgCalls" 
-                stackId="touchpoints" 
-                fill="#9b59b6" 
-                name="Avg Calls" 
-                radius={[0, 0, 0, 0]}
-                onClick={(data) => navigateToLeads({ owner: [data.owner] })}
-                style={{ cursor: 'pointer' }}
-              />
-              <Bar 
-                dataKey="avgEmails" 
-                stackId="touchpoints" 
-                fill="#e67e22" 
-                name="Avg Emails" 
-                radius={[2, 2, 0, 0]}
-                onClick={(data) => navigateToLeads({ owner: [data.owner] })}
-                style={{ cursor: 'pointer' }}
-              />
-            </BarChart>
-          </ResponsiveContainer>
-        </div>
-
-        {/* Contact Categories Pie Chart */}
-        <div className="chart-container resizable">
-          <div className="chart-header">
-            <h3>🏢 Contact Categories</h3>
-          </div>
+          <div className="chart-header"><h3>🏢 Contact Categories</h3></div>
           <ResponsiveContainer width="100%" height={350}>
             <PieChart>
-              <Pie
-                data={categoryData}
-                cx="50%"
-                cy="50%"
-                labelLine={false}
-                label={renderCustomizedLabel}
-                outerRadius={100}
-                fill="#8884d8"
-                dataKey="count"
-                nameKey="name"
-              >
+              <Pie data={categoryData} cx="50%" cy="50%" labelLine={false} label={renderCustomizedLabel} outerRadius={100} fill="#8884d8" dataKey="count" nameKey="name">
                 {categoryData.map((entry, index) => (
-                  <Cell 
-                    key={`cell-${index}`} 
-                    fill={COLORS[index % COLORS.length]}
-                    onClick={() => navigateToLeads({ contactCategory: [entry.name] })}
-                    style={{ cursor: 'pointer' }}
-                  />
+                  <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} onClick={() => navigateToLeads({ contactCategory: [entry.name] })} style={{ cursor: 'pointer' }} />
                 ))}
               </Pie>
-              <Tooltip formatter={(value, name) => [value, 'Count']} />
+              <Tooltip formatter={(value) => [value, 'Count']} />
               <Legend />
             </PieChart>
           </ResponsiveContainer>
         </div>
-
-        {/* Response Rate by Owner */}
+        
         <div className="chart-container resizable">
-          <div className="chart-header">
-            <h3>📈 Response Rate by Owner</h3>
-          </div>
+          <div className="chart-header"><h3>📈 Response Rate by Owner</h3></div>
           <ResponsiveContainer width="100%" height={350}>
-            <BarChart 
-              data={ownerAnalytics} 
-              margin={{ top: 20, right: 30, left: 20, bottom: 60 }}
-            >
+            <BarChart data={ownerAnalytics} margin={{ top: 20, right: 30, left: 20, bottom: 60 }}>
               <CartesianGrid strokeDasharray="3 3" stroke="#ecf0f1" />
-              <XAxis 
-                dataKey="owner" 
-                angle={-45} 
-                textAnchor="end" 
-                height={100}
-                fontSize={10}
-                stroke="#7f8c8d"
-              />
+              <XAxis dataKey="owner" angle={-45} textAnchor="end" height={100} fontSize={10} stroke="#7f8c8d" />
               <YAxis domain={[0, 'dataMax + 10']} stroke="#7f8c8d" />
               <Tooltip formatter={(value) => [`${value}%`, 'Response Rate']} />
               <Legend />
-              <Bar 
-                dataKey="responseRate" 
-                fill="#e74c3c" 
-                name="Response Rate %" 
-                radius={[4, 4, 0, 0]}
-                onClick={(data) => navigateToLeads({ owner: [data.owner] })}
-                style={{ cursor: 'pointer' }}
-              />
+              <Bar dataKey="responseRate" fill="#e74c3c" name="Response Rate %" radius={[4, 4, 0, 0]} onClick={(data) => navigateToLeads({ owner: [data.owner] })} style={{ cursor: 'pointer' }} />
             </BarChart>
           </ResponsiveContainer>
         </div>
-
-        {/* Sample Timing by Owner */}
+        
         <div className="chart-container resizable">
-          <div className="chart-header">
-            <h3>⏰ Avg Sample Timing by Owner</h3>
-          </div>
+          <div className="chart-header"><h3>⏰ Avg Sample Timing by Owner</h3></div>
           <ResponsiveContainer width="100%" height={350}>
             <AreaChart data={ownerAnalytics} margin={{ top: 20, right: 30, left: 20, bottom: 60 }}>
               <CartesianGrid strokeDasharray="3 3" stroke="#ecf0f1" />
-              <XAxis 
-                dataKey="owner" 
-                angle={-45} 
-                textAnchor="end" 
-                height={100}
-                fontSize={10}
-                stroke="#7f8c8d"
-              />
+              <XAxis dataKey="owner" angle={-45} textAnchor="end" height={100} fontSize={10} stroke="#7f8c8d" />
               <YAxis stroke="#7f8c8d" />
               <Tooltip formatter={(value) => [`${value} hours`, 'Avg Sample Timing']} />
-              <Area 
-                type="monotone" 
-                dataKey="avgSampleHours" 
-                stroke="#f39c12" 
-                fill="#f39c12" 
-                fillOpacity={0.6}
-                strokeWidth={2}
-              />
+              <Area type="monotone" dataKey="avgSampleHours" stroke="#f39c12" fill="#f39c12" fillOpacity={0.6} strokeWidth={2} />
             </AreaChart>
           </ResponsiveContainer>
         </div>
-
-        {/* First Call Timing by Owner */}
+        
         <div className="chart-container resizable">
-          <div className="chart-header">
-            <h3>📞 Avg First Call Timing by Owner</h3>
-          </div>
+          <div className="chart-header"><h3>📞 Avg First Call Timing by Owner</h3></div>
           <ResponsiveContainer width="100%" height={350}>
             <LineChart data={ownerAnalytics} margin={{ top: 20, right: 30, left: 20, bottom: 60 }}>
               <CartesianGrid strokeDasharray="3 3" stroke="#ecf0f1" />
-              <XAxis 
-                dataKey="owner" 
-                angle={-45} 
-                textAnchor="end" 
-                height={100}
-                fontSize={10}
-                stroke="#7f8c8d"
-              />
+              <XAxis dataKey="owner" angle={-45} textAnchor="end" height={100} fontSize={10} stroke="#7f8c8d" />
               <YAxis stroke="#7f8c8d" />
               <Tooltip formatter={(value) => [`${value} minutes`, 'Avg First Call Timing']} />
               <Legend />
-              <Line 
-                type="monotone" 
-                dataKey="avgFirstCallMinutes" 
-                stroke="#9b59b6" 
-                strokeWidth={3}
-                dot={{ fill: '#9b59b6', strokeWidth: 2, r: 4 }}
-                activeDot={{ r: 6, fill: '#9b59b6' }}
-              />
+              <Line type="monotone" dataKey="avgFirstCallMinutes" stroke="#9b59b6" strokeWidth={3} dot={{ fill: '#9b59b6', strokeWidth: 2, r: 4 }} activeDot={{ r: 6, fill: '#9b59b6' }} />
             </LineChart>
           </ResponsiveContainer>
         </div>
-
-        {/* Lead Levels Distribution by Owner */}
+        
         <div className="chart-container resizable">
-          <div className="chart-header">
-            <h3>🌡️ Lead Levels Distribution by Owner</h3>
-          </div>
+          <div className="chart-header"><h3>🌡️ Lead Levels Distribution by Owner</h3></div>
           <ResponsiveContainer width="100%" height={350}>
-            <BarChart 
-              data={leadLevelByOwnerData} 
-              margin={{ top: 20, right: 30, left: 20, bottom: 60 }}
-            >
+            <BarChart data={leadLevelByOwnerData} margin={{ top: 20, right: 30, left: 20, bottom: 60 }}>
               <CartesianGrid strokeDasharray="3 3" stroke="#ecf0f1" />
-              <XAxis 
-                dataKey="owner" 
-                angle={-45} 
-                textAnchor="end" 
-                height={100}
-                fontSize={10}
-                stroke="#7f8c8d"
-              />
+              <XAxis dataKey="owner" angle={-45} textAnchor="end" height={100} fontSize={10} stroke="#7f8c8d" />
               <YAxis stroke="#7f8c8d" />
               <Tooltip />
               <Legend />
               {allLeadLevels.map((level, index) => (
-                <Bar 
-                  key={level}
-                  dataKey={level} 
-                  stackId="leadLevels"
-                  fill={COLORS[index % COLORS.length]} 
-                  name={level}
-                  onClick={(data) => navigateToLeads({ owner: [data.owner], leadLevel: [level] })}
-                  style={{ cursor: 'pointer' }}
-                />
+                <Bar key={level} dataKey={level} stackId="leadLevels" fill={COLORS[index % COLORS.length]} name={level} onClick={(data) => navigateToLeads({ owner: [data.owner], leadLevel: [level] })} style={{ cursor: 'pointer' }}/>
               ))}
             </BarChart>
           </ResponsiveContainer>
         </div>
-
-        {/* Territory Distribution - Different Colors */}
+        
         <div className="chart-container resizable">
-          <div className="chart-header">
-            <h3>🗺️ Territory Distribution</h3>
-          </div>
+          <div className="chart-header"><h3>🗺️ Territory Distribution</h3></div>
           <ResponsiveContainer width="100%" height={350}>
-            <BarChart 
-              data={territoryData} 
-              margin={{ top: 20, right: 30, left: 20, bottom: 60 }}
-            >
+            <BarChart data={territoryData} margin={{ top: 20, right: 30, left: 20, bottom: 60 }}>
               <CartesianGrid strokeDasharray="3 3" stroke="#ecf0f1" />
-              <XAxis 
-                dataKey="territory" 
-                angle={-45} 
-                textAnchor="end" 
-                height={100}
-                fontSize={10}
-                stroke="#7f8c8d"
-              />
+              <XAxis dataKey="territory" angle={-45} textAnchor="end" height={100} fontSize={10} stroke="#7f8c8d" />
               <YAxis stroke="#7f8c8d" />
               <Tooltip />
               <Bar dataKey="count" radius={[4, 4, 0, 0]}>
                 {territoryData.map((entry, index) => (
-                  <Cell 
-                    key={`cell-${index}`} 
-                    fill={entry.fill}
-                    onClick={() => navigateToLeads({ territory: [entry.territory] })}
-                    style={{ cursor: 'pointer' }}
-                  />
+                  <Cell key={`cell-${index}`} fill={entry.fill} onClick={() => navigateToLeads({ territory: [entry.territory] })} style={{ cursor: 'pointer' }} />
                 ))}
               </Bar>
             </BarChart>
           </ResponsiveContainer>
         </div>
+
+        <div className="chart-container resizable">
+          <div className="chart-header"><h3>🏆 Deals Won by Owner</h3></div>
+          {dealsWonData.length > 0 ? (
+            <ResponsiveContainer width="100%" height={350}>
+              <BarChart data={dealsWonData} margin={{ top: 20, right: 30, left: 20, bottom: 60 }} layout="vertical">
+                <CartesianGrid strokeDasharray="3 3" stroke="#ecf0f1" />
+                <XAxis type="number" stroke="#7f8c8d" />
+                <YAxis type="category" dataKey="owner" width={120} fontSize={10} stroke="#7f8c8d" />
+                <Tooltip formatter={(value) => [value, 'Deals Won']} />
+                <Legend />
+                <Bar dataKey="count" fill="#27ae60" name="Deals Won" radius={[0, 4, 4, 0]} onClick={(data) => navigateToLeads({ owner: [data.owner], status: ['Won'] })} style={{ cursor: 'pointer' }} />
+              </BarChart>
+            </ResponsiveContainer>
+          ) : (
+            <div className="no-data-message" style={{ height: 350 }}>
+              <p>No "Won" deals found for the current filters.</p>
+              <small>This chart requires `dealsWonBreakdown` data from the API. The backend should aggregate contacts where `status_name` is "Won".</small>
+            </div>
+          )}
+        </div>
+
+        <div className="chart-container resizable">
+          <div className="chart-header">
+            <h3>📈 New Leads Over Time by Owner</h3>
+            <small>Updates with date filter</small>
+          </div>
+          <ResponsiveContainer width="100%" height={350}>
+            <LineChart data={leadsOverTime} margin={{ top: 20, right: 30, left: 20, bottom: 60 }}>
+              <CartesianGrid strokeDasharray="3 3" stroke="#ecf0f1" />
+              <XAxis dataKey="date" stroke="#7f8c8d" />
+              <YAxis stroke="#7f8c8d" />
+              <Tooltip />
+              <Legend />
+              {allOwnersInTimeSeries.map((owner, index) => (
+                <Line key={owner} type="monotone" dataKey={owner} stroke={COLORS[index % COLORS.length]} strokeWidth={2} dot={{ r: 3 }} activeDot={{ r: 5 }} />
+              ))}
+            </LineChart>
+          </ResponsiveContainer>
+        </div>
       </div>
 
-      {/* Owner Details Table */}
       <div className="table-container">
         <h3>👥 Detailed Owner Analytics</h3>
         <div className="table-wrapper">
           <table className="analytics-table">
             <thead>
               <tr>
-                <th>Owner</th>
-                <th>Total</th>
-                <th>Active</th>
-                <th>Corporate</th>
-                <th>Generic</th>
-                <th>Avg Touchpoints</th>
-                <th>Response Rate</th>
-                <th>Avg Sample Time</th>
-                <th>Avg Call Time</th>
+                <th>Owner</th><th>Total</th><th>Active</th><th>Corporate</th><th>Generic</th>
+                <th>Avg Touchpoints</th><th>Response Rate</th><th>Avg Sample Time</th><th>Avg Call Time</th>
               </tr>
             </thead>
             <tbody>
               {ownerAnalytics.map((owner, index) => (
                 <tr key={index}>
                   <td className="owner-name">{owner.owner}</td>
-                  <td>{owner.totalContacts}</td>
-                  <td className="active-count">{owner.activeLeads}</td>
-                  <td className="corporate-count">{owner.corporateLeads}</td>
-                  <td className="generic-count">{owner.genericLeads}</td>
-                  <td>{owner.avgTouchpoints}</td>
-                  <td className="response-rate">{owner.responseRate}%</td>
-                  <td className="sample-time">{owner.avgSampleHours}h</td>
-                  <td className="call-time">{owner.avgFirstCallMinutes}m</td>
+                  <td>{owner.totalContacts}</td><td className="active-count">{owner.activeLeads}</td>
+                  <td className="corporate-count">{owner.corporateLeads}</td><td className="generic-count">{owner.genericLeads}</td>
+                  <td>{owner.avgTouchpoints}</td><td className="response-rate">{owner.responseRate}%</td>
+                  <td className="sample-time">{owner.avgSampleHours}h</td><td className="call-time">{owner.avgFirstCallMinutes}m</td>
                 </tr>
               ))}
             </tbody>
           </table>
+        </div>
+      </div>
+      
+      <div className="custom-chart-container">
+        <div className="custom-chart-header">
+          <h2>🔬 Custom Analytics Explorer</h2>
+          <p>Build your own chart by selecting a metric and a grouping.</p>
+        </div>
+        <div className="custom-chart-controls">
+          <div className="control-group">
+            <label htmlFor="groupBy-select">Group By (X-Axis)</label>
+            <select id="groupBy-select" value={customChartConfig.groupBy} onChange={(e) => setCustomChartConfig(prev => ({ ...prev, groupBy: e.target.value }))}>
+              {customChartOptions.groupBy.map(opt => (<option key={opt.value} value={opt.value}>{opt.label}</option>))}
+            </select>
+          </div>
+          <div className="control-group">
+            <label htmlFor="metric-select">Show Metric (Y-Axis)</label>
+            <select id="metric-select" value={customChartConfig.metric} onChange={(e) => setCustomChartConfig(prev => ({ ...prev, metric: e.target.value }))}>
+              {customChartOptions.metric.map(opt => (<option key={opt.value} value={opt.value}>{opt.label}</option>))}
+            </select>
+          </div>
+        </div>
+        <div className="custom-chart-wrapper">
+          {customChartData.length > 0 ? (
+            <ResponsiveContainer width="100%" height={400}>
+              <BarChart data={customChartData} margin={{ top: 20, right: 30, left: 20, bottom: 80 }}>
+                <CartesianGrid strokeDasharray="3 3" />
+                <XAxis dataKey="name" angle={-45} textAnchor="end" interval={0} height={100} />
+                <YAxis />
+                <Tooltip formatter={(value, name) => [typeof value === 'number' ? value.toLocaleString() : value, customChartOptions.metric.find(m => m.value === customChartConfig.metric)?.label ]} />
+                <Bar dataKey="value" name={customChartOptions.metric.find(m => m.value === customChartConfig.metric)?.label} fill="#3498db" radius={[4, 4, 0, 0]} />
+              </BarChart>
+            </ResponsiveContainer>
+          ) : (
+             <div className="no-data-message" style={{ height: 400 }}>
+              <p>No data available for the selected combination.</p>
+              <small>Try adjusting the main dashboard filters or your selections above.</small>
+            </div>
+          )}
         </div>
       </div>
     </div>

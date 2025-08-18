@@ -23,11 +23,35 @@ services:
       SITE_DOMAIN: ${SITE_DOMAIN}
       USER_EMAIL: ${USER_EMAIL}
       FOLDER_PATH: ${FOLDER_PATH}
+      FRESHWORKS_API_KEY: ${FRESHWORKS_API_KEY}
+      FRESHWORKS_API_KEY_2: ${FRESHWORKS_API_KEY_2}
+      FRESHWORKS_API_KEY_3: ${FRESHWORKS_API_KEY_3}
+      FRESHWORKS_BASE_URL: ${FRESHWORKS_BASE_URL}
+      OPENAI_API_KEY: ${OPENAI_API_KEY}
     volumes:
       - ./backend:/app
       - ./backend/.env:/app/.env
     working_dir: /app
     command: ["node", "server.js"]
+
+  contact-sync:
+    build:
+      context: ./backend
+    environment:
+      NODE_ENV: production
+      MONGO_URI: ${MONGO_URI}
+      FRESHWORKS_API_KEY: ${FRESHWORKS_API_KEY}
+      FRESHWORKS_API_KEY_2: ${FRESHWORKS_API_KEY_2}
+      FRESHWORKS_API_KEY_3: ${FRESHWORKS_API_KEY_3}
+      FRESHWORKS_BASE_URL: ${FRESHWORKS_BASE_URL}
+      OPENAI_API_KEY: ${OPENAI_API_KEY}
+    volumes:
+      - ./backend:/app
+      - ./backend/.env:/app/.env
+    working_dir: /app
+    command: ["node", "syncContacts.js"]
+    depends_on:
+      - backend
 
   frontend:
     build:
