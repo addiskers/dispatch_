@@ -1,32 +1,112 @@
-// syncContacts.js - Freshworks CRM to MongoDB Contact Sync Service
 require('dotenv').config();
 const axios = require('axios');
 const { MongoClient } = require('mongodb');
 const cron = require('node-cron');
 const { calculateCRMAnalytics } = require('./crmAnalytics');
 
-// Configuration from environment variables
 const {
-  MONGO_URI = 'mongodb://localhost:27017/sale',
+  MONGO_URI ,
   FRESHWORKS_API_KEY,
+  FRESHWORKS_API_KEY_2,
+  FRESHWORKS_API_KEY_3,
   FRESHWORKS_BASE_URL
 } = process.env;
 
-// Validate required environment variables
 if (!FRESHWORKS_API_KEY || !FRESHWORKS_BASE_URL) {
   console.error('Missing required environment variables: FRESHWORKS_API_KEY, FRESHWORKS_BASE_URL');
   process.exit(1);
 }
 
-// Email domains to exclude from sync
+const API_KEYS = [
+  FRESHWORKS_API_KEY,
+  FRESHWORKS_API_KEY_2,
+  FRESHWORKS_API_KEY_3
+].filter(key => key && key.trim() !== ''); 
+
+let currentKeyIndex = 0;
+let apiCallCount = 0;
+const MAX_CALLS_PER_KEY = 1900; 
+const RATE_LIMIT_RESET_TIME = 60 * 60 * 1000; // 1 hour in milliseconds
+
+console.log(`Initialized with ${API_KEYS.length} API keys for rate limiting`);
 const IGNORED_EMAIL_DOMAINS = ['skyquestt.com', 'gii.co.jp','freshchat.com'];
 
-// API headers for Freshworks requests
-const headers = {
-  "Authorization": `Token token=${FRESHWORKS_API_KEY}`,
-  "Content-Type": "application/json",
-  "Accept": "*/*"
-};
+/**
+ * Get current API headers with automatic key rotation
+ */
+function getAPIHeaders() {
+  const currentKey = API_KEYS[currentKeyIndex];
+  return {
+    "Authorization": `Token token=${currentKey}`,
+    "Content-Type": "application/json",
+    "Accept": "*/*"
+  };
+}
+
+/**
+ * Rotate to next API key when rate limit is approached
+ */
+function rotateAPIKey() {
+  const oldIndex = currentKeyIndex;
+  currentKeyIndex = (currentKeyIndex + 1) % API_KEYS.length;
+  apiCallCount = 0;
+  
+  if (currentKeyIndex === 0 && oldIndex > 0) {
+    console.log('Cycled through all API keys. Waiting 60 seconds before continuing...');
+    return new Promise(resolve => setTimeout(resolve, 60000));
+  }
+  
+  return Promise.resolve();
+}
+
+/**
+ * Make API request with automatic rate limiting and key rotation
+ */
+async function makeAPIRequest(url, options = {}) {
+  if (apiCallCount >= MAX_CALLS_PER_KEY) {
+    await rotateAPIKey();
+  }
+  
+  const headers = getAPIHeaders();
+  const requestOptions = {
+    ...options,
+    headers: { ...headers, ...options.headers },
+    validateStatus: status => status < 500,
+    timeout: 15000
+  };
+  
+  try {
+    apiCallCount++;
+    const response = await axios.get(url, requestOptions);
+    
+    // Check for rate limit response
+    if (response.status === 429 || 
+        (response.data && typeof response.data === 'string' && response.data.includes('Rate limit'))) {
+      console.log(`⚠️Rate limit hit on API key ${currentKeyIndex + 1}. Rotating...`);
+      await rotateAPIKey();
+      
+      // Retry with new key
+      const newHeaders = getAPIHeaders();
+      apiCallCount++;
+      return await axios.get(url, { ...requestOptions, headers: newHeaders });
+    }
+    
+    return response;
+  } catch (error) {
+    // If we get a rate limit error, try rotating and retrying
+    if (error.response && error.response.status === 429) {
+      console.log(` Rate limit error on API key ${currentKeyIndex + 1}. Rotating...`);
+      await rotateAPIKey();
+      
+      // Retry once with new key
+      const newHeaders = getAPIHeaders();
+      apiCallCount++;
+      return await axios.get(url, { ...requestOptions, headers: newHeaders });
+    }
+    
+    throw error;
+  }
+}
 
 /**
  * Check if contact has a valid market name (cf_report_name)
@@ -69,7 +149,6 @@ function shouldIgnoreContact(contact) {
     });
   }
   
-  // Check if any email contains ignored domains
   return emailsToCheck.some(email => 
     IGNORED_EMAIL_DOMAINS.some(domain => 
       email.toLowerCase().includes(domain.toLowerCase())
@@ -81,7 +160,6 @@ function shouldIgnoreContact(contact) {
  * Main contact validation - combines all ignore conditions
  */
 function shouldSkipContact(contact) {
-  // Check email domains
   if (shouldIgnoreContact(contact)) {
     return { skip: true, reason: 'ignored_email_domain' };
   }
@@ -181,16 +259,12 @@ function findTerritoryName(territoryId, territories) {
 async function fetchContactConversations(contactId, contactName = null) {
   try {
     const nameInfo = contactName ? ` (${contactName})` : '';
-    console.log(`     Fetching conversations for contact ${contactId}${nameInfo}...`);
+    console.log(`     Fetching conversations for contact ${contactId}${nameInfo}... [API Key ${currentKeyIndex + 1}]`);
     
     const apiUrl = `${FRESHWORKS_BASE_URL}/contacts/${contactId}/conversations/all` +
                    `?include=email_conversation_recipients,targetable,phone_number,phone_caller,note,user&per_page=100`;
     
-    const response = await axios.get(apiUrl, { 
-      headers,
-      validateStatus: status => status < 500,
-      timeout: 15000
-    });
+    const response = await makeAPIRequest(apiUrl);
     
     // Check for authentication issues (HTML response instead of JSON)
     const contentType = response.headers['content-type'] || '';
@@ -220,7 +294,7 @@ async function fetchContactConversations(contactId, contactName = null) {
 async function fetchCompleteEmailThread(emailId, contactName = null) {
   try {
     const nameInfo = contactName ? ` (${contactName})` : '';
-    console.log(`     Fetching complete email thread for ${emailId}${nameInfo}...`);
+    console.log(`     Fetching complete email thread for ${emailId}${nameInfo}... [API Key ${currentKeyIndex + 1}]`);
     
     let allEmailConversations = [];
     let allEmailRecipients = [];
@@ -233,13 +307,8 @@ async function fetchCompleteEmailThread(emailId, contactName = null) {
       const apiUrl = `${FRESHWORKS_BASE_URL}/emails/${emailId}` +
                      `?include=email_conversation_recipients,attachments,targetable&page=${page}`;
       
-      const response = await axios.get(apiUrl, { 
-        headers,
-        validateStatus: status => status < 500,
-        timeout: 15000
-      });
+      const response = await makeAPIRequest(apiUrl);
       
-      // Check for authentication issues
       const contentType = response.headers['content-type'] || '';
       if (contentType.includes('text/html') || 
           (typeof response.data === 'string' && response.data.includes('<!DOCTYPE html>'))) {
@@ -255,7 +324,6 @@ async function fetchCompleteEmailThread(emailId, contactName = null) {
       const emailConversations = response.data.email_conversations || [];
       allEmailConversations.push(...emailConversations);
       
-      // Merge other data
       if (response.data.email_conversation_recipients) {
         allEmailRecipients.push(...response.data.email_conversation_recipients);
       }
@@ -266,10 +334,9 @@ async function fetchCompleteEmailThread(emailId, contactName = null) {
         allContacts.push(...response.data.contacts);
       }
       
-      console.log(`       Page ${page}: Found ${emailConversations.length} email conversations`);
+      console.log(`  Page ${page}: Found ${emailConversations.length} email conversations`);
       page++;
       
-      // Rate limiting
       await new Promise(resolve => setTimeout(resolve, 100));
     }
 
@@ -304,7 +371,6 @@ function processEmailThread(emailThreadData, emailId) {
     contacts 
   } = emailThreadData;
 
-  // Sort messages by conversation time to maintain chronological order
   const sortedMessages = email_conversations.sort((a, b) => 
     new Date(a.conversation_time) - new Date(b.conversation_time)
   );
@@ -312,14 +378,12 @@ function processEmailThread(emailThreadData, emailId) {
   const messages = [];
 
   sortedMessages.forEach((emailConv, index) => {
-    // Process email recipients for this message
     const emailRecipientIds = emailConv.email_conversation_recipient_ids || [];
     const relevantRecipients = email_conversation_recipients.filter(er => 
       emailRecipientIds.includes(er.id)
     );
 
     const participants = relevantRecipients.map(recipient => {
-      // Find user or contact details
       let participantDetails = {};
       if (recipient.is_user) {
         const user = users.find(u => u.email === recipient.email_address);
@@ -339,7 +403,7 @@ function processEmailThread(emailThreadData, emailId) {
 
       return {
         recipient_id: recipient.id,
-        field: recipient.field, // from, to, cc, bcc, reply_to
+        field: recipient.field, 
         email: recipient.email_address,
         name: recipient.email_name,
         is_user: recipient.is_user,
@@ -352,10 +416,8 @@ function processEmailThread(emailThreadData, emailId) {
       };
     });
 
-    // Find sender (from field)
     const sender = participants.find(p => p.field === 'from') || {};
 
-    // Process attachments for this message
     const attachments = (emailConv.attachments || []).map(att => ({
       id: att.id,
       name: att.content_file_name,
@@ -372,12 +434,11 @@ function processEmailThread(emailThreadData, emailId) {
       subject: emailConv.subject,
       content: emailConv.display_content,
       html_content: emailConv.html_content,
-      direction: emailConv.direction, // incoming/outgoing
+      direction: emailConv.direction,
       is_read: emailConv.is_read,
       needs_response: emailConv.needs_response,
       status: emailConv.status,
       
-      // Sender details
       sender: {
         name: sender.name || 'Unknown',
         email: sender.email || '',
@@ -386,13 +447,9 @@ function processEmailThread(emailThreadData, emailId) {
         type: sender.type || 'unknown'
       },
       
-      // All participants (from, to, cc, bcc, reply_to)
       participants: participants,
-      
-      // Attachments for this message
       attachments: attachments,
       
-      // Engagement metrics
       engagement: {
         opened: participants.some(p => p.opened),
         clicked: participants.some(p => p.clicked),
@@ -401,26 +458,22 @@ function processEmailThread(emailThreadData, emailId) {
         clicked_time: participants.find(p => p.clicked_time)?.clicked_time || null
       },
       
-      // Linked deals for this message
       linked_deals: emailConv.linked_deals || []
     };
 
     messages.push(message);
   });
 
-  // Create the complete thread object
   const emailThread = {
     id: `email-thread-${emailId}`,
     type: 'email_thread',
     email_id: emailId,
     thread_count: messages.length,
     
-    // Thread metadata
     subject: messages[0]?.subject || 'No Subject',
     first_message_date: messages[0]?.timestamp || null,
     last_message_date: messages[messages.length - 1]?.timestamp || null,
     
-    // Thread statistics
     stats: {
       total_messages: messages.length,
       incoming_messages: messages.filter(m => m.direction === 'incoming').length,
@@ -432,7 +485,6 @@ function processEmailThread(emailThreadData, emailId) {
       needs_response: messages.some(m => m.needs_response)
     },
     
-    // All messages in chronological order (0, 1, 2, ...)
     messages: messages
   };
 
@@ -650,6 +702,7 @@ async function syncContacts() {
     const isFirstRun = !state;
     
     console.log(isFirstRun ? 'First run - getting ALL contacts' : `Continuing sync from: ${lastSync}`);
+    console.log(`🔑 Starting sync with API Key ${currentKeyIndex + 1}/${API_KEYS.length}`);
 
     // Initialize counters
     let page = 1;
@@ -665,13 +718,13 @@ async function syncContacts() {
 
     // Process contacts page by page
     while (keepGoing) {
-      console.log(`Processing page ${page}...`);
+      console.log(`Processing page ${page}... [API Key ${currentKeyIndex + 1}, Calls: ${apiCallCount}/${MAX_CALLS_PER_KEY}]`);
       
       const url = `${FRESHWORKS_BASE_URL}/api/contacts/view/402001974783` +
                   `?per_page=100&page=${page}` +
                   `&sort=updated_at&sort_type=desc&include=owner,contact_status,territory`;
 
-      const response = await axios.get(url, { headers });
+      const response = await makeAPIRequest(url);
       const contacts = response.data.contacts || [];
       const users = response.data.users || [];
       const contactStatuses = response.data.contact_status || [];
@@ -811,7 +864,6 @@ async function syncContacts() {
             console.log(`   No conversations found for ${contact.display_name} [Market: ${contact.custom_field.cf_report_name}]`);
           }
         } else if (existingContact && existingContact.conversations) {
-          // Keep existing conversations
           contact.conversations = existingContact.conversations;
           contact.conversation_stats = existingContact.conversation_stats || {};
           console.log(`   Keeping ${existingContact.conversations.length} existing conversations for ${contact.display_name} [Market: ${contact.custom_field.cf_report_name}]`);
@@ -838,7 +890,6 @@ async function syncContacts() {
           contact.crm_analytics = getEmptyAnalytics(contact);
         }
         
-        // Prepare update data
         let updateData = { ...contact };
         
         // Add field update history for existing contacts with changes
@@ -900,7 +951,9 @@ async function syncContacts() {
           updatedRecords,
           conversationsProcessed,
           ignoredByEmailDomain,
-          ignoredByMarketName
+          ignoredByMarketName,
+          apiKeyUsed: currentKeyIndex + 1,
+          totalApiCalls: apiCallCount
         } 
       },
       { upsert: true }
@@ -916,6 +969,7 @@ async function syncContacts() {
     console.log(`Ignored by email domain: ${ignoredByEmailDomain}`);
     console.log(`Ignored by missing/invalid market name: ${ignoredByMarketName}`);
     console.log(`Total ignored contacts: ${ignoredByEmailDomain + ignoredByMarketName}`);
+    console.log(`🔑 Ended sync using API Key ${currentKeyIndex + 1}/${API_KEYS.length} (${apiCallCount} calls made)`);
     console.log(`Next sync will start from: ${newestContactSeen}`);
 
   } catch (error) {
@@ -958,6 +1012,9 @@ async function getSyncStatus() {
     ]).toArray();
 
     console.log('Current Sync Status:');
+    console.log(`🔑 Available API Keys: ${API_KEYS.length}`);
+    console.log(`🔑 Current API Key: ${currentKeyIndex + 1}/${API_KEYS.length} (${apiCallCount}/${MAX_CALLS_PER_KEY} calls used)`);
+    
     if (state) {
       console.log(`   Last sync: ${state.lastSyncAt}`);
       console.log(`   Last completed: ${state.lastSyncCompleted}`);
@@ -965,6 +1022,8 @@ async function getSyncStatus() {
       console.log(`   Conversations processed: ${state.conversationsProcessed || 0}`);
       console.log(`   Ignored by email domain: ${state.ignoredByEmailDomain || 0}`);
       console.log(`   Ignored by market name: ${state.ignoredByMarketName || 0}`);
+      console.log(`   API Key used in last sync: ${state.apiKeyUsed || 1}`);
+      console.log(`   Total API calls in last sync: ${state.totalApiCalls || 0}`);
     } else {
       console.log('   No sync history found - first run will get all contacts');
     }
@@ -1005,8 +1064,8 @@ async function initialize() {
   console.log('Running initial sync...');
   await syncContacts();
   
-  // Schedule hourly sync
-  cron.schedule('0 * * * *', () => {
+  // Schedule  sync
+  cron.schedule('0 2 * * *', () => {
     console.log('Running scheduled contacts sync...');
     syncContacts().catch(error => {
       console.error('Scheduled sync failed:', error);
@@ -1017,7 +1076,6 @@ async function initialize() {
   console.log('Press Ctrl+C to stop.');
 }
 
-// Graceful shutdown handlers
 process.on('SIGINT', () => {
   console.log('\nShutting down gracefully...');
   process.exit(0);
