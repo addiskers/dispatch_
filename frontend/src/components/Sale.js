@@ -67,7 +67,8 @@ const Sale = () => {
   const [refreshing, setRefreshing] = useState(false);
   const [showCustomDatePicker, setShowCustomDatePicker] = useState(false);
 
-  const API_BASE_URL = process.env.REACT_APP_API_URL || 'http://localhost:5000/api';
+  const API_BASE_URL = `${process.env.REACT_APP_API_BASE_URL || 'https://www.theskyquestt.org'}/api`;
+
 
   const priorityCountries = [
     'United States', 'United Kingdom', 'France', 'Italy', 

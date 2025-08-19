@@ -121,7 +121,7 @@ const FreshworksLeads = ({ initialFilters = {} }) => {
   const [conversationsLoading, setConversationsLoading] = useState(false);
   const [conversationsError, setConversationsError] = useState(null);
   const [expandedEmails, setExpandedEmails] = useState(new Set());
-  const [conversationFilter, setConversationFilter] = useState('all'); // 'all', 'email', 'phone', 'note'
+  const [conversationFilter, setConversationFilter] = useState('all'); 
 
   // Date filter options
   const dateFilterOptions = [
@@ -364,7 +364,6 @@ const FreshworksLeads = ({ initialFilters = {} }) => {
     fetchFilterOptions();
   }, []);
 
-  // Load saved column configuration
   useEffect(() => {
     const savedConfig = localStorage.getItem('freshworks-column-config');
     const savedOrder = localStorage.getItem('freshworks-column-order');

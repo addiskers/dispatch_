@@ -266,7 +266,6 @@ async function fetchContactConversations(contactId, contactName = null) {
     
     const response = await makeAPIRequest(apiUrl);
     
-    // Check for authentication issues (HTML response instead of JSON)
     const contentType = response.headers['content-type'] || '';
     if (contentType.includes('text/html') || 
         (typeof response.data === 'string' && response.data.includes('<!DOCTYPE html>'))) {
@@ -518,7 +517,6 @@ async function processConversationDataEnhanced(conversationsResponse, contactNam
     const actualId = parseInt(actualIdStr);
     
     if (conversationType === 'email') {
-      // Find the corresponding email conversation to get email_id
       const emailConv = email_conversations.find(ec => ec.id === conversation.targetable?.id);
       if (emailConv && emailConv.email_id) {
         if (!emailThreads.has(emailConv.email_id)) {
@@ -530,7 +528,6 @@ async function processConversationDataEnhanced(conversationsResponse, contactNam
         }
       }
     } else if (conversationType === 'phone') {
-      // Process phone conversation
       const processedConv = {
         id: conversation.id,
         type: 'phone',
@@ -552,7 +549,6 @@ async function processConversationDataEnhanced(conversationsResponse, contactNam
       
       const phoneCall = phone_calls.find(pc => pc.id === actualId);
       if (phoneCall) {
-        // Basic call information
         processedConv.created_at = phoneCall.conversation_time;
         processedConv.updated_at = phoneCall.conversation_time;
         processedConv.call_duration = phoneCall.call_duration;
@@ -561,7 +557,6 @@ async function processConversationDataEnhanced(conversationsResponse, contactNam
         processedConv.call_status = phoneCall.status;
         processedConv.content = `${processedConv.call_direction} call - Duration: ${phoneCall.call_duration}s`;
         
-        // Get phone number from phone_caller (the contact's number)
         if (phoneCall.phone_caller_id) {
           const phoneCaller = phone_callers.find(pc => pc.id === phoneCall.phone_caller_id);
           if (phoneCaller) {
@@ -576,7 +571,6 @@ async function processConversationDataEnhanced(conversationsResponse, contactNam
           }
         }
         
-        // Get user details (who made/received the call)
         if (phoneCall.user_id) {
           const user = users.find(u => u.id === phoneCall.user_id);
           if (user) {
@@ -620,7 +614,6 @@ async function processConversationDataEnhanced(conversationsResponse, contactNam
       processedConversations.push(processedConv);
       
     } else if (conversationType === 'note') {
-      // Process note conversation
       const processedConv = {
         id: conversation.id,
         type: 'note',
@@ -655,7 +648,6 @@ async function processConversationDataEnhanced(conversationsResponse, contactNam
     }
   }
 
-  // Fetch complete email threads - each thread contains ALL messages
   for (const [emailId, threadInfo] of emailThreads) {
     console.log(`       Fetching complete thread for email ${emailId} (${threadInfo.count} messages)`);
     
@@ -668,7 +660,6 @@ async function processConversationDataEnhanced(conversationsResponse, contactNam
       }
     }
     
-    // Rate limiting between email thread requests
     await new Promise(resolve => setTimeout(resolve, 200));
   }
 
@@ -683,13 +674,10 @@ async function storeConversationsAndGetSummaries(contactId, conversations, db) {
   const conversationsCol = db.collection('conversations');
   const summaries = [];
   
-  // Delete existing conversations for this contact
   await conversationsCol.deleteMany({ contact_id: contactId });
   
-  // Store each conversation and create summary
   for (const conversation of conversations) {
     try {
-      // Prepare conversation document
       const conversationDoc = {
         contact_id: contactId,
         conversation_id: conversation.id,
@@ -707,7 +695,6 @@ async function storeConversationsAndGetSummaries(contactId, conversations, db) {
         }
       };
       
-      // Add type-specific fields
       if (conversation.type === 'email_thread') {
         conversationDoc.email_id = conversation.email_id;
         conversationDoc.thread_count = conversation.thread_count;
@@ -725,11 +712,8 @@ async function storeConversationsAndGetSummaries(contactId, conversations, db) {
         conversationDoc.outcome = conversation.outcome;
         conversationDoc.user_details = conversation.user_details;
       }
-      
-      // Store in conversations collection
       await conversationsCol.insertOne(conversationDoc);
       
-      // Create summary for contact document
       const summary = {
         conversation_id: conversation.id,
         type: conversation.type,
@@ -743,7 +727,6 @@ async function storeConversationsAndGetSummaries(contactId, conversations, db) {
         needs_response: false
       };
       
-      // Type-specific summary data
       if (conversation.type === 'email_thread') {
         summary.message_count = conversation.messages ? conversation.messages.length : 0;
         summary.has_attachments = conversation.stats ? conversation.stats.total_attachments > 0 : false;
@@ -760,7 +743,6 @@ async function storeConversationsAndGetSummaries(contactId, conversations, db) {
       
     } catch (error) {
       console.error(`Error storing conversation ${conversation.id} for contact ${contactId}:`, error.message);
-      // Continue with other conversations even if one fails
     }
   }
   
@@ -780,7 +762,6 @@ async function syncContacts() {
     const conversationsCol = db.collection('conversations');
     const stateCol = db.collection('sync_state');
 
-    // Get last sync state
     const state = await stateCol.findOne({ _id: 'contacts_sync' });
     let lastSync = state ? state.lastSyncAt : "2020-01-01T00:00:00+05:30";
     const isFirstRun = !state;
@@ -788,7 +769,6 @@ async function syncContacts() {
     console.log(isFirstRun ? 'First run - getting ALL contacts' : `Continuing sync from: ${lastSync}`);
     console.log(`🔑 Starting sync with API Key ${currentKeyIndex + 1}/${API_KEYS.length}`);
 
-    // Initialize counters
     let page = 1;
     let keepGoing = true;
     let totalProcessed = 0;
@@ -835,7 +815,6 @@ async function syncContacts() {
         const contactDate = new Date(contact.updated_at);
         const lastSyncDate = new Date(lastSync);
         
-        // Stop if we've reached old data (not first run)
         if (!isFirstRun && contactDate <= lastSyncDate) {
           console.log(`Reached old data at contact ${contact.id}, stopping sync`);
           keepGoing = false;
@@ -844,17 +823,14 @@ async function syncContacts() {
 
         pageHasNewData = true;
         
-        // Update newest contact timestamp
         if (contact.updated_at > newestContactSeen) {
           newestContactSeen = contact.updated_at;
         }
         
-        // Enrich contact with owner, status, and territory names
         contact.owner_name = findOwnerName(contact.owner_id, users);
         contact.status_name = findStatusName(contact.contact_status_id, contactStatuses);
         contact.territory_name = findTerritoryName(contact.territory_id, territories);
         
-        // Check if contact exists and detect changes
         const existingContact = await contactsCol.findOne({ id: contact.id });
         let changedFields = {};
         let isNewContact = !existingContact;
@@ -866,13 +842,11 @@ async function syncContacts() {
           if (Object.keys(changedFields).length > 0) {
             recordsWithChanges++;
             
-            // Fetch conversations if last_contacted changed
             if (changedFields.last_contacted) {
               shouldFetchConversations = true;
             }
           }
         } else {
-          // Always fetch conversations for new contacts
           shouldFetchConversations = true;
         }
         
@@ -881,7 +855,6 @@ async function syncContacts() {
         contact.syncedAt = currentSyncTime;
         contact.lastUpdatedAt = contact.updated_at;
         
-        // Fetch conversations if needed
         let conversationSummaries = [];
         let fullConversations = [];
         
@@ -891,7 +864,6 @@ async function syncContacts() {
           if (conversationsResponse && conversationsResponse.conversations && conversationsResponse.conversations.length > 0) {
             fullConversations = await processConversationDataEnhanced(conversationsResponse, contact.display_name);
             
-            // Store conversations separately and get summaries
             conversationSummaries = await storeConversationsAndGetSummaries(contact.id, fullConversations, db);
             
             conversationsProcessed += fullConversations.reduce((sum, conv) => {
@@ -910,15 +882,12 @@ async function syncContacts() {
           console.log(`   Keeping ${existingContact.conversation_summaries.length} existing conversation summaries for ${contact.display_name} [Market: ${contact.custom_field.cf_report_name}]`);
         }
         
-        // Add conversation summaries to contact
         contact.conversation_summaries = conversationSummaries;
         
-        // Calculate conversation stats
         const emailThreads = conversationSummaries.filter(c => c.type === 'email_thread');
         const phoneConversations = conversationSummaries.filter(c => c.type === 'phone');
         const notes = conversationSummaries.filter(c => c.type === 'note');
         
-        // Calculate total messages across all email threads
         const totalEmailMessages = emailThreads.reduce((sum, thread) => sum + (thread.message_count || 1), 0);
         
         contact.conversation_stats = {
@@ -944,14 +913,12 @@ async function syncContacts() {
         };
         
         // Calculate CRM analytics using full conversation data for analytics
-        // We need to temporarily restore the full conversations format for analytics calculation
         const tempConversationsForAnalytics = fullConversations.length > 0 ? fullConversations : [];
         const tempContactForAnalytics = { ...contact, conversations: tempConversationsForAnalytics };
         contact.crm_analytics = calculateCRMAnalytics(tempContactForAnalytics);
         
         let updateData = { ...contact };
         
-        // Add field update history for existing contacts with changes
         if (!isNewContact && Object.keys(changedFields).length > 0) {
           const existingUpdates = existingContact.fieldUpdates || [];
           const newUpdate = {
@@ -962,14 +929,12 @@ async function syncContacts() {
           updateData.fieldUpdates = [...existingUpdates, newUpdate];
         }
 
-        // Upsert contact to MongoDB
         await contactsCol.updateOne(
           { id: contact.id },
           { $set: updateData },
           { upsert: true }
         );
 
-        // Update counters
         if (existingContact) {
           updatedRecords++;
         } else {
@@ -980,7 +945,6 @@ async function syncContacts() {
 
       console.log(`Processed ${contacts.length} contacts on page ${page}`);
 
-      // Stop if no new data and not first run
       if (!pageHasNewData && !isFirstRun) {
         console.log('No new data on this page, stopping');
         break;
@@ -988,17 +952,14 @@ async function syncContacts() {
 
       page++;
       
-      // Stop if less than full page (last page)
       if (contacts.length < 100) {
         console.log('Last page reached');
         break;
       }
 
-      // Rate limiting
       await new Promise(resolve => setTimeout(resolve, 100));
     }
 
-    // Update sync state
     await stateCol.updateOne(
       { _id: 'contacts_sync' },
       { 
@@ -1206,7 +1167,6 @@ function getEmptyAnalytics(contact) {
   };
 }
 
-// Start the service
 initialize().catch(error => {
   console.error('Failed to initialize:', error);
   process.exit(1);

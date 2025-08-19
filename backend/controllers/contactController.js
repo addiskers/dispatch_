@@ -1274,10 +1274,9 @@ const getFilterOptions = async (req, res) => {
 };
 const getTimeSeriesData = async (req, res) => {
   try {
-    // ... (all the code at the beginning of the function remains the same)
     const {
       chartType,
-      timeFilter = 'monthly', // daily, monthly
+      timeFilter = 'monthly', 
     } = req.query;
 
     const parseFilter = (filterStr) => {
@@ -1493,7 +1492,6 @@ const getTimeSeriesData = async (req, res) => {
         const field = chartType === 'leadLevelsByOwner' ? "$custom_field.cf_lead_level" : "$custom_field.cf_contact_category";
         const key = chartType === 'leadLevelsByOwner' ? 'level' : 'category';
         
-        // ===== FIX #1: Change the collection name to match the dynamicKeys object =====
         const collectionName = chartType === 'leadLevelsByOwner' ? 'leadLevels' : 'contactCategories';
 
         aggregationPipeline = [
@@ -1514,7 +1512,6 @@ const getTimeSeriesData = async (req, res) => {
         ];
         break;
 
-      // ... (case for 'territoryDistribution' is unchanged)
       case 'territoryDistribution':
         const topTerritories = await Contact.aggregate([
           { $match: query },
