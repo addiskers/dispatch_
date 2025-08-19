@@ -28,7 +28,7 @@ const Sale = () => {
     leadLevelBreakdown: {},
     contactCategoryBreakdown: {},
     priorityCountries: {},
-    dealsWonBreakdown: {}, // Expected from API: { "Owner Name": count, ... } for contacts with status "Won"
+    dealsWonBreakdown: {},
   });
 
   const [ownerAnalytics, setOwnerAnalytics] = useState([]);

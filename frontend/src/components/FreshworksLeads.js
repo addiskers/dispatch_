@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom'; 
 import '../styles/freshworksleads.css';
+import "../styles/conversations-modal.css";
 
 const FreshworksLeads = ({ initialFilters = {} }) => {
   const location = useLocation(); 
@@ -34,7 +35,7 @@ const FreshworksLeads = ({ initialFilters = {} }) => {
   const [totalPages, setTotalPages] = useState(1);
   const [totalCount, setTotalCount] = useState(0);
   const [sortConfig, setSortConfig] = useState({ key: 'created_at', direction: 'desc' });
-  
+  const [expandedThreads, setExpandedThreads] = useState(new Set());
   const [filters, setFilters] = useState({
     status: [],
     owner: [],
@@ -81,7 +82,7 @@ const FreshworksLeads = ({ initialFilters = {} }) => {
     lead_level: { label: 'Lead Category', width: 130, visible: true },
     last_contacted_time: { label: 'Last Contact', width: 160, visible: true },
     owner_name: { label: 'Owner', width: 120, visible: true },
-    request_sample: { label: 'Request Sample', width: 140, visible: true }, // NEW COLUMN
+    request_sample: { label: 'Request Sample', width: 140, visible: true },
     email: { label: 'Email', width: 200, visible: false },
     country: { label: 'Country', width: 120, visible: true },
     territory: { label: 'Territory', width: 120, visible: false },
@@ -89,6 +90,7 @@ const FreshworksLeads = ({ initialFilters = {} }) => {
     contact_category: { label: 'Contact Category', width: 140, visible: false },
     custom_tags: { label: 'Custom Tags', width: 140, visible: false },
     is_active: { label: 'Active Status', width: 120, visible: false },
+    view_conversations: { label: 'View Conversations', width: 150, visible: true }, 
     sample_sent_timing: { label: 'Sample Sent (Hours)', width: 150, visible: false },
     first_call_timing: { label: 'First Call (Minutes)', width: 150, visible: false }, 
     last_email_received: { label: 'Last Email Received', width: 160, visible: false },
@@ -112,8 +114,14 @@ const FreshworksLeads = ({ initialFilters = {} }) => {
   const [tempColumnOrder, setTempColumnOrder] = useState(Object.keys(availableColumns));
 
   const filtersInitialized = useRef(false);
-
-  const API_BASE_URL = process.env.REACT_APP_API_URL || 'http://localhost:5000/api';
+  const API_BASE_URL = `${process.env.REACT_APP_API_BASE_URL || 'https://www.theskyquestt.org'}/api`;
+  const [showConversationsModal, setShowConversationsModal] = useState(false);
+  const [selectedContact, setSelectedContact] = useState(null);
+  const [conversations, setConversations] = useState([]);
+  const [conversationsLoading, setConversationsLoading] = useState(false);
+  const [conversationsError, setConversationsError] = useState(null);
+  const [expandedEmails, setExpandedEmails] = useState(new Set());
+  const [conversationFilter, setConversationFilter] = useState('all'); // 'all', 'email', 'phone', 'note'
 
   // Date filter options
   const dateFilterOptions = [
@@ -128,10 +136,8 @@ const FreshworksLeads = ({ initialFilters = {} }) => {
   // Handle Request Sample button click
   const handleRequestSample = async (contact) => {
     try {
-      // Add your API call here to handle sample request
       console.log('Requesting sample for contact:', contact);
       
-      // Show confirmation
       if (window.confirm(`Request sample for ${contact.display_name} at ${contact.company}?`)) {
         // You can add an API call here
         // await fetch(`${API_BASE_URL}/contacts/${contact.id}/request-sample`, {
@@ -147,6 +153,135 @@ const FreshworksLeads = ({ initialFilters = {} }) => {
     }
   };
 
+  // Calculate conversation metrics for modal header
+  const calculateConversationMetrics = (contact, conversations) => {
+    if (!conversations || conversations.length === 0) {
+      return {
+        sampleSentTiming: null,
+        needsAction: false,
+        hasReplied: false,
+        lastInteractionDays: null,
+        ownerName: contact.owner_name || 'Unassigned',
+        primaryUser: null
+      };
+    }
+
+    // Calculate sample sent timing using CRM analytics data
+    let sampleSentTiming = null;
+    if (contact.created_at && contact.crm_analytics?.first_email_with_attachment?.date) {
+      const createdDate = new Date(contact.created_at);
+      const sampleDate = new Date(contact.crm_analytics.first_email_with_attachment.date);
+      const hoursDelay = (sampleDate - createdDate) / (1000 * 60 * 60);
+      if (hoursDelay >= 0) {
+        sampleSentTiming = hoursDelay.toFixed(1);
+      }
+    }
+
+    // Check if contact has replied
+    const hasReplied = conversations.some(conv => 
+      conv.type === 'email_thread' && 
+      conv.messages?.some(msg => msg.direction === 'incoming')
+    );
+
+    // Check if needs action (last message was outgoing and no recent response)
+    const emailThreads = conversations.filter(conv => conv.type === 'email_thread');
+    let needsAction = false;
+    
+    if (emailThreads.length > 0) {
+      const latestThread = emailThreads.sort((a, b) => 
+        new Date(b.last_message_date) - new Date(a.last_message_date)
+      )[0];
+      
+      if (latestThread.messages && latestThread.messages.length > 0) {
+        const latestMessage = latestThread.messages.sort((a, b) => 
+          new Date(b.timestamp) - new Date(a.timestamp)
+        )[0];
+        
+        if (latestMessage.direction === 'outgoing') {
+          const daysSinceLastMessage = (new Date() - new Date(latestMessage.timestamp)) / (1000 * 60 * 60 * 24);
+          needsAction = daysSinceLastMessage > 2; // Need action if no response for 2+ days
+        }
+      }
+    }
+
+    // Calculate days since last interaction
+    let lastInteractionDays = null;
+    const allDates = conversations.flatMap(conv => {
+      if (conv.type === 'email_thread') {
+        return conv.messages?.map(msg => msg.timestamp) || [];
+      }
+      return [conv.created_at];
+    }).filter(date => date);
+
+    if (allDates.length > 0) {
+      const latestDate = new Date(Math.max(...allDates.map(date => new Date(date))));
+      lastInteractionDays = Math.floor((new Date() - latestDate) / (1000 * 60 * 60 * 24));
+    }
+
+    // Get primary user from CRM analytics
+    const primaryUser = contact.crm_analytics?.primary_user || null;
+
+    return {
+      sampleSentTiming,
+      needsAction,
+      hasReplied,
+      lastInteractionDays,
+      ownerName: contact.owner_name || 'Unassigned',
+      primaryUser
+    };
+  };
+
+  const toggleEmailExpansion = (conversationId, messageId) => {
+    const key = `${conversationId}-${messageId}`;
+    setExpandedEmails(prev => {
+      const newSet = new Set(prev);
+      if (newSet.has(key)) {
+        newSet.delete(key);
+      } else {
+        newSet.add(key);
+      }
+      return newSet;
+    });
+  };
+
+  const handleViewConversations = async (contact) => {
+    try {
+      setSelectedContact(contact);
+      setShowConversationsModal(true);
+      setConversationsLoading(true);
+      setConversationsError(null);
+      setExpandedEmails(new Set());
+      setExpandedThreads(new Set()); 
+      setConversationFilter('all');
+
+      console.log('Fetching conversations for contact:', contact);
+
+      const response = await fetch(`${API_BASE_URL}/contacts/${contact.id}/conversations?includeConversations=true`);
+      const data = await response.json();
+
+      if (data.success) {
+        setConversations(data.data || []);
+      } else {
+        setConversationsError(data.message || 'Error fetching conversations');
+      }
+    } catch (error) {
+      console.error('Error fetching conversations:', error);
+      setConversationsError('Failed to fetch conversations');
+    } finally {
+      setConversationsLoading(false);
+    }
+  };
+
+  // Filter conversations based on type
+  const getFilteredConversations = () => {
+    if (conversationFilter === 'all') {
+      return conversations;
+    }
+    return conversations.filter(conv => conv.type === conversationFilter);
+  };
+
+
+
   // Handle navigation state from Sale.js
   useEffect(() => {
     if (location.state?.filters && location.state?.fromAnalytics && !filtersInitialized.current) {
@@ -161,7 +296,7 @@ const FreshworksLeads = ({ initialFilters = {} }) => {
     }
   }, [location.state, navigate, location.pathname]);
 
-  // Apply initial filters (if provided as props)
+  // Apply initial filters 
   useEffect(() => {
     if (initialFilters && Object.keys(initialFilters).length > 0) {
       console.log('Applying initial filters:', initialFilters);
@@ -415,7 +550,62 @@ const FreshworksLeads = ({ initialFilters = {} }) => {
       [dateType]: value
     }));
   };
+  // Updated conversation counting function - counts all email messages, not just threads
+const getConversationCounts = () => {
+  // Count individual email messages instead of threads
+  const emailMessageCount = conversations.reduce((total, conversation) => {
+    if (conversation.type === 'email_thread') {
+      return total + (conversation.messages?.length || 0);
+    }
+    return total;
+  }, 0);
+  
+  const phoneCount = conversations.filter(c => c.type === 'phone').length;
+  const noteCount = conversations.filter(c => c.type === 'note').length;
+  
+  return { 
+    emailCount: emailMessageCount,
+    phoneCount, 
+    noteCount, 
+    total: emailMessageCount + phoneCount + noteCount 
+  };
+};
 
+// Updated function to expand/collapse all emails in a thread
+const toggleAllEmailsInThread = (conversationId) => {
+  const conversation = conversations.find(c => c.conversation_id === conversationId);
+  if (!conversation || conversation.type !== 'email_thread' || !conversation.messages) return;
+  
+  const allMessageKeys = conversation.messages.map((message, index) => 
+    `${conversationId}-${message.message_id || index}`
+  );
+  
+  const hasExpandedMessages = allMessageKeys.some(key => expandedEmails.has(key));
+  
+  setExpandedEmails(prev => {
+    const newSet = new Set(prev);
+    
+    if (hasExpandedMessages) {
+      allMessageKeys.forEach(key => newSet.delete(key));
+    } else {
+      allMessageKeys.forEach(key => newSet.add(key));
+    }
+    
+    return newSet;
+  });
+};
+
+// Function to check if all emails in a thread are expanded
+const areAllEmailsExpanded = (conversationId) => {
+  const conversation = conversations.find(c => c.conversation_id === conversationId);
+  if (!conversation || conversation.type !== 'email_thread' || !conversation.messages) return false;
+  
+  const allMessageKeys = conversation.messages.map((message, index) => 
+    `${conversationId}-${message.message_id || index}`
+  );
+  
+  return allMessageKeys.every(key => expandedEmails.has(key));
+};
   const clearFilters = () => {
     setFilters({ 
       status: [], 
@@ -507,8 +697,21 @@ const FreshworksLeads = ({ initialFilters = {} }) => {
     setTempColumnOrder(columnOrder);
     setShowColumnCustomizer(false);
   };
+  const toggleThreadVisibility = (conversationId) => {
+    setExpandedThreads(prev => {
+      const newSet = new Set(prev);
+      if (newSet.has(conversationId)) {
+        newSet.delete(conversationId);
+      } else {
+        newSet.add(conversationId);
+      }
+      return newSet;
+    });
+  };
 
-  // Drag and drop functionality 
+  const isThreadExpanded = (conversationId) => {
+    return expandedThreads.has(conversationId);
+  };
   const handleDragStart = (e, columnKey) => {
     setDraggedColumn(columnKey);
     e.dataTransfer.effectAllowed = 'move';
@@ -682,7 +885,22 @@ const FreshworksLeads = ({ initialFilters = {} }) => {
         </button>
       );
     }
-
+    if (columnKey === 'view_conversations') {
+      return (
+        <button
+          className="btn btn-sm btn-info view-conversations-btn"
+          onClick={() => handleViewConversations(contact)}
+          title={`View conversations for ${contact.display_name}`}
+          style={{
+            fontSize: '0.75rem',
+            padding: '0.25rem 0.5rem',
+            whiteSpace: 'nowrap'
+          }}
+        >
+          💬 View Conversations
+        </button>
+      );
+    }
     const getValue = () => {
       switch (columnKey) {
         case 'created_at':
@@ -1528,16 +1746,16 @@ const FreshworksLeads = ({ initialFilters = {} }) => {
                   >
                     <div 
                       className="header-content"
-                      onClick={() => columnKey !== 'request_sample' && handleSort(columnKey)}
+                      onClick={() => (columnKey !== 'request_sample' && columnKey !== 'view_conversations') && handleSort(columnKey)}
                       title={config.label}
-                      style={{ cursor: columnKey === 'request_sample' ? 'default' : 'pointer' }}
+                      style={{ cursor: (columnKey === 'request_sample' || columnKey === 'view_conversations') ? 'default' : 'pointer' }}
                     >
                       <span className="header-text">{config.label}</span>
-                      {columnKey !== 'request_sample' && (
+                      {(columnKey !== 'request_sample' && columnKey !== 'view_conversations') && (
                         <span className="sort-icon">{getSortIcon(columnKey)}</span>
                       )}
                     </div>
-                    {columnKey !== 'request_sample' && (
+                    {(columnKey !== 'request_sample' && columnKey !== 'view_conversations') && (
                       <div 
                         className="resize-handle"
                         onMouseDown={(e) => handleMouseDown(e, columnKey)}
@@ -1645,6 +1863,479 @@ const FreshworksLeads = ({ initialFilters = {} }) => {
           </div>
         </div>
       </div>
+      {/* Enhanced Professional Conversations Modal */}
+      {showConversationsModal && (
+        <div className="modal-overlay" onClick={() => {
+            setShowConversationsModal(false);
+            setExpandedThreads(new Set()); 
+            setExpandedEmails(new Set());
+          }}>
+          <div className="conversations-modal-professional" onClick={(e) => e.stopPropagation()}>
+            <div className="modal-header-professional">
+              <div className="contact-header-info">
+                <div className="contact-title">
+                  <h3 className="contact-name">{selectedContact?.display_name}</h3>
+                  <div className="contact-details">
+                    {selectedContact?.company && <span className="company-name">{selectedContact.company}</span>}
+                    {selectedContact?.country && <span className="country-info">{selectedContact.country}</span>}
+                    {selectedContact?.job_title && <span className="job-title">{selectedContact.job_title}</span>}
+                  </div>
+                </div>
+                
+                {/* Enhanced header with metrics and owner info */}
+                {conversations.length > 0 && (() => {
+                  const metrics = calculateConversationMetrics(selectedContact, conversations);
+                  return (
+                    <div className="conversation-metrics">
+                      {/* Owner Information */}
+                      <div className="metric-item owner-info">
+                        <div className="metric-icon"></div>
+                        <div className="metric-content">
+                          <span className="metric-label">Owner</span>
+                          <span className="metric-value">{metrics.ownerName}</span>
+                        </div>
+                      </div>
+
+                     
+                      {/* Sample Timing using first_email_with_attachment */}
+                      {metrics.sampleSentTiming && (
+                        <div className="metric-item sample-timing">
+                          <div className="metric-icon">📊</div>
+                          <div className="metric-content">
+                            <span className="metric-label">Sample Sent</span>
+                            <span className="metric-value">{metrics.sampleSentTiming}h after contact</span>
+                          </div>
+                        </div>
+                      )}
+                      
+                     
+                      
+                      {metrics.needsAction && (
+                        <div className="metric-item needs-action">
+                          <div className="metric-icon">⚠️</div>
+                          <div className="metric-content">
+                            <span className="metric-label">Action</span>
+                            <span className="metric-value">Needs Follow-up</span>
+                          </div>
+                        </div>
+                      )}
+                      
+                      {metrics.lastInteractionDays !== null && (
+                        <div className="metric-item last-interaction">
+                          <div className="metric-icon">🕒</div>
+                          <div className="metric-content">
+                            <span className="metric-label">Last Contact</span>
+                            <span className="metric-value">
+                              {metrics.lastInteractionDays === 0 ? 'Today' : 
+                               metrics.lastInteractionDays === 1 ? '1 day ago' : 
+                               `${metrics.lastInteractionDays} days ago`}
+                            </span>
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  );
+                })()}
+              </div>
+              
+              <button 
+                    className="close-button-professional" 
+                    onClick={() => {
+                      setShowConversationsModal(false);
+                      setExpandedThreads(new Set()); 
+                      setExpandedEmails(new Set());
+                    }}
+                    aria-label="Close"
+                  >
+                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                  <line x1="18" y1="6" x2="6" y2="18"></line>
+                  <line x1="6" y1="6" x2="18" y2="18"></line>
+                </svg>
+              </button>
+            </div>
+
+            {/* Conversation Filter Buttons */}
+            {conversations.length > 0 && (
+              <div className="conversation-filters">
+                {(() => {
+                  const counts = getConversationCounts();
+                  return (
+                    <div className="filter-buttons">
+                      <button 
+                        className={`filter-btn ${conversationFilter === 'all' ? 'active' : ''}`}
+                        onClick={() => setConversationFilter('all')}
+                      >
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                          <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"></path>
+                        </svg>
+                        All ({counts.total})
+                      </button>
+                      {counts.emailCount > 0 && (
+                        <button 
+                          className={`filter-btn email-filter ${conversationFilter === 'email_thread' ? 'active' : ''}`}
+                          onClick={() => setConversationFilter('email_thread')}
+                        >
+                          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                            <path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"></path>
+                            <polyline points="22,6 12,13 2,6"></polyline>
+                          </svg>
+                          Emails ({counts.emailCount})
+                        </button>
+                      )}
+                      {counts.phoneCount > 0 && (
+                        <button 
+                          className={`filter-btn phone-filter ${conversationFilter === 'phone' ? 'active' : ''}`}
+                          onClick={() => setConversationFilter('phone')}
+                        >
+                          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                            <path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 22 16.92z"></path>
+                          </svg>
+                          Calls ({counts.phoneCount})
+                        </button>
+                      )}
+                      {counts.noteCount > 0 && (
+                        <button 
+                          className={`filter-btn note-filter ${conversationFilter === 'note' ? 'active' : ''}`}
+                          onClick={() => setConversationFilter('note')}
+                        >
+                          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                            <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
+                            <polyline points="14,2 14,8 20,8"></polyline>
+                            <line x1="16" y1="13" x2="8" y2="13"></line>
+                            <line x1="16" y1="17" x2="8" y2="17"></line>
+                            <polyline points="10,9 9,9 8,9"></polyline>
+                          </svg>
+                          Notes ({counts.noteCount})
+                        </button>
+                      )}
+                    </div>
+                  );
+                })()}
+              </div>
+            )}
+            
+            <div className="modal-body-professional">
+              {/* Enhanced Conversation Modal with updated functionality */}
+                {!conversationsLoading && !conversationsError && conversations.length > 0 && (
+                  <div className="conversations-list-professional">
+                    {getFilteredConversations()
+                      .sort((a, b) => {
+                        const dateA = new Date(a.last_message_date || a.created_at);
+                        const dateB = new Date(b.last_message_date || b.created_at);
+                        return dateB - dateA;
+                      })
+                      .map((conversation, index) => (
+                      <div key={conversation.conversation_id || index} 
+                        className={`conversation-item-professional conversation-${conversation.type} ${
+                          conversation.type === 'email_thread' && isThreadExpanded(conversation.conversation_id) ? 'expanded' : ''
+                        }`}>
+                        <div className="stat-item expand-all-action" onClick={(e) => {
+                            e.stopPropagation();
+                            toggleAllEmailsInThread(conversation.conversation_id);
+                          }}>
+                            <span className="stat-icon">
+                              {areAllEmailsExpanded(conversation.conversation_id) ? '📝' : '📄'}
+                            </span>
+                            <span className="stat-text">
+                              {areAllEmailsExpanded(conversation.conversation_id) ? 'Collapse All Content' : 'Expand All Content'}
+                            </span>
+                          </div>
+                        {/* Enhanced Email Thread with proper toggle functionality */}
+                        {conversation.type === 'email_thread' && (
+                          <div className={`email-thread-professional ${isThreadExpanded(conversation.conversation_id) ? 'expanded' : 'collapsed'}`}>
+                            <div className="conversation-header-professional">
+                              <div className="conversation-type-info">
+                                <div className="type-badge email-badge">
+                                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                                    <path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"></path>
+                                    <polyline points="22,6 12,13 2,6"></polyline>
+                                  </svg>
+                                  Email Thread
+                                </div>
+                                <div className="message-count-prominent">
+                                  <span className="message-count-number">{conversation.messages?.length || 0}</span>
+                                  <span className="message-count-text">messages</span>
+                                </div>
+                              </div>
+                              
+                              <div className="conversation-date-range">
+                                <span>{formatDateTime(conversation.first_message_date)}</span>
+                                <span className="date-separator">→</span>
+                                <span>{formatDateTime(conversation.last_message_date)}</span>
+                              </div>
+                            </div>
+                            
+                            {/* Clickable thread subject that toggles entire thread visibility */}
+                            <div 
+                              className="thread-subject-professional clickable-header"
+                              onClick={() => toggleThreadVisibility(conversation.conversation_id)}
+                              style={{ cursor: 'pointer' }}
+                            >
+                              <div className="subject-header-content">
+                                <h5>{conversation.subject || 'No Subject'}</h5>
+                                <div className="expand-all-indicator">
+                                  {isThreadExpanded(conversation.conversation_id) ? (
+                                    <span className="expand-icon">📖 Click to collapse thread</span>
+                                  ) : (
+                                    <span className="expand-icon">📧 Click to view all {conversation.messages?.length || 0} emails</span>
+                                  )}
+                                </div>
+                              </div>
+                            </div>
+                            
+                            {/* Show thread stats only when thread is expanded */}
+                            {isThreadExpanded(conversation.conversation_id) && (
+                              <div className="thread-stats-professional">
+                                <div className="stat-item">
+                                  <span className="stat-icon">📤</span>
+                                  <span className="stat-text">{conversation.stats?.outgoing_messages || 0} Sent</span>
+                                </div>
+                                <div className="stat-item">
+                                  <span className="stat-icon">📥</span>
+                                  <span className="stat-text">{conversation.stats?.incoming_messages || 0} Received</span>
+                                </div>
+                                {conversation.stats?.total_attachments > 0 && (
+                                  <div className="stat-item">
+                                    <span className="stat-icon">📎</span>
+                                    <span className="stat-text">{conversation.stats.total_attachments} Attachments</span>
+                                  </div>
+                                )}
+                                {conversation.stats?.needs_response && (
+                                  <div className="stat-item urgent">
+                                    <span className="stat-icon">🔔</span>
+                                    <span className="stat-text">Needs Response</span>
+                                  </div>
+                                )}
+                                
+                                {/* Secondary action to expand/collapse all email content within the thread */}
+                                <div className="stat-item expand-all-action" onClick={(e) => {
+                                  e.stopPropagation();
+                                  toggleAllEmailsInThread(conversation.conversation_id);
+                                }}>
+                                  <span className="stat-icon">
+                                    {areAllEmailsExpanded(conversation.conversation_id) ? '📝' : '📄'}
+                                  </span>
+                                  <span className="stat-text">
+                                    {areAllEmailsExpanded(conversation.conversation_id) ? 'Collapse All Content' : 'Expand All Content'}
+                                  </span>
+                                </div>
+                              </div>
+                            )}
+
+                            {/* Messages container - only show when thread is expanded */}
+                            {isThreadExpanded(conversation.conversation_id) && (
+                              <div className="messages-container-professional">
+                                {conversation.messages
+                                  ?.sort((a, b) => new Date(a.timestamp) - new Date(b.timestamp)) 
+                                  ?.map((message, msgIndex) => {
+                                  const expandKey = `${conversation.conversation_id}-${message.message_id || msgIndex}`;
+                                  const isExpanded = expandedEmails.has(expandKey);
+                                  const shouldTruncate = message.content && message.content.length > 300;
+                                  
+                                  return (
+                                    <div key={message.message_id || msgIndex} className={`message-item-professional ${message.direction}`}>
+                                      <div className="message-header-professional">
+                                        <div className="sender-info-professional">
+                                          <div className="sender-avatar">
+                                            {message.direction === 'incoming' ? '👤' : '🏢'}
+                                          </div>
+                                          <div className="sender-details">
+                                            <span className="sender-name">{message.sender?.name || 'Unknown'}</span>
+                                            <span className="message-number">Message {msgIndex + 1} of {conversation.messages.length}</span>
+                                          </div>
+                                          <div className={`direction-badge-professional ${message.direction}`}>
+                                            {message.direction === 'incoming' ? '📥 Received' : '📤 Sent'}
+                                          </div>
+                                        </div>
+                                        <div className="message-timestamp">
+                                          {formatDateTime(message.timestamp)}
+                                        </div>
+                                      </div>
+                                      
+                                      {message.attachments?.length > 0 && (
+                                        <div className="attachments-professional">
+                                          <div className="attachments-header">
+                                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                                              <path d="M21.44 11.05l-9.19 9.19a6 6 0 0 1-8.49-8.49l9.19-9.19a4 4 0 0 1 5.66 5.66l-9.2 9.19a2 2 0 0 1-2.83-2.83l8.49-8.48"></path>
+                                            </svg>
+                                            Attachments:
+                                          </div>
+                                          <div className="attachments-list">
+                                            {message.attachments.map((attachment, attIndex) => (
+                                              <div key={attIndex} className="attachment-item-professional">
+                                                <span className="attachment-name">{attachment.name}</span>
+                                                <span className="attachment-size">({(attachment.size / 1024).toFixed(1)}KB)</span>
+                                              </div>
+                                            ))}
+                                          </div>
+                                        </div>
+                                      )}
+                                      
+                                      <div className="message-content-professional">
+                                        {message.content ? (
+                                          <div 
+                                            className={`content-text ${shouldTruncate && !isExpanded ? 'truncated' : ''}`}
+                                            dangerouslySetInnerHTML={{ 
+                                              __html: shouldTruncate && !isExpanded 
+                                                ? message.content.substring(0, 300) + '...'
+                                                : message.content
+                                            }} 
+                                          />
+                                        ) : (
+                                          <em className="no-content">No content available</em>
+                                        )}
+                                        
+                                        {shouldTruncate && (
+                                          <button 
+                                            className="expand-button"
+                                            onClick={() => toggleEmailExpansion(conversation.conversation_id, message.message_id || msgIndex)}
+                                          >
+                                            {isExpanded ? 'Show Less' : 'Show Full Email'}
+                                          </button>
+                                        )}
+                                      </div>
+
+                                      {message.engagement && (
+                                        <div className="engagement-info-professional">
+                                          {message.engagement.opened && (
+                                            <div className="engagement-stat">
+                                              <span className="engagement-icon">👁️</span>
+                                              <span>Opened</span>
+                                            </div>
+                                          )}
+                                          {message.engagement.clicked && (
+                                            <div className="engagement-stat">
+                                              <span className="engagement-icon">🖱️</span>
+                                              <span>Clicked</span>
+                                            </div>
+                                          )}
+                                          {message.engagement.bounced && (
+                                            <div className="engagement-stat bounced">
+                                              <span className="engagement-icon">⚠️</span>
+                                              <span>Bounced</span>
+                                            </div>
+                                          )}
+                                        </div>
+                                      )}
+                                    </div>
+                                  );
+                                })}
+                              </div>
+                            )}
+                          </div>
+                        )}
+
+                        {/* Phone Call and Note sections remain the same */}
+                        {conversation.type === 'phone' && (
+                          <div className="phone-call-professional">
+                            <div className="conversation-header-professional">
+                              <div className="conversation-type-info">
+                                <div className="type-badge phone-badge">
+                                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                                    <path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 22 16.92z"></path>
+                                  </svg>
+                                  Phone Call
+                                </div>
+                                <div className={`call-direction-badge ${conversation.call_direction}`}>
+                                  {conversation.call_direction === 'incoming' ? '📞 Incoming' : '📱 Outgoing'}
+                                </div>
+                              </div>
+                              
+                              <div className="conversation-date-range">
+                                {formatDateTime(conversation.created_at)}
+                              </div>
+                            </div>
+                            
+                            <div className="call-details-professional">
+                              <div className="call-metrics">
+                                <div className="metric-card">
+                                  <div className="metric-icon">⏱️</div>
+                                  <div className="metric-info">
+                                    <span className="metric-label">Duration</span>
+                                    <span className="metric-value">{formatDuration(conversation.call_duration || 0)}</span>
+                                  </div>
+                                </div>
+                                
+                                <div className="metric-card">
+                                  <div className={`metric-icon ${conversation.call_duration > 90 ? 'success' : 'error'}`}>
+                                    {conversation.call_duration > 90 ? '✅' : '❌'}
+                                  </div>
+                                  <div className="metric-info">
+                                    <span className="metric-label">Status</span>
+                                    <span className="metric-value">
+                                      {conversation.call_duration > 90 ? 'Connected' : 'Not Connected'}
+                                    </span>
+                                  </div>
+                                </div>
+                                
+                                {conversation.phone_number && (
+                                  <div className="metric-card">
+                                    <div className="metric-icon">📞</div>
+                                    <div className="metric-info">
+                                      <span className="metric-label">Number</span>
+                                      <span className="metric-value">{conversation.phone_number}</span>
+                                    </div>
+                                  </div>
+                                )}
+                              </div>                           
+                              {conversation.call_recording_url && (
+                                <div className="recording-info-professional">
+                                  <a href={conversation.call_recording_url} target="_blank" rel="noopener noreferrer" className="recording-link">
+                                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                                      <polygon points="5,3 19,12 5,21"></polygon>
+                                    </svg>
+                                    Listen to Recording
+                                  </a>
+                                </div>
+                              )}
+                            </div>
+                          </div>
+                        )}
+
+                        {conversation.type === 'note' && (
+                          <div className="note-item-professional">
+                            <div className="conversation-header-professional">
+                              <div className="conversation-type-info">
+                                <div className="type-badge note-badge">
+                                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                                    <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
+                                    <polyline points="14,2 14,8 20,8"></polyline>
+                                    <line x1="16" y1="13" x2="8" y2="13"></line>
+                                    <line x1="16" y1="17" x2="8" y2="17"></line>
+                                    <polyline points="10,9 9,9 8,9"></polyline>
+                                  </svg>
+                                  Note
+                                </div>
+                              </div>
+                              
+                              <div className="conversation-date-range">
+                                {formatDateTime(conversation.created_at)}
+                              </div>
+                            </div>
+                            
+                            <div className="note-content-professional">
+                              <h5>{conversation.subject || 'Note'}</h5>
+                              <div className="note-text">
+                                {conversation.content || 'No content available'}
+                              </div>
+                            </div>
+
+                            {conversation.participants?.length > 0 && (
+                              <div className="note-creator-professional">
+                                <div className="creator-avatar">👤</div>
+                                <span>Created by {conversation.participants[0].name}</span>
+                              </div>
+                            )}
+                          </div>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                )}
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Column Customizer Modal */}
       {showColumnCustomizer && (

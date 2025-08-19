@@ -392,8 +392,7 @@
   background: white;
   border-radius: 12px;
   width: 90%;
-  max-width: 480px;
-  max-height: 85vh;
+  max-width: 780px;
   overflow: hidden;
   display: flex;
   flex-direction: column;

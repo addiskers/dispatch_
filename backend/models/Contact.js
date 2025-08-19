@@ -1,125 +1,23 @@
 const mongoose = require('mongoose');
 const Schema = mongoose.Schema;
 
-// Participant sub-schema
-const ParticipantSchema = new Schema({
-  id: Number,
-  name: String,
-  email: String,
-  phone: String,
-  country: String,
-  type: { type: String, enum: ['contact', 'user', 'unknown'] },
-  is_user: Boolean,
-  bounced: Boolean,
-  opened: Boolean,
-  clicked: Boolean,
-  opened_time: Date,
-  clicked_time: Date,
-  recipient_id: Number,
-  field: { type: String, enum: ['from', 'to', 'cc', 'bcc', 'reply_to'] }
-}, { _id: false });
-
-// Attachment sub-schema
-const AttachmentSchema = new Schema({
-  id: Number,
-  name: String,
-  size: Number,
-  content_type: String,
-  download_url: String
-}, { _id: false });
-
-// Email Engagement sub-schema
-const EmailEngagementSchema = new Schema({
-  opened: { type: Boolean, default: false },
-  clicked: { type: Boolean, default: false },
-  bounced: { type: Boolean, default: false },
-  opened_time: Date,
-  clicked_time: Date
-}, { _id: false });
-
-// Email Message sub-schema
-const EmailMessageSchema = new Schema({
-  message_index: Number,
-  message_id: Number,
-  conversation_id: Number,
-  timestamp: Date,
+const ConversationSummarySchema = new Schema({
+  conversation_id: String,
+  type: { type: String, enum: ['phone', 'email_thread', 'note', 'chat'] },
   subject: String,
-  content: String,
-  html_content: String,
-  direction: { type: String, enum: ['incoming', 'outgoing'] },
-  is_read: Boolean,
-  needs_response: { type: Boolean, default: false },
-  status: Number,
-  sender: {
-    name: String,
-    email: String,
-    is_user: Boolean,
-    id: Number,
-    type: String
-  },
-  participants: [ParticipantSchema],
-  attachments: [AttachmentSchema],
-  engagement: EmailEngagementSchema,
-  linked_deals: [Number]
-}, { _id: false });
-
-// Call Outcome sub-schema
-const CallOutcomeSchema = new Schema({
-  id: Number,
-  name: String
-}, { _id: false });
-
-
-
-// Email Thread Stats sub-schema
-const EmailThreadStatsSchema = new Schema({
-  total_messages: { type: Number, default: 0 },
-  incoming_messages: { type: Number, default: 0 },
-  outgoing_messages: { type: Number, default: 0 },
-  messages_with_attachments: { type: Number, default: 0 },
-  total_attachments: { type: Number, default: 0 },
-  unique_participants: { type: Number, default: 0 },
-  has_unread_messages: { type: Boolean, default: false },
+  created_at: Date,
+  updated_at: Date,
+  message_count: { type: Number, default: 1 },
+  has_attachments: { type: Boolean, default: false },
+  attachment_count: { type: Number, default: 0 },
+  last_activity: Date,
+  participants_count: { type: Number, default: 0 },
+  direction: String, 
+  duration: Number, 
+  is_connected: Boolean, 
   needs_response: { type: Boolean, default: false }
 }, { _id: false });
 
-// Conversation sub-schema
-const ConversationSchema = new Schema({
-  id: String,
-  type: { type: String, enum: ['phone', 'email_thread', 'note', 'chat'] },
-  
-  // Phone call fields
-  call_id: Number,
-  call_recording_url: String,
-  call_duration: Number,
-  phone_number: String,
-  call_direction: { type: String, enum: ['incoming', 'outgoing'] },
-  call_status: { type: String, enum: ['incoming', 'outgoing', 'missed', 'voicemail'] },
-  outcome: CallOutcomeSchema,
-  
-  // Email thread fields
-  email_id: Number,
-  thread_count: Number,
-  first_message_date: Date,
-  last_message_date: Date,
-  stats: EmailThreadStatsSchema,
-  messages: [EmailMessageSchema],
-  
-  // Common fields
-  created_at: Date,
-  updated_at: Date,
-  subject: String,
-  content: String,
-  attachments: [AttachmentSchema],
-  participants: [ParticipantSchema],
-  user_details: {
-    id: Number,
-    name: String,
-    email: String
-  }
-}, { _id: false });
-
-// Conversation Stats sub-schema
 const ConversationStatsSchema = new Schema({
   total_conversations: { type: Number, default: 0 },
   email_threads: { type: Number, default: 0 },
@@ -171,7 +69,7 @@ const CustomFieldSchema = new Schema({
   cf_your_research_requirements: String,
   cf_industry: String,
   cf_sub_industry: String
-}, { _id: false, strict: false }); // strict: false allows additional fields
+}, { _id: false, strict: false });
 
 // Email/Phone item sub-schema
 const ContactItemSchema = new Schema({
@@ -195,11 +93,117 @@ const LinksSchema = new Schema({
   connections: String
 }, { _id: false });
 
-// Field update sub-schema
+// Field update sub-schema 
 const FieldUpdateSchema = new Schema({
   syncTime: Date,
   updatedAt: Date,
   changes: Schema.Types.Mixed
+}, { _id: false });
+
+// CRM Analytics Schema for storing calculated analytics
+const CRMAnalyticsSchema = new Schema({
+  first_contact: {
+    date: String,
+    type: String,
+    direction: String,
+    user_id: Number,
+    user_name: String,
+    user_email: String
+  },
+  first_call: {
+    date: String,
+    direction: String,
+    duration: Number,
+    is_connected: Boolean,
+    outcome: String,
+    user_id: Number,
+    user_name: String,
+    user_email: String
+  },
+  first_email_sent: {
+    date: String,
+    subject: String,
+    is_automated: Boolean,
+    has_attachment: Boolean,
+    user_id: Number,
+    user_name: String,
+    user_email: String
+  },
+  first_email_received: {
+    date: String,
+    subject: String
+  },
+  last_email_received: {
+    date: String,
+    subject: String
+  },
+  first_email_with_attachment: {
+    date: String,
+    subject: String,
+    attachment_count: Number,
+    user_id: Number,
+    user_name: String,
+    user_email: String
+  },
+  last_contact: {
+    date: String,
+    type: String,
+    direction: String,
+    user_id: Number,
+    user_name: String,
+    user_email: String
+  },
+  user_activities: Schema.Types.Mixed,
+  primary_user: {
+    user_id: Number,
+    user_name: String,
+    user_email: String,
+    total_activities: Number
+  },
+  total_users_involved: Number,
+  engagement: {
+    total_touchpoints: { type: Number, default: 0 },
+    outgoing_emails: { type: Number, default: 0 },
+    incoming_emails: { type: Number, default: 0 },
+    outgoing_calls: { type: Number, default: 0 },
+    incoming_calls: { type: Number, default: 0 },
+    connected_calls: { type: Number, default: 0 },
+    not_connected_calls: { type: Number, default: 0 },
+    email_opens: { type: Number, default: 0 },
+    email_clicks: { type: Number, default: 0 },
+    email_replies: { type: Number, default: 0 },
+    call_answers: { type: Number, default: 0 },
+    call_duration_total: { type: Number, default: 0 },
+    connected_call_duration_total: { type: Number, default: 0 },
+    avg_call_duration: { type: Number, default: 0 },
+    avg_connected_call_duration: { type: Number, default: 0 }
+  },
+  response_metrics: {
+    first_response_time: String,
+    avg_response_time: String,
+    last_response_date: String,
+    response_rate: { type: Number, default: 0 },
+    needs_follow_up: { type: Boolean, default: true }
+  },
+  lead_progression: {
+    days_in_pipeline: Number,
+    status_changes: [Schema.Types.Mixed],
+    qualification_score: { type: Number, default: 0 },
+    next_action_due: String,
+    last_action_date: String
+  },
+  contact_frequency: {
+    last_7_days: { type: Number, default: 0 },
+    last_30_days: { type: Number, default: 0 },
+    last_90_days: { type: Number, default: 0 },
+    avg_contacts_per_week: { type: Number, default: 0 }
+  },
+  meetings: {
+    scheduled: { type: Number, default: 0 },
+    completed: { type: Number, default: 0 },
+    no_shows: { type: Number, default: 0 },
+    next_meeting: String
+  }
 }, { _id: false });
 
 // Main Contact schema
@@ -266,7 +270,6 @@ const ContactSchema = new Schema({
   first_source: String,
   last_campaign: String,
   last_medium: String,
-  last_source: String,
   latest_campaign: String,
   latest_medium: String,
   latest_source: String,
@@ -310,9 +313,10 @@ const ContactSchema = new Schema({
   lastUpdatedAt: Date,
   syncedAt: Date,
   
-  // Related Data
-  conversations: [ConversationSchema],
+  // Related Data - CHANGED: Only summaries, not full conversations
+  conversation_summaries: [ConversationSummarySchema], // Lightweight summaries
   conversation_stats: ConversationStatsSchema,
+  crm_analytics: CRMAnalyticsSchema, 
   custom_field: CustomFieldSchema,
   links: LinksSchema,
   fieldUpdates: [FieldUpdateSchema]
@@ -322,8 +326,8 @@ const ContactSchema = new Schema({
 });
 
 // Indexes for better query performance
-ContactSchema.index({ 'conversations.type': 1 });
-ContactSchema.index({ 'conversations.created_at': -1 });
+ContactSchema.index({ 'conversation_summaries.type': 1 });
+ContactSchema.index({ 'conversation_summaries.created_at': -1 });
 ContactSchema.index({ 'custom_field.cf_company_name': 1 });
 ContactSchema.index({ 'custom_field.cf_region': 1 });
 ContactSchema.index({ lead_score: -1 });
@@ -338,13 +342,13 @@ ContactSchema.virtual('full_name').get(function() {
 // Method to get conversation summary
 ContactSchema.methods.getConversationSummary = function() {
   const summary = {
-    total: this.conversations.length,
+    total: this.conversation_summaries.length,
     phone_calls: 0,
     email_threads: 0,
     last_interaction: null
   };
   
-  this.conversations.forEach(conv => {
+  this.conversation_summaries.forEach(conv => {
     if (conv.type === 'phone') summary.phone_calls++;
     if (conv.type === 'email_thread') summary.email_threads++;
     
@@ -356,7 +360,6 @@ ContactSchema.methods.getConversationSummary = function() {
   return summary;
 };
 
-// Static method to get contacts by owner
 ContactSchema.statics.findByOwner = function(ownerName, options = {}) {
   return this.find({ owner_name: ownerName }, null, options);
 };

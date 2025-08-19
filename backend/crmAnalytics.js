@@ -2,14 +2,20 @@
  * Calculate comprehensive CRM analytics for a contact with IST timestamps and user tracking
  */
 function calculateCRMAnalytics(contact) {
+  // Check if we have full conversations (during sync) 
   const conversations = contact.conversations || [];
+  const conversationSummaries = contact.conversation_summaries || [];
+  
+  // Use full conversations if available
+  const hasFullConversations = conversations.length > 0;
+  
   const createdDate = new Date(contact.created_at);
   const now = new Date();
   
   // Helper function to convert to IST format
   const toISTFormat = (date) => {
     if (!date) return null;
-    const istDate = new Date(date.getTime() + (5.5 * 60 * 60 * 1000)); // Add 5.5 hours for IST
+    const istDate = new Date(date.getTime() + (5.5 * 60 * 60 * 1000)); 
     return istDate.toISOString().replace('Z', '+05:30');
   };
 
@@ -43,9 +49,8 @@ function calculateCRMAnalytics(contact) {
     last_contact: null,
     
     // User activity tracking - WHO is working this lead
-    user_activities: {}, // Will store per-user statistics
-    primary_user: null,  // User with most activity
-    total_users_involved: 0,
+    user_activities: {}, 
+    primary_user: null,  
     
     engagement: {
       total_touchpoints: 0,
@@ -53,8 +58,8 @@ function calculateCRMAnalytics(contact) {
       incoming_emails: 0,
       outgoing_calls: 0,
       incoming_calls: 0,
-      connected_calls: 0,      // Calls > 45 seconds
-      not_connected_calls: 0,  // Calls <= 45 seconds
+      connected_calls: 0,      // Calls > 90 seconds
+      not_connected_calls: 0,  // Calls <= 90 seconds
       email_opens: 0,
       email_clicks: 0,
       email_replies: 0,
@@ -92,11 +97,56 @@ function calculateCRMAnalytics(contact) {
     }
   };
 
-  // Process all conversations to calculate statistics
+  // If we have existing CRM analytics and no full conversations
+  if (!hasFullConversations && contact.crm_analytics) {
+    const existingAnalytics = contact.crm_analytics;
+    
+    Object.assign(analytics, existingAnalytics);
+    
+    // Update basic calculated fields
+    analytics.lead_progression.days_in_pipeline = Math.ceil((now - createdDate) / (1000 * 60 * 60 * 24));
+    
+    // Calculate basic stats from conversation summaries
+    if (conversationSummaries.length > 0) {
+      analytics.engagement.total_touchpoints = conversationSummaries.length;
+      
+      const emailThreads = conversationSummaries.filter(c => c.type === 'email_thread');
+      const phoneCalls = conversationSummaries.filter(c => c.type === 'phone');
+      
+      // Basic counting from summaries
+      analytics.engagement.outgoing_emails = emailThreads.length; // Approximation
+      analytics.engagement.outgoing_calls = phoneCalls.filter(c => c.direction === 'outgoing').length;
+      analytics.engagement.incoming_calls = phoneCalls.filter(c => c.direction === 'incoming').length;
+      analytics.engagement.connected_calls = phoneCalls.filter(c => c.is_connected).length;
+      analytics.engagement.not_connected_calls = phoneCalls.filter(c => !c.is_connected).length;
+      
+      // Find last contact
+      const lastConversation = conversationSummaries.sort((a, b) => 
+        new Date(b.last_activity || b.created_at) - new Date(a.last_activity || a.created_at)
+      )[0];
+      
+      if (lastConversation) {
+        analytics.last_contact = {
+          date: toISTFormat(new Date(lastConversation.last_activity || lastConversation.created_at)),
+          type: lastConversation.type,
+          direction: lastConversation.direction || 'outgoing'
+        };
+        analytics.lead_progression.last_action_date = analytics.last_contact.date;
+      }
+    }
+    
+    return analytics;
+  }
+
+  if (!hasFullConversations) {
+    console.log('No full conversations available for analytics calculation');
+    return analytics;
+  }
+
   const allInteractions = [];
-  const validOutgoingEmails = []; // For tracking first non-template email
-  const incomingEmails = []; // For tracking first and last received emails
-  const emailsWithAttachments = []; // For tracking first attachment
+  const validOutgoingEmails = []; 
+  const incomingEmails = []; 
+  const emailsWithAttachments = []; 
   
   conversations.forEach(conversation => {
     if (conversation.type === 'email_thread') {
@@ -139,7 +189,7 @@ function calculateCRMAnalytics(contact) {
       // Process phone call
       const callDate = new Date(conversation.created_at);
       const duration = conversation.call_duration || 0;
-      const isConnected = duration > 90 ;
+      const isConnected = duration > 90;
       
       allInteractions.push({
         date: callDate,
@@ -176,7 +226,6 @@ function calculateCRMAnalytics(contact) {
   incomingEmails.sort((a, b) => a.date - b.date);
   emailsWithAttachments.sort((a, b) => a.date - b.date);
 
-  // Track user activities - WHO is doing what on this lead
   const userActivities = {};
   
   allInteractions.forEach(interaction => {
@@ -184,7 +233,6 @@ function calculateCRMAnalytics(contact) {
     const userName = interaction.user_name || 'Unknown User';
     const userEmail = interaction.user_email;
     
-    // Skip if no user (like notes without user info)
     if (!userId) return;
     
     // Initialize user if not exists
@@ -202,7 +250,7 @@ function calculateCRMAnalytics(contact) {
         not_connected_calls: 0,
         call_duration_total: 0,
         connected_call_duration_total: 0,
-        follow_ups: 0, // Count of activities after first contact
+        follow_ups: 0, 
         activity_breakdown: {
           last_7_days: 0,
           last_30_days: 0,
@@ -252,7 +300,6 @@ function calculateCRMAnalytics(contact) {
   // Count follow-ups for each user (activities after their first contact)
   Object.values(userActivities).forEach(userActivity => {
     const userInteractions = allInteractions.filter(i => i.user_id === userActivity.user_id);
-    // Everything after the first interaction is a follow-up
     userActivity.follow_ups = Math.max(0, userInteractions.length - 1);
   });
 
@@ -518,7 +565,6 @@ function getEmptyAnalytics(contact) {
     first_email_with_attachment: null,
     last_contact: null,
     
-    // User tracking
     user_activities: {},
     primary_user: null,
     total_users_involved: 0,
@@ -569,7 +615,6 @@ function getEmptyAnalytics(contact) {
   };
 }
 
-// Export functions for use in your sync process
 module.exports = {
   calculateCRMAnalytics,
   isAutomatedEmail,

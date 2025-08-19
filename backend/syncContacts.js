@@ -5,7 +5,7 @@ const cron = require('node-cron');
 const { calculateCRMAnalytics } = require('./crmAnalytics');
 
 const {
-  MONGO_URI ,
+  MONGO_URI,
   FRESHWORKS_API_KEY,
   FRESHWORKS_API_KEY_2,
   FRESHWORKS_API_KEY_3,
@@ -677,11 +677,94 @@ async function processConversationDataEnhanced(conversationsResponse, contactNam
 }
 
 /**
- * Process conversation data into structured format (fallback for existing code)
+ * Store conversations in separate collection and return summaries
  */
-async function processConversationData(conversationsResponse) {
-  // Use the enhanced version by default
-  return processConversationDataEnhanced(conversationsResponse, 'Contact');
+async function storeConversationsAndGetSummaries(contactId, conversations, db) {
+  const conversationsCol = db.collection('conversations');
+  const summaries = [];
+  
+  // Delete existing conversations for this contact
+  await conversationsCol.deleteMany({ contact_id: contactId });
+  
+  // Store each conversation and create summary
+  for (const conversation of conversations) {
+    try {
+      // Prepare conversation document
+      const conversationDoc = {
+        contact_id: contactId,
+        conversation_id: conversation.id,
+        type: conversation.type,
+        created_at: new Date(conversation.created_at || Date.now()),
+        updated_at: new Date(conversation.updated_at || conversation.created_at || Date.now()),
+        subject: conversation.subject,
+        content: conversation.content,
+        attachments: conversation.attachments || [],
+        participants: conversation.participants || [],
+        sync_metadata: {
+          synced_at: new Date(),
+          last_updated: new Date(),
+          version: 1
+        }
+      };
+      
+      // Add type-specific fields
+      if (conversation.type === 'email_thread') {
+        conversationDoc.email_id = conversation.email_id;
+        conversationDoc.thread_count = conversation.thread_count;
+        conversationDoc.first_message_date = conversation.first_message_date ? new Date(conversation.first_message_date) : null;
+        conversationDoc.last_message_date = conversation.last_message_date ? new Date(conversation.last_message_date) : null;
+        conversationDoc.stats = conversation.stats;
+        conversationDoc.messages = conversation.messages;
+      } else if (conversation.type === 'phone') {
+        conversationDoc.call_id = conversation.call_id;
+        conversationDoc.call_recording_url = conversation.call_recording_url;
+        conversationDoc.call_duration = conversation.call_duration;
+        conversationDoc.phone_number = conversation.phone_number;
+        conversationDoc.call_direction = conversation.call_direction;
+        conversationDoc.call_status = conversation.call_status;
+        conversationDoc.outcome = conversation.outcome;
+        conversationDoc.user_details = conversation.user_details;
+      }
+      
+      // Store in conversations collection
+      await conversationsCol.insertOne(conversationDoc);
+      
+      // Create summary for contact document
+      const summary = {
+        conversation_id: conversation.id,
+        type: conversation.type,
+        subject: conversation.subject,
+        created_at: conversationDoc.created_at,
+        updated_at: conversationDoc.updated_at,
+        participants_count: conversation.participants ? conversation.participants.length : 0,
+        has_attachments: false,
+        attachment_count: 0,
+        last_activity: conversationDoc.updated_at,
+        needs_response: false
+      };
+      
+      // Type-specific summary data
+      if (conversation.type === 'email_thread') {
+        summary.message_count = conversation.messages ? conversation.messages.length : 0;
+        summary.has_attachments = conversation.stats ? conversation.stats.total_attachments > 0 : false;
+        summary.attachment_count = conversation.stats ? conversation.stats.total_attachments : 0;
+        summary.needs_response = conversation.stats ? conversation.stats.needs_response : false;
+        summary.last_activity = conversation.last_message_date ? new Date(conversation.last_message_date) : conversationDoc.created_at;
+      } else if (conversation.type === 'phone') {
+        summary.direction = conversation.call_direction;
+        summary.duration = conversation.call_duration;
+        summary.is_connected = conversation.call_duration > 90; // Connected if > 90 seconds
+      }
+      
+      summaries.push(summary);
+      
+    } catch (error) {
+      console.error(`Error storing conversation ${conversation.id} for contact ${contactId}:`, error.message);
+      // Continue with other conversations even if one fails
+    }
+  }
+  
+  return summaries;
 }
 
 /**
@@ -694,6 +777,7 @@ async function syncContacts() {
     await client.connect();
     const db = client.db();
     const contactsCol = db.collection('contacts');
+    const conversationsCol = db.collection('conversations');
     const stateCol = db.collection('sync_state');
 
     // Get last sync state
@@ -798,97 +882,72 @@ async function syncContacts() {
         contact.lastUpdatedAt = contact.updated_at;
         
         // Fetch conversations if needed
+        let conversationSummaries = [];
+        let fullConversations = [];
+        
         if (shouldFetchConversations) {
           const conversationsResponse = await fetchContactConversations(contact.id, contact.display_name);
           
           if (conversationsResponse && conversationsResponse.conversations && conversationsResponse.conversations.length > 0) {
-            contact.conversations = await processConversationDataEnhanced(conversationsResponse, contact.display_name);
+            fullConversations = await processConversationDataEnhanced(conversationsResponse, contact.display_name);
             
-            // Calculate thread statistics
-            const emailThreads = contact.conversations.filter(c => c.type === 'email_thread');
-            const phoneConversations = contact.conversations.filter(c => c.type === 'phone');
-            const notes = contact.conversations.filter(c => c.type === 'note');
+            // Store conversations separately and get summaries
+            conversationSummaries = await storeConversationsAndGetSummaries(contact.id, fullConversations, db);
             
-            // Calculate total messages across all email threads
-            const totalEmailMessages = emailThreads.reduce((sum, thread) => sum + thread.messages.length, 0);
+            conversationsProcessed += fullConversations.reduce((sum, conv) => {
+              if (conv.type === 'email_thread') {
+                return sum + (conv.messages ? conv.messages.length : 1);
+              }
+              return sum + 1;
+            }, 0);
             
-            contact.conversation_stats = {
-              total_conversations: contact.conversations.length,
-              email_threads: emailThreads.length,
-              total_email_messages: totalEmailMessages,
-              phone_calls: phoneConversations.length,
-              notes: notes.length,
-              
-              // Detailed email stats
-              email_stats: {
-                threads_with_replies: emailThreads.filter(t => t.messages.length > 1).length,
-                average_messages_per_thread: emailThreads.length > 0 ? 
-                  (totalEmailMessages / emailThreads.length).toFixed(2) : 0,
-                longest_thread: emailThreads.length > 0 ? 
-                  Math.max(...emailThreads.map(t => t.messages.length)) : 0,
-                total_attachments: emailThreads.reduce((sum, t) => sum + t.stats.total_attachments, 0),
-                needs_response: emailThreads.some(t => t.stats.needs_response)
-              },
-              
-              last_conversation_date: contact.conversations.length > 0 ? 
-                Math.max(...contact.conversations.map(c => {
-                  if (c.type === 'email_thread') {
-                    return new Date(c.last_message_date);
-                  }
-                  return new Date(c.created_at);
-                })) : null
-            };
-            contact.crm_analytics = calculateCRMAnalytics(contact);
-
-            conversationsProcessed += totalEmailMessages + phoneConversations.length + notes.length;
-            console.log(`   Processed ${contact.conversations.length} conversations (${emailThreads.length} email threads with ${totalEmailMessages} messages, ${phoneConversations.length} calls, ${notes.length} notes) for ${contact.display_name} [Market: ${contact.custom_field.cf_report_name}]`);
+            console.log(`   Processed ${fullConversations.length} conversations (${conversationSummaries.filter(s => s.type === 'email_thread').length} email threads, ${conversationSummaries.filter(s => s.type === 'phone').length} calls, ${conversationSummaries.filter(s => s.type === 'note').length} notes) for ${contact.display_name} [Market: ${contact.custom_field.cf_report_name}]`);
           } else {
-            contact.conversations = [];
-            contact.conversation_stats = {
-              total_conversations: 0,
-              email_threads: 0,
-              total_email_messages: 0,
-              phone_calls: 0,
-              notes: 0,
-              email_stats: {
-                threads_with_replies: 0,
-                average_messages_per_thread: 0,
-                longest_thread: 0,
-                total_attachments: 0,
-                needs_response: false
-              },
-              last_conversation_date: null
-            };
-            contact.crm_analytics = getEmptyAnalytics(contact);
-
             console.log(`   No conversations found for ${contact.display_name} [Market: ${contact.custom_field.cf_report_name}]`);
           }
-        } else if (existingContact && existingContact.conversations) {
-          contact.conversations = existingContact.conversations;
-          contact.conversation_stats = existingContact.conversation_stats || {};
-          console.log(`   Keeping ${existingContact.conversations.length} existing conversations for ${contact.display_name} [Market: ${contact.custom_field.cf_report_name}]`);
-          contact.crm_analytics = calculateCRMAnalytics(contact);
-
-          
-        } else {
-          contact.conversations = [];
-          contact.conversation_stats = {
-            total_conversations: 0,
-            email_threads: 0,
-            total_email_messages: 0,
-            phone_calls: 0,
-            notes: 0,
-            email_stats: {
-              threads_with_replies: 0,
-              average_messages_per_thread: 0,
-              longest_thread: 0,
-              total_attachments: 0,
-              needs_response: false
-            },
-            last_conversation_date: null
-          };
-          contact.crm_analytics = getEmptyAnalytics(contact);
+        } else if (existingContact && existingContact.conversation_summaries) {
+          conversationSummaries = existingContact.conversation_summaries;
+          console.log(`   Keeping ${existingContact.conversation_summaries.length} existing conversation summaries for ${contact.display_name} [Market: ${contact.custom_field.cf_report_name}]`);
         }
+        
+        // Add conversation summaries to contact
+        contact.conversation_summaries = conversationSummaries;
+        
+        // Calculate conversation stats
+        const emailThreads = conversationSummaries.filter(c => c.type === 'email_thread');
+        const phoneConversations = conversationSummaries.filter(c => c.type === 'phone');
+        const notes = conversationSummaries.filter(c => c.type === 'note');
+        
+        // Calculate total messages across all email threads
+        const totalEmailMessages = emailThreads.reduce((sum, thread) => sum + (thread.message_count || 1), 0);
+        
+        contact.conversation_stats = {
+          total_conversations: conversationSummaries.length,
+          email_threads: emailThreads.length,
+          total_email_messages: totalEmailMessages,
+          phone_calls: phoneConversations.length,
+          notes: notes.length,
+          
+          // Detailed email stats
+          email_stats: {
+            threads_with_replies: emailThreads.filter(t => (t.message_count || 1) > 1).length,
+            average_messages_per_thread: emailThreads.length > 0 ? 
+              (totalEmailMessages / emailThreads.length).toFixed(2) : 0,
+            longest_thread: emailThreads.length > 0 ? 
+              Math.max(...emailThreads.map(t => t.message_count || 1)) : 0,
+            total_attachments: emailThreads.reduce((sum, t) => sum + (t.attachment_count || 0), 0),
+            needs_response: emailThreads.some(t => t.needs_response)
+          },
+          
+          last_conversation_date: conversationSummaries.length > 0 ? 
+            Math.max(...conversationSummaries.map(c => new Date(c.last_activity || c.created_at).getTime())) : null
+        };
+        
+        // Calculate CRM analytics using full conversation data for analytics
+        // We need to temporarily restore the full conversations format for analytics calculation
+        const tempConversationsForAnalytics = fullConversations.length > 0 ? fullConversations : [];
+        const tempContactForAnalytics = { ...contact, conversations: tempConversationsForAnalytics };
+        contact.crm_analytics = calculateCRMAnalytics(tempContactForAnalytics);
         
         let updateData = { ...contact };
         
@@ -971,6 +1030,7 @@ async function syncContacts() {
     console.log(`Total ignored contacts: ${ignoredByEmailDomain + ignoredByMarketName}`);
     console.log(`🔑 Ended sync using API Key ${currentKeyIndex + 1}/${API_KEYS.length} (${apiCallCount} calls made)`);
     console.log(`Next sync will start from: ${newestContactSeen}`);
+    console.log(`📚 Conversations stored separately for efficient querying`);
 
   } catch (error) {
     console.error('Sync failed:', error);
@@ -991,12 +1051,17 @@ async function getSyncStatus() {
     const db = client.db();
     const stateCol = db.collection('sync_state');
     const contactsCol = db.collection('contacts');
+    const conversationsCol = db.collection('conversations');
 
     const state = await stateCol.findOne({ _id: 'contacts_sync' });
     const totalContacts = await contactsCol.countDocuments();
     const contactsWithConversations = await contactsCol.countDocuments({ 
-      "conversations.0": { $exists: true } 
+      "conversation_summaries.0": { $exists: true } 
     });
+    const totalConversations = await conversationsCol.countDocuments();
+    const conversationsByType = await conversationsCol.aggregate([
+      { $group: { _id: '$type', count: { $sum: 1 } } }
+    ]).toArray();
 
     // Territory statistics
     const territoryStats = await contactsCol.aggregate([
@@ -1029,6 +1094,8 @@ async function getSyncStatus() {
     }
     console.log(`   Total contacts in DB: ${totalContacts}`);
     console.log(`   Contacts with conversations: ${contactsWithConversations}`);
+    console.log(`   Total conversations stored: ${totalConversations}`);
+    console.log(`   Conversation breakdown:`, conversationsByType);
     console.log(`   Ignored email domains: ${IGNORED_EMAIL_DOMAINS.join(', ')}`);
     
     if (territoryStats.length > 0) {
@@ -1058,13 +1125,14 @@ async function initialize() {
   console.log('Starting Freshworks Contact Sync Service...');
   console.log(`Email domains to ignore: ${IGNORED_EMAIL_DOMAINS.join(', ')}`);
   console.log('Only syncing contacts with valid market names (cf_report_name)');
+  console.log('📚 Using separate conversations collection for efficient storage');
   
   await getSyncStatus();
   
   console.log('Running initial sync...');
   await syncContacts();
   
-  // Schedule  sync
+  // Schedule hourly sync
   cron.schedule('0 2 * * *', () => {
     console.log('Running scheduled contacts sync...');
     syncContacts().catch(error => {
@@ -1084,12 +1152,6 @@ process.on('SIGINT', () => {
 process.on('SIGTERM', () => {
   console.log('\nShutting down gracefully...');
   process.exit(0);
-});
-
-// Start the service
-initialize().catch(error => {
-  console.error('Failed to initialize:', error);
-  process.exit(1);
 });
 
 function getEmptyAnalytics(contact) {
@@ -1143,3 +1205,9 @@ function getEmptyAnalytics(contact) {
     }
   };
 }
+
+// Start the service
+initialize().catch(error => {
+  console.error('Failed to initialize:', error);
+  process.exit(1);
+});

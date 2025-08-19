@@ -1,6 +1,7 @@
 const Contact = require('../models/Contact');
+const Conversation = require('../models/Conversation');
 
-// Updated getContactsTable function with fixed analytics and country filtering
+// Enhanced getContactsTable function with better analytics and conversation support
 const getContactsTable = async (req, res) => {
   try {
     // Extract query parameters
@@ -38,6 +39,7 @@ const getContactsTable = async (req, res) => {
 
     const analyticsCountries = parseFilter(analyticsCountryFilter);
     console.log('Analytics country filter received:', analyticsCountries);
+    
     const query = {};
 
     if (search) {
@@ -251,9 +253,9 @@ const getContactsTable = async (req, res) => {
       dbSortField = 'crm_analytics.engagement.not_connected_calls';
     } else if (sortBy === 'call_duration_total') {
       dbSortField = 'crm_analytics.engagement.avg_connected_call_duration';
-    }else if (sortBy === 'first_call_timing') {
-    dbSortField = 'crm_analytics.first_call.date';
-  }
+    } else if (sortBy === 'first_call_timing') {
+      dbSortField = 'crm_analytics.first_call.date';
+    }
 
     // Get contacts with required fields for table INCLUDING CRM analytics
     const contacts = await Contact.find(query)
@@ -313,6 +315,7 @@ const getContactsTable = async (req, res) => {
       }
       return null;
     };
+
     const calculateFirstCallTiming = (contact) => {
       if (!contact.created_at || !contact.crm_analytics?.first_call?.date) {
         return null;
@@ -327,6 +330,7 @@ const getContactsTable = async (req, res) => {
       }
       return null;
     };
+
     // Transform data for table view and double-check market_name
     const tableData = contacts
       .filter(contact => {
@@ -353,7 +357,7 @@ const getContactsTable = async (req, res) => {
         custom_tags: formatValue(contact.custom_field?.cf_custom_tags),
         is_active: isContactActive(contact) ? 'Yes' : 'No',
         sample_sent_timing: calculateSampleSentTiming(contact),
-        first_call_timing: calculateFirstCallTiming(contact), // NEW FIELD
+        first_call_timing: calculateFirstCallTiming(contact),
         status_name: formatValue(contact.status_name),
         owner_name: formatValue(contact.owner_name),
         created_at: contact.created_at,
@@ -363,7 +367,7 @@ const getContactsTable = async (req, res) => {
         // CRM Analytics fields
         last_email_received: contact.crm_analytics?.last_email_received?.date || null,
         first_email_with_attachment: contact.crm_analytics?.first_email_with_attachment?.date || null,
-        first_call_date: contact.crm_analytics?.first_call?.date || null, // NEW FIELD
+        first_call_date: contact.crm_analytics?.first_call?.date || null,
         total_touchpoints: contact.crm_analytics?.engagement?.total_touchpoints || 0,
         outgoing_emails: contact.crm_analytics?.engagement?.outgoing_emails || 0,
         incoming_emails: contact.crm_analytics?.engagement?.incoming_emails || 0,
@@ -373,6 +377,7 @@ const getContactsTable = async (req, res) => {
         avg_connected_call_duration: contact.crm_analytics?.engagement?.avg_connected_call_duration || 0,
         avg_connected_call_duration_formatted: formatDuration(contact.crm_analytics?.engagement?.avg_connected_call_duration || 0)
       }));
+
     const allFilteredContacts = await Contact.find(query)
       .select('custom_field crm_analytics created_at country territory_name')
       .lean();
@@ -386,13 +391,13 @@ const getContactsTable = async (req, res) => {
           avgCalls: '0.0',
           avgConnectedCalls: '0.0',
           avgSampleSentHours: '0.0',
-          avgFirstCallMinutes: '0.0', // NEW FIELD
+          avgFirstCallMinutes: '0.0',
           clientEmailsReceived: 0,
           avgCallDuration: '0',
           avgConnectedCallDuration: '0',
           responseRate: '0.0',
           samplesSentCount: 0,
-          firstCallsCount: 0, // NEW FIELD
+          firstCallsCount: 0,
           countryBreakdown: {},
           territoryBreakdown: {},
           activeLeadCount: 0,
@@ -417,9 +422,9 @@ const getContactsTable = async (req, res) => {
   let totalIncomingEmails = 0;
   let totalConnectedCalls = 0;
   let totalSampleSentHours = 0;
-  let totalFirstCallMinutes = 0; // NEW VARIABLE
+  let totalFirstCallMinutes = 0;
   let validSampleSentCount = 0;
-  let validFirstCallCount = 0; // NEW VARIABLE
+  let validFirstCallCount = 0;
   let totalCallDuration = 0;
   let totalConnectedCallDuration = 0; 
   let validCallDurationCount = 0;
@@ -427,14 +432,12 @@ const getContactsTable = async (req, res) => {
   let contactsWithCalls = 0;
   let activeLeadCount = 0;
 
-  // Breakdown objects (always based on ALL contacts, not filtered)
   const countryBreakdown = {};
   const territoryBreakdown = {};
   const leadLevelBreakdown = {};
   const contactCategoryBreakdown = {};
   const priorityCountries = {};
 
-  // Initialize priority countries with ALL contacts
   const priorityCountryList = [
     'United States', 'United Kingdom', 'France', 'Italy', 
     'Germany', 'Spain', 'Japan', 'Korea, Republic of'
@@ -443,12 +446,10 @@ const getContactsTable = async (req, res) => {
     priorityCountries[country] = 0;
   });
 
-  // Process ALL contacts for breakdowns
   contacts.forEach(contact => {
     const country = contact.country || 'Unknown';
     countryBreakdown[country] = (countryBreakdown[country] || 0) + 1;
     
-    // Priority countries tracking
     if (priorityCountries.hasOwnProperty(country)) {
       priorityCountries[country]++;
     }
@@ -465,13 +466,15 @@ const getContactsTable = async (req, res) => {
     contactCategoryBreakdown[contactCategory] = (contactCategoryBreakdown[contactCategory] || 0) + 1;
   });
 
-  // Process analytics-filtered contacts for metrics
+  // Process analytics-filtered contacts for metrics with enhanced email counting
   analyticsContacts.forEach(contact => {
-    // Basic engagement analytics
     if (contact.crm_analytics?.engagement) {
       const engagement = contact.crm_analytics.engagement;
       
-      totalTouchpoints += engagement.total_touchpoints || 0;
+      const emailTouchpoints = (engagement.outgoing_emails || 0) + (engagement.incoming_emails || 0);
+      const callTouchpoints = (engagement.outgoing_calls || 0) + (engagement.incoming_calls || 0);
+      
+      totalTouchpoints += emailTouchpoints + callTouchpoints;
       totalOutgoingEmails += engagement.outgoing_emails || 0;
       totalOutgoingCalls += engagement.outgoing_calls || 0;
       
@@ -484,7 +487,6 @@ const getContactsTable = async (req, res) => {
       
       totalIncomingEmails += engagement.incoming_emails || 0;
       
-      // Calculate total call duration (all calls)
       if (engagement.call_duration_total && engagement.call_duration_total > 0) {
         totalCallDuration += engagement.call_duration_total;
         validCallDurationCount++;
@@ -497,14 +499,11 @@ const getContactsTable = async (req, res) => {
         totalConnectedCallDuration += engagement.call_duration_total;
         validConnectedCallDurationCount += connectedCalls;
       }
-
-      // Check if contact is active
       if ((engagement.incoming_emails || 0) > 0 || connectedCalls > 0) {
         activeLeadCount++;
       }
     }
     
-    // Sample sent timing
     if (contact.created_at && contact.crm_analytics?.first_email_with_attachment?.date) {
       const createdDate = new Date(contact.created_at);
       const sampleSentDate = new Date(contact.crm_analytics.first_email_with_attachment.date);
@@ -518,14 +517,13 @@ const getContactsTable = async (req, res) => {
       }
     }
 
-    // NEW: First call timing calculation
     if (contact.created_at && contact.crm_analytics?.first_call?.date) {
       const createdDate = new Date(contact.created_at);
       const firstCallDate = new Date(contact.crm_analytics.first_call.date);
       
       if (firstCallDate > createdDate) {
         const minutesDelay = (firstCallDate - createdDate) / (1000 * 60);
-        if (minutesDelay >= 0 && minutesDelay <= 525600) { // 365 days in minutes
+        if (minutesDelay >= 0 && minutesDelay <= 525600) { 
           totalFirstCallMinutes += minutesDelay;
           validFirstCallCount++;
         }
@@ -543,13 +541,13 @@ const getContactsTable = async (req, res) => {
     avgCalls: analyticsContacts.length > 0 ? (totalOutgoingCalls / analyticsContacts.length).toFixed(1) : '0.0',
     avgConnectedCalls: contactsWithCalls > 0 ? (totalConnectedCalls / contactsWithCalls).toFixed(1) : '0.0',
     avgSampleSentHours: validSampleSentCount > 0 ? (totalSampleSentHours / validSampleSentCount).toFixed(1) : '0.0',
-    avgFirstCallMinutes: validFirstCallCount > 0 ? (totalFirstCallMinutes / validFirstCallCount).toFixed(1) : '0.0', // NEW FIELD
+    avgFirstCallMinutes: validFirstCallCount > 0 ? (totalFirstCallMinutes / validFirstCallCount).toFixed(1) : '0.0',
     clientEmailsReceived: totalIncomingEmails,
     avgCallDuration: validCallDurationCount > 0 ? (totalCallDuration / validCallDurationCount).toFixed(0) : '0',
     avgConnectedCallDuration: validConnectedCallDurationCount > 0 ? (totalConnectedCallDuration / validConnectedCallDurationCount).toFixed(0) : '0',
     responseRate: responseRate.toFixed(1),
     samplesSentCount: validSampleSentCount,
-    firstCallsCount: validFirstCallCount, // NEW FIELD
+    firstCallsCount: validFirstCallCount,
     countryBreakdown,
     territoryBreakdown,
     activeLeadCount, 
@@ -587,7 +585,154 @@ const getContactsTable = async (req, res) => {
   }
 };
 
-// Updated getAllContacts function with multi-select support
+// Enhanced getContactConversations 
+const getContactConversations = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { type } = req.query;
+
+    // Helper function to check if string is valid ObjectId
+    const isValidObjectId = (id) => {
+      return /^[0-9a-fA-F]{24}$/.test(id);
+    };
+
+    // Build query based on whether id is ObjectId or numeric
+    let contactQuery;
+    if (isValidObjectId(id)) {
+      contactQuery = {
+        $or: [
+          { _id: id },
+          { id: parseInt(id) }
+        ]
+      };
+    } else {
+      contactQuery = { id: parseInt(id) };
+    }
+
+    // Find the contact first
+    const contact = await Contact.findOne(contactQuery).select('id display_name created_at');
+
+    if (!contact) {
+      return res.status(404).json({
+        success: false,
+        message: 'Contact not found'
+      });
+    }
+
+    // Build query for conversations collection
+    const query = { contact_id: contact.id };
+    if (type) {
+      query.type = type;
+    }
+
+    // Get ALL conversations for the modal with enhanced data and proper sorting
+    const conversations = await Conversation.find(query)
+      .sort({ 
+        created_at: -1,  // Primary sort by creation date (newest first)
+        updated_at: -1   // Secondary sort by update date
+      })
+      .lean();
+
+    // Enhance conversations with calculated metrics and proper sorting
+    const enhancedConversations = conversations.map(conversation => {
+      const enhanced = { ...conversation };
+
+      // For email threads, add calculated stats and ensure message sorting
+      if (conversation.type === 'email_thread' && conversation.messages) {
+        // Sort messages chronologically within each thread (oldest first for reading flow)
+        enhanced.messages = conversation.messages.sort((a, b) => 
+          new Date(a.timestamp) - new Date(b.timestamp)
+        );
+
+        const stats = {
+          outgoing_messages: enhanced.messages.filter(msg => msg.direction === 'outgoing').length,
+          incoming_messages: enhanced.messages.filter(msg => msg.direction === 'incoming').length,
+          total_attachments: enhanced.messages.reduce((total, msg) => 
+            total + (msg.attachments ? msg.attachments.length : 0), 0),
+          needs_response: false // Will be calculated based on last message direction
+        };
+
+        // Check if needs response (last message was outgoing and no response for 2+ days)
+        if (enhanced.messages.length > 0) {
+          const sortedMessages = enhanced.messages.sort((a, b) => 
+            new Date(b.timestamp) - new Date(a.timestamp)
+          );
+          const lastMessage = sortedMessages[0];
+          
+          if (lastMessage.direction === 'outgoing') {
+            const daysSinceLastMessage = (new Date() - new Date(lastMessage.timestamp)) / (1000 * 60 * 60 * 24);
+            stats.needs_response = daysSinceLastMessage > 2;
+          }
+        }
+
+        enhanced.stats = stats;
+
+        // Add date range for the thread (for proper conversation sorting)
+        const messageDates = enhanced.messages.map(msg => new Date(msg.timestamp));
+        enhanced.first_message_date = new Date(Math.min(...messageDates)).toISOString();
+        enhanced.last_message_date = new Date(Math.max(...messageDates)).toISOString();
+
+        // Update conversation sort key to use last message date for better ordering
+        enhanced.sort_date = enhanced.last_message_date;
+      } else {
+        // For non-email conversations, use created_at as sort date
+        enhanced.sort_date = conversation.created_at;
+      }
+
+      // For phone calls, enhance with calculated duration and status
+      if (conversation.type === 'phone') {
+        enhanced.call_status = (conversation.call_duration || 0) > 90 ? 'connected' : 'not_connected';
+        enhanced.call_duration_formatted = formatDuration(conversation.call_duration || 0);
+        enhanced.is_connected = (conversation.call_duration || 0) > 90;
+      }
+
+      return enhanced;
+    });
+
+    // Final sort by the most recent activity (last message date for emails, created_at for others)
+    enhancedConversations.sort((a, b) => {
+      const dateA = new Date(a.sort_date || a.created_at);
+      const dateB = new Date(b.sort_date || b.created_at);
+      return dateB - dateA; 
+    });
+
+    console.log(`Found ${enhancedConversations.length} conversations for contact ${contact.id}`);
+    
+    // Log conversation order for debugging
+    console.log('Conversation order:', enhancedConversations.map(c => ({
+      id: c.conversation_id,
+      type: c.type,
+      sort_date: c.sort_date || c.created_at,
+      subject: c.subject || 'No subject'
+    })));
+
+    res.json({
+      success: true,
+      data: enhancedConversations,
+      contact_info: {
+        id: contact.id,
+        name: contact.display_name,
+        created_at: contact.created_at
+      }
+    });
+  } catch (error) {
+    console.error('Error fetching conversations:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Error fetching conversations',
+      error: error.message
+    });
+  }
+};
+
+// Helper function to format duration (keeping existing)
+const formatDuration = (seconds) => {
+  if (!seconds || seconds === 0) return '0m 0s';
+  const minutes = Math.floor(seconds / 60);
+  const remainingSeconds = seconds % 60;
+  return `${minutes}m ${remainingSeconds}s`;
+};
+
 const getAllContacts = async (req, res) => {
   try {
     const {
@@ -600,7 +745,6 @@ const getAllContacts = async (req, res) => {
       endDate = ''
     } = req.query;
 
-    // Parse multi-select filters
     const parseFilter = (filterStr) => {
       try {
         const parsed = JSON.parse(filterStr || '[]');
@@ -618,7 +762,6 @@ const getAllContacts = async (req, res) => {
 
     const query = {};
 
-    // Add search filter including market name
     if (search) {
       query.$or = [
         { display_name: { $regex: search, $options: 'i' } },
@@ -629,7 +772,6 @@ const getAllContacts = async (req, res) => {
       ];
     }
 
-    // Multi-select filters
     if (filters.status.length > 0) {
       query.status_name = { $in: filters.status };
     }
@@ -642,7 +784,6 @@ const getAllContacts = async (req, res) => {
       query.country = { $in: filters.country };
     }
 
-    // Filter out contacts with empty market names
     query['custom_field.cf_report_name'] = { 
       $exists: true, 
       $ne: null, 
@@ -692,22 +833,44 @@ const getAllContacts = async (req, res) => {
   }
 };
 
-// Get single contact by ID
 const getContactById = async (req, res) => {
   try {
     const { id } = req.params;
+    const { includeConversations = 'false' } = req.query;
     
-    const contact = await Contact.findOne({
-      $or: [
-        { _id: id },
-        { id: parseInt(id) }
-      ]
-    });
+    const isValidObjectId = (id) => {
+      return /^[0-9a-fA-F]{24}$/.test(id);
+    };
+
+    let contactQuery;
+    if (isValidObjectId(id)) {
+      contactQuery = {
+        $or: [
+          { _id: id },
+          { id: parseInt(id) }
+        ]
+      };
+    } else {
+      contactQuery = { id: parseInt(id) };
+    }
+
+    const contact = await Contact.findOne(contactQuery);
 
     if (!contact) {
       return res.status(404).json({
         success: false,
         message: 'Contact not found'
+      });
+    }
+
+    if (includeConversations === 'true') {
+      const conversations = await Conversation.find({ 
+        contact_id: contact.id 
+      }).sort({ created_at: -1 });
+      
+      return res.json({
+        success: true,
+        data: conversations
       });
     }
 
@@ -724,7 +887,6 @@ const getContactById = async (req, res) => {
   }
 };
 
-// Get contact statistics
 const getContactStats = async (req, res) => {
   try {
     const marketNameFilter = {
@@ -760,7 +922,6 @@ const getContactStats = async (req, res) => {
       }
     ]);
 
-    // Get contacts by status (with market name filter)
     const statusDistribution = await Contact.aggregate([
       { $match: marketNameFilter },
       {
@@ -772,7 +933,6 @@ const getContactStats = async (req, res) => {
       { $sort: { count: -1 } }
     ]);
 
-    // Get contacts by owner (with market name filter)
     const ownerDistribution = await Contact.aggregate([
       { $match: marketNameFilter },
       {
@@ -788,7 +948,6 @@ const getContactStats = async (req, res) => {
       { $limit: 10 } 
     ]);
 
-    // Get contacts by territory
     const territoryDistribution = await Contact.aggregate([
       { $match: marketNameFilter },
       {
@@ -800,20 +959,27 @@ const getContactStats = async (req, res) => {
       { $sort: { count: -1 } }
     ]);
 
-    // Get average call duration and total calls
-    const callStats = await Contact.aggregate([
-      { $match: marketNameFilter },
-      { $unwind: '$conversations' },
-      { $match: { 'conversations.type': 'phone' } },
+    const callStats = await Conversation.aggregate([
+      { $match: { type: 'phone' } },
+      {
+        $lookup: {
+          from: 'contacts',
+          localField: 'contact_id',
+          foreignField: 'id',
+          as: 'contact'
+        }
+      },
+      { $unwind: '$contact' },
+      { $match: { 'contact.custom_field.cf_report_name': { $exists: true, $ne: null, $ne: '', $ne: '-' } } },
       {
         $group: {
           _id: null,
-          avgCallDuration: { $avg: '$conversations.call_duration' },
+          avgCallDuration: { $avg: '$call_duration' },
           totalCalls: { $sum: 1 },
           answeredCalls: {
             $sum: {
               $cond: [
-                { $gt: ['$conversations.call_duration', 0] },
+                { $gt: ['$call_duration', 90] },
                 1,
                 0
               ]
@@ -823,7 +989,6 @@ const getContactStats = async (req, res) => {
       }
     ]);
 
-    // Get recent activity stats
     const thirtyDaysAgo = new Date();
     thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
 
@@ -873,73 +1038,30 @@ const getContactStats = async (req, res) => {
   }
 };
 
-// Get contact conversations
-const getContactConversations = async (req, res) => {
-  try {
-    const { id } = req.params;
-    const { type, page = 1, limit = 10 } = req.query;
+const isValidObjectId = (id) => {
+  return /^[0-9a-fA-F]{24}$/.test(id);
+};
 
-    const contact = await Contact.findOne({
+const buildContactQuery = (id) => {
+  if (isValidObjectId(id)) {
+    return {
       $or: [
         { _id: id },
         { id: parseInt(id) }
       ]
-    }).select('conversations');
-
-    if (!contact) {
-      return res.status(404).json({
-        success: false,
-        message: 'Contact not found'
-      });
-    }
-
-    let conversations = contact.conversations;
-
-    // Filter by type if specified
-    if (type) {
-      conversations = conversations.filter(conv => conv.type === type);
-    }
-
-    // Sort by created_at descending
-    conversations.sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
-
-    // Pagination
-    const startIndex = (parseInt(page) - 1) * parseInt(limit);
-    const endIndex = startIndex + parseInt(limit);
-    const paginatedConversations = conversations.slice(startIndex, endIndex);
-
-    res.json({
-      success: true,
-      data: paginatedConversations,
-      pagination: {
-        currentPage: parseInt(page),
-        totalPages: Math.ceil(conversations.length / parseInt(limit)),
-        totalCount: conversations.length,
-        limit: parseInt(limit)
-      }
-    });
-  } catch (error) {
-    res.status(500).json({
-      success: false,
-      message: 'Error fetching conversations',
-      error: error.message
-    });
+    };
+  } else {
+    return { id: parseInt(id) };
   }
 };
 
-// Update contact
 const updateContact = async (req, res) => {
   try {
     const { id } = req.params;
     const updates = req.body;
 
     const contact = await Contact.findOneAndUpdate(
-      {
-        $or: [
-          { _id: id },
-          { id: parseInt(id) }
-        ]
-      },
+      buildContactQuery(id),
       updates,
       { new: true, runValidators: true }
     );
@@ -965,17 +1087,11 @@ const updateContact = async (req, res) => {
   }
 };
 
-// Delete contact
 const deleteContact = async (req, res) => {
   try {
     const { id } = req.params;
     
-    const contact = await Contact.findOneAndDelete({
-      $or: [
-        { _id: id },
-        { id: parseInt(id) }
-      ]
-    });
+    const contact = await Contact.findOneAndDelete(buildContactQuery(id));
 
     if (!contact) {
       return res.status(404).json({
@@ -984,9 +1100,11 @@ const deleteContact = async (req, res) => {
       });
     }
 
+    await Conversation.deleteMany({ contact_id: contact.id });
+
     res.json({
       success: true,
-      message: 'Contact deleted successfully'
+      message: 'Contact and related conversations deleted successfully'
     });
   } catch (error) {
     res.status(500).json({
@@ -997,7 +1115,6 @@ const deleteContact = async (req, res) => {
   }
 };
 
-// Updated getFilterOptions with countries and enhanced filtering
 const getFilterOptions = async (req, res) => {
   try {
     const marketNameFilter = {
@@ -1024,10 +1141,8 @@ const getFilterOptions = async (req, res) => {
       Contact.distinct('country', marketNameFilter)
     ]);
 
-    // DEBUGGING: Log contact categories found
     console.log('Raw contact categories from database:', contactCategories);
 
-    // Filter out NA, null, empty values from all filter options
     const filterNA = (values) => values.filter(val => 
       val && 
       val !== null && 
@@ -1039,7 +1154,6 @@ const getFilterOptions = async (req, res) => {
       val !== 'n/a'
     );
 
-    // Count contacts with missing/NA values for each field
     const [
       unassignedOwnerCount, 
       unassignedTerritoryCount, 
@@ -1128,17 +1242,15 @@ const getFilterOptions = async (req, res) => {
       })
     ]);
 
-    // Prepare filter options with unassigned counts
     const processedOwners = filterNA(owners);
     const processedTerritories = filterNA(territories);
     const processedLeadLevels = filterNA(leadLevels);
     const processedContactCategories = filterNA(contactCategories);
     const processedCustomTags = filterNA(customTags);
-    const processedCountries = filterNA(countries).sort(); // Sort countries alphabetically
+    const processedCountries = filterNA(countries).sort();
 
     console.log('Processed contact categories:', processedContactCategories);
 
-    // Add "Unassigned" options if there are contacts without these values
     if (unassignedOwnerCount > 0) {
       processedOwners.unshift(`Unassigned (${unassignedOwnerCount})`);
     }
