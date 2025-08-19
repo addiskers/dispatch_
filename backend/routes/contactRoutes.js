@@ -9,15 +9,17 @@ const {
   getContactConversations,
   updateContact,
   deleteContact,
-  getFilterOptions
+  getFilterOptions,
+  getTimeSeriesData 
 } = require('../controllers/contactController');
-
 router.get('/table', getContactsTable);
 router.get('/filters', getFilterOptions);
 router.get('/stats', getContactStats);
+router.get('/timeseries', getTimeSeriesData); 
 router.get('/:id/conversations', getContactConversations);
-router.get('/:id', getContactById);
+router.get('/:id', getContactById); 
 router.get('/', getAllContacts);
 router.put('/:id', updateContact);
 router.delete('/:id', deleteContact);
+
 module.exports = router;

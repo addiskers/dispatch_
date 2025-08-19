@@ -1,10 +1,8 @@
 const Contact = require('../models/Contact');
 const Conversation = require('../models/Conversation');
 
-// Enhanced getContactsTable function with better analytics and conversation support
 const getContactsTable = async (req, res) => {
   try {
-    // Extract query parameters
     const {
       page = 1,
       limit = 100,
@@ -16,7 +14,6 @@ const getContactsTable = async (req, res) => {
       analyticsCountryFilter = '[]'
     } = req.query;
 
-    // Parse multi-select filters
     const parseFilter = (filterStr) => {
       try {
         const parsed = JSON.parse(filterStr || '[]');
@@ -69,12 +66,10 @@ const getContactsTable = async (req, res) => {
 
       const conditions = [];
       
-      // Add standard values condition
       if (standardValues.length > 0) {
         conditions.push({ [fieldPath]: { $in: standardValues } });
       }
       
-      // Add unassigned condition
       if (unassignedValues.length > 0) {
         conditions.push({
           $or: [
@@ -257,7 +252,6 @@ const getContactsTable = async (req, res) => {
       dbSortField = 'crm_analytics.first_call.date';
     }
 
-    // Get contacts with required fields for table INCLUDING CRM analytics
     const contacts = await Contact.find(query)
       .select('id display_name email country job_title custom_field owner_name created_at last_contacted last_contacted_mode status_name territory_name crm_analytics')
       .sort({ [dbSortField]: sortOrder === 'asc' ? 1 : -1 })
@@ -326,12 +320,11 @@ const getContactsTable = async (req, res) => {
       
       if (firstCallDate > createdDate) {
         const minutesDelay = (firstCallDate - createdDate) / (1000 * 60);
-        return minutesDelay >= 0 && minutesDelay <= 525600 ? minutesDelay.toFixed(1) : null; // 365 days in minutes
+        return minutesDelay >= 0 && minutesDelay <= 525600 ? minutesDelay.toFixed(1) : null; 
       }
       return null;
     };
 
-    // Transform data for table view and double-check market_name
     const tableData = contacts
       .filter(contact => {
         const marketName = contact.custom_field?.cf_report_name;
@@ -466,7 +459,6 @@ const getContactsTable = async (req, res) => {
     contactCategoryBreakdown[contactCategory] = (contactCategoryBreakdown[contactCategory] || 0) + 1;
   });
 
-  // Process analytics-filtered contacts for metrics with enhanced email counting
   analyticsContacts.forEach(contact => {
     if (contact.crm_analytics?.engagement) {
       const engagement = contact.crm_analytics.engagement;
@@ -591,12 +583,10 @@ const getContactConversations = async (req, res) => {
     const { id } = req.params;
     const { type } = req.query;
 
-    // Helper function to check if string is valid ObjectId
     const isValidObjectId = (id) => {
       return /^[0-9a-fA-F]{24}$/.test(id);
     };
 
-    // Build query based on whether id is ObjectId or numeric
     let contactQuery;
     if (isValidObjectId(id)) {
       contactQuery = {
@@ -609,7 +599,6 @@ const getContactConversations = async (req, res) => {
       contactQuery = { id: parseInt(id) };
     }
 
-    // Find the contact first
     const contact = await Contact.findOne(contactQuery).select('id display_name created_at');
 
     if (!contact) {
@@ -619,27 +608,22 @@ const getContactConversations = async (req, res) => {
       });
     }
 
-    // Build query for conversations collection
     const query = { contact_id: contact.id };
     if (type) {
       query.type = type;
     }
 
-    // Get ALL conversations for the modal with enhanced data and proper sorting
     const conversations = await Conversation.find(query)
       .sort({ 
-        created_at: -1,  // Primary sort by creation date (newest first)
-        updated_at: -1   // Secondary sort by update date
+        created_at: -1,  
+        updated_at: -1   
       })
       .lean();
 
-    // Enhance conversations with calculated metrics and proper sorting
     const enhancedConversations = conversations.map(conversation => {
       const enhanced = { ...conversation };
 
-      // For email threads, add calculated stats and ensure message sorting
       if (conversation.type === 'email_thread' && conversation.messages) {
-        // Sort messages chronologically within each thread (oldest first for reading flow)
         enhanced.messages = conversation.messages.sort((a, b) => 
           new Date(a.timestamp) - new Date(b.timestamp)
         );
@@ -649,10 +633,9 @@ const getContactConversations = async (req, res) => {
           incoming_messages: enhanced.messages.filter(msg => msg.direction === 'incoming').length,
           total_attachments: enhanced.messages.reduce((total, msg) => 
             total + (msg.attachments ? msg.attachments.length : 0), 0),
-          needs_response: false // Will be calculated based on last message direction
+          needs_response: false 
         };
 
-        // Check if needs response (last message was outgoing and no response for 2+ days)
         if (enhanced.messages.length > 0) {
           const sortedMessages = enhanced.messages.sort((a, b) => 
             new Date(b.timestamp) - new Date(a.timestamp)
@@ -667,19 +650,15 @@ const getContactConversations = async (req, res) => {
 
         enhanced.stats = stats;
 
-        // Add date range for the thread (for proper conversation sorting)
         const messageDates = enhanced.messages.map(msg => new Date(msg.timestamp));
         enhanced.first_message_date = new Date(Math.min(...messageDates)).toISOString();
         enhanced.last_message_date = new Date(Math.max(...messageDates)).toISOString();
 
-        // Update conversation sort key to use last message date for better ordering
         enhanced.sort_date = enhanced.last_message_date;
       } else {
-        // For non-email conversations, use created_at as sort date
         enhanced.sort_date = conversation.created_at;
       }
 
-      // For phone calls, enhance with calculated duration and status
       if (conversation.type === 'phone') {
         enhanced.call_status = (conversation.call_duration || 0) > 90 ? 'connected' : 'not_connected';
         enhanced.call_duration_formatted = formatDuration(conversation.call_duration || 0);
@@ -689,7 +668,6 @@ const getContactConversations = async (req, res) => {
       return enhanced;
     });
 
-    // Final sort by the most recent activity (last message date for emails, created_at for others)
     enhancedConversations.sort((a, b) => {
       const dateA = new Date(a.sort_date || a.created_at);
       const dateB = new Date(b.sort_date || b.created_at);
@@ -698,7 +676,6 @@ const getContactConversations = async (req, res) => {
 
     console.log(`Found ${enhancedConversations.length} conversations for contact ${contact.id}`);
     
-    // Log conversation order for debugging
     console.log('Conversation order:', enhancedConversations.map(c => ({
       id: c.conversation_id,
       type: c.type,
@@ -725,7 +702,6 @@ const getContactConversations = async (req, res) => {
   }
 };
 
-// Helper function to format duration (keeping existing)
 const formatDuration = (seconds) => {
   if (!seconds || seconds === 0) return '0m 0s';
   const minutes = Math.floor(seconds / 60);
@@ -1296,6 +1272,378 @@ const getFilterOptions = async (req, res) => {
     });
   }
 };
+const getTimeSeriesData = async (req, res) => {
+  try {
+    // ... (all the code at the beginning of the function remains the same)
+    const {
+      chartType,
+      timeFilter = 'monthly', // daily, monthly
+    } = req.query;
+
+    const parseFilter = (filterStr) => {
+      try {
+        const parsed = JSON.parse(filterStr || '[]');
+        return Array.isArray(parsed) ? parsed : [];
+      } catch (e) {
+        return [];
+      }
+    };
+
+    const filters = {
+      status: parseFilter(req.query.status),
+      owner: parseFilter(req.query.owner),
+      territory: parseFilter(req.query.territory),
+      leadLevel: parseFilter(req.query.leadLevel),
+      contactCategory: parseFilter(req.query.contactCategory),
+      customTags: parseFilter(req.query.customTags),
+      country: parseFilter(req.query.country),
+      isActive: req.query.isActive || ''
+    };
+
+    const query = {};
+
+    const buildMultiSelectFilter = (fieldPath, values) => {
+      if (!values || values.length === 0) return null;
+      const standardValues = values.filter(v => !v.startsWith('Unassigned'));
+      const unassignedValues = values.filter(v => v.startsWith('Unassigned'));
+      const conditions = [];
+      if (standardValues.length > 0) {
+        conditions.push({ [fieldPath]: { $in: standardValues } });
+      }
+      if (unassignedValues.length > 0) {
+        conditions.push({ [fieldPath]: { $in: [null, '', '-', 'NA', 'na', 'N/A', 'n/a'] } });
+      }
+      return conditions.length > 0 ? { $or: conditions } : null;
+    };
+
+    const applyFilter = (field, values) => {
+      const filter = buildMultiSelectFilter(field, values);
+      if (filter) {
+        query.$and = query.$and || [];
+        query.$and.push(filter);
+      }
+    };
+
+    applyFilter('status_name', filters.status);
+    applyFilter('owner_name', filters.owner);
+    applyFilter('territory_name', filters.territory);
+    applyFilter('custom_field.cf_lead_level', filters.leadLevel);
+    applyFilter('custom_field.cf_contact_category', filters.contactCategory);
+    applyFilter('custom_field.cf_custom_tags', filters.customTags);
+    applyFilter('country', filters.country);
+
+    if (filters.isActive) {
+        query.$and = query.$and || [];
+        const isActiveCondition = filters.isActive === 'yes' ? { $gt: 0 } : { $in: [0, null] };
+        query.$and.push({
+            $or: [
+                { 'crm_analytics.engagement.incoming_emails': isActiveCondition },
+                { 'crm_analytics.engagement.connected_calls': isActiveCondition }
+            ]
+        });
+    }
+
+    query['custom_field.cf_report_name'] = { $exists: true, $nin: [null, '', '-', 'NA', 'na', 'N/A', 'n/a'] };
+
+    const robustDateFromString = (field) => ({
+      $dateFromString: { dateString: field, onError: null, onNull: null }
+    });
+
+    const createdAtDate = robustDateFromString("$created_at");
+
+    let timeRangeQuery = {};
+    if (req.query.startDate || req.query.endDate) {
+      timeRangeQuery = { $expr: { $and: [] } };
+      if (req.query.startDate) {
+        timeRangeQuery.$expr.$and.push({ $gte: [createdAtDate, new Date(req.query.startDate)] });
+      }
+      if (req.query.endDate) {
+        timeRangeQuery.$expr.$and.push({ $lte: [createdAtDate, new Date(req.query.endDate)] });
+      }
+    } else {
+      const twelveMonthsAgo = new Date();
+      twelveMonthsAgo.setMonth(twelveMonthsAgo.getMonth() - 12);
+      timeRangeQuery = { $expr: { $gte: [createdAtDate, twelveMonthsAgo] } };
+    }
+
+    const finalQuery = { $and: [query, timeRangeQuery] };
+    
+    let dateGrouping = {
+        $dateToString: {
+            format: timeFilter === 'daily' ? "%Y-%m-%d" : "%Y-%m",
+            date: createdAtDate,
+            onNull: "Unknown Date"
+        }
+    };
+
+    let aggregationPipeline = [];
+
+    switch (chartType) {
+      case 'performanceByOwner':
+        aggregationPipeline = [
+          { $match: finalQuery },
+          {
+            $group: {
+              _id: { period: dateGrouping, owner: { $ifNull: ["$owner_name", "Unassigned"] } },
+              totalContacts: { $sum: 1 },
+              activeLeads: {
+                $sum: { $cond: [{ $or: [ { $gt: [{ $ifNull: ["$crm_analytics.engagement.incoming_emails", 0] }, 0] }, { $gt: [{ $ifNull: ["$crm_analytics.engagement.connected_calls", 0] }, 0] } ] }, 1, 0] }
+              }
+            }
+          },
+          {
+            $group: {
+              _id: "$_id.period",
+              totalContacts: { $sum: "$totalContacts" },
+              owners: { $push: { owner: "$_id.owner", contacts: "$totalContacts", activeLeads: "$activeLeads" } }
+            }
+          },
+          { $sort: { "_id": 1 } }
+        ];
+        break;
+
+    case 'avgTouchpointsByOwner':
+        aggregationPipeline = [
+          { $match: finalQuery },
+          {
+            $group: {
+              _id: { period: dateGrouping, owner: { $ifNull: ["$owner_name", "Unassigned"] } },
+              avgEmails: { $avg: { $ifNull: ["$crm_analytics.engagement.outgoing_emails", 0] } },
+              avgCalls: { $avg: { $ifNull: ["$crm_analytics.engagement.outgoing_calls", 0] } }
+            }
+          },
+          {
+            $group: {
+              _id: "$_id.period",
+              owners: { $push: { owner: "$_id.owner", avgEmails: "$avgEmails", avgCalls: "$avgCalls" } }
+            }
+          },
+          { $sort: { "_id": 1 } }
+        ];
+        break;
+
+    case 'responseRateByOwner':
+        aggregationPipeline = [
+          { $match: finalQuery },
+          {
+            $group: {
+              _id: { period: dateGrouping, owner: { $ifNull: ["$owner_name", "Unassigned"] } },
+              totalOutgoing: { $sum: { $ifNull: ["$crm_analytics.engagement.outgoing_emails", 0] } },
+              totalIncoming: { $sum: { $ifNull: ["$crm_analytics.engagement.incoming_emails", 0] } }
+            }
+          },
+          { $addFields: { responseRate: { $cond: [{ $gt: ["$totalOutgoing", 0] }, { $multiply: [{ $divide: ["$totalIncoming", "$totalOutgoing"] }, 100] }, 0] } } },
+          {
+            $group: {
+              _id: "$_id.period",
+              owners: { $push: { owner: "$_id.owner", responseRate: "$responseRate" } }
+            }
+          },
+          { $sort: { "_id": 1 } }
+        ];
+        break;
+
+    case 'avgSampleTimingByOwner':
+    case 'avgFirstCallTimingByOwner':
+        const isSample = chartType === 'avgSampleTimingByOwner';
+        const dateField = isSample ? "$crm_analytics.first_email_with_attachment.date" : "$crm_analytics.first_call.date";
+        const timingField = isSample ? "sampleTiming" : "firstCallTiming";
+        const divisor = isSample ? 3600000 : 60000;
+        const validRange = isSample ? 8760 : 525600;
+
+        aggregationPipeline = [
+            { $match: finalQuery },
+            {
+                $addFields: {
+                    endDate: robustDateFromString(dateField),
+                    startDate: robustDateFromString("$created_at")
+                }
+            },
+            {
+                $addFields: {
+                    [timingField]: {
+                        $cond: {
+                            if: { $and: ["$startDate", "$endDate", { $gte: ["$endDate", "$startDate"] }] },
+                            then: { $divide: [{ $subtract: ["$endDate", "$startDate"] }, divisor] },
+                            else: null
+                        }
+                    }
+                }
+            },
+            { $match: { [timingField]: { $ne: null, $lte: validRange } } },
+            {
+                $group: {
+                    _id: { period: dateGrouping, owner: { $ifNull: ["$owner_name", "Unassigned"] } },
+                    avgTiming: { $avg: `$${timingField}` }
+                }
+            },
+            {
+                $group: {
+                    _id: "$_id.period",
+                    owners: { $push: { owner: "$_id.owner", avgTiming: "$avgTiming" } }
+                }
+            },
+            { $sort: { "_id": 1 } }
+        ];
+        break;
+
+
+      case 'leadLevelsByOwner':
+      case 'contactCategories':
+        const field = chartType === 'leadLevelsByOwner' ? "$custom_field.cf_lead_level" : "$custom_field.cf_contact_category";
+        const key = chartType === 'leadLevelsByOwner' ? 'level' : 'category';
+        
+        // ===== FIX #1: Change the collection name to match the dynamicKeys object =====
+        const collectionName = chartType === 'leadLevelsByOwner' ? 'leadLevels' : 'contactCategories';
+
+        aggregationPipeline = [
+          { $match: finalQuery },
+          {
+            $group: {
+              _id: { period: dateGrouping, item: { $ifNull: [field, "Unassigned"] } },
+              count: { $sum: 1 }
+            }
+          },
+          {
+            $group: {
+              _id: "$_id.period",
+              [collectionName]: { $push: { [key]: "$_id.item", count: "$count" } }
+            }
+          },
+          { $sort: { "_id": 1 } }
+        ];
+        break;
+
+      // ... (case for 'territoryDistribution' is unchanged)
+      case 'territoryDistribution':
+        const topTerritories = await Contact.aggregate([
+          { $match: query },
+          { $group: { _id: { $ifNull: ["$territory_name", "Unassigned"] }, count: { $sum: 1 } } },
+          { $sort: { count: -1 } },
+          { $limit: 5 }
+        ]);
+        const topTerritoryNames = topTerritories.map(t => t._id);
+
+        aggregationPipeline = [
+          { $match: { ...finalQuery, territory_name: { $in: topTerritoryNames } } },
+          {
+            $group: {
+              _id: { period: dateGrouping, territory: { $ifNull: ["$territory_name", "Unassigned"] } },
+              count: { $sum: 1 }
+            }
+          },
+          {
+            $group: {
+              _id: "$_id.period",
+              territories: { $push: { territory: "$_id.territory", count: "$count" } }
+            }
+          },
+          { $sort: { "_id": 1 } }
+        ];
+        break;
+
+
+      default:
+        return res.status(400).json({ success: false, message: 'Invalid chart type' });
+    }
+
+    const results = await Contact.aggregate(aggregationPipeline);
+
+    const timeSeriesData = [];
+    const dynamicKeys = {
+      owners: new Set(),
+      territories: new Set(),
+      leadLevels: new Set(),
+      contactCategories: new Set()
+    };
+    
+    results.forEach(result => {
+      if (result._id === "Unknown Date") return;
+
+      const period = result._id;
+      const dataPoint = { period };
+
+      const processGroup = (group, keyName, valueKey, prefix) => {
+          result[group]?.forEach(item => {
+              const key = item[keyName];
+              dynamicKeys[group].add(key);
+              dataPoint[`${prefix}_${key.replace(/[\s.]+/g, '_')}`] = parseFloat(item[valueKey].toFixed(2));
+          });
+      };
+
+      switch (chartType) {
+          case 'performanceByOwner':
+              dataPoint.totalContacts = result.totalContacts;
+              result.owners?.forEach(owner => {
+                  dynamicKeys.owners.add(owner.owner);
+                  dataPoint[`owner_${owner.owner.replace(/[\s.]+/g, '_')}`] = owner.contacts;
+              });
+              break;
+          case 'avgTouchpointsByOwner':
+              result.owners?.forEach(owner => {
+                  dynamicKeys.owners.add(owner.owner);
+                  dataPoint[`${owner.owner.replace(/[\s.]+/g, '_')}_emails`] = parseFloat(owner.avgEmails.toFixed(2));
+                  dataPoint[`${owner.owner.replace(/[\s.]+/g, '_')}_calls`] = parseFloat(owner.avgCalls.toFixed(2));
+              });
+              break;
+          case 'responseRateByOwner':
+              processGroup('owners', 'owner', 'responseRate', 'owner');
+              break;
+          case 'avgSampleTimingByOwner':
+          case 'avgFirstCallTimingByOwner':
+              processGroup('owners', 'owner', 'avgTiming', 'owner');
+              break;
+          case 'leadLevelsByOwner':
+              processGroup('leadLevels', 'level', 'count', 'level');
+              break;
+          
+          case 'contactCategories':
+              processGroup('contactCategories', 'category', 'count', 'category');
+              break;
+
+          case 'territoryDistribution':
+              processGroup('territories', 'territory', 'count', 'territory');
+              break;
+      }
+      timeSeriesData.push(dataPoint);
+    });
+
+    // ... (rest of the function is unchanged)
+    timeSeriesData.forEach(dp => {
+        Object.keys(dynamicKeys).forEach(group => {
+            dynamicKeys[group].forEach(key => {
+                const prefix = group === 'owners' ? 'owner' : (group === 'contactCategories' ? 'category' : group.slice(0, -1));
+                if (chartType === 'avgTouchpointsByOwner') {
+                    const emailKey = `${key.replace(/[\s.]+/g, '_')}_emails`;
+                    const callKey = `${key.replace(/[\s.]+/g, '_')}_calls`;
+                    if (!(emailKey in dp)) dp[emailKey] = 0;
+                    if (!(callKey in dp)) dp[callKey] = 0;
+                } else {
+                    const fullKey = `${prefix}_${key.replace(/[\s.]+/g, '_')}`;
+                    if (!(fullKey in dp)) dp[fullKey] = 0;
+                }
+            });
+        });
+    });
+
+    res.json({
+      success: true,
+      data: timeSeriesData,
+      owners: Array.from(dynamicKeys.owners),
+      territories: Array.from(dynamicKeys.territories),
+      leadLevels: Array.from(dynamicKeys.leadLevels),
+      contactCategories: Array.from(dynamicKeys.contactCategories)
+    });
+
+  } catch (error) {
+    console.error('Error in getTimeSeriesData:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Error fetching time series data',
+      error: error.message
+    });
+  }
+};
 
 module.exports = {
   getContactsTable,
@@ -1305,5 +1653,6 @@ module.exports = {
   getContactConversations,
   updateContact,
   deleteContact,
-  getFilterOptions
+  getFilterOptions,
+  getTimeSeriesData 
 };

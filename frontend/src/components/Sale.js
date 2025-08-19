@@ -1,14 +1,17 @@
+// src/components/Sale.js
 import React, { useState, useEffect, useRef } from 'react';
-import { useNavigate } from 'react-router-dom'; 
+import { useNavigate } from 'react-router-dom';
 import { 
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, 
   LineChart, Line, PieChart, Pie, Cell, ResponsiveContainer,
-  ComposedChart, Area, AreaChart
+   Area, AreaChart
 } from 'recharts';
 import '../styles/Sale.css';
+import TimeSeriesModal from './TimeSeriesModal';
 
 const Sale = () => {
   const navigate = useNavigate(); 
+
   const [analyticsData, setAnalyticsData] = useState({
     totalContacts: 0,
     avgTouchpoints: '0.0',
@@ -34,15 +37,13 @@ const Sale = () => {
   const [ownerAnalytics, setOwnerAnalytics] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
-
   const [rawContacts, setRawContacts] = useState([]);
-  const [leadsOverTime, setLeadsOverTime] = useState([]);
 
-  const [customChartConfig, setCustomChartConfig] = useState({
-    groupBy: 'leadLevel',
-    metric: 'totalContacts',
+  const [tsModalConfig, setTsModalConfig] = useState({
+    isOpen: false,
+    chartType: '',
+    chartTitle: ''
   });
-  const [customChartData, setCustomChartData] = useState([]);
   
   const [filters, setFilters] = useState({
     status: [], owner: [], territory: [], leadLevel: [],
@@ -52,6 +53,7 @@ const Sale = () => {
 
   const navigateToLeads = (additionalFilters = {}) => {
     const combinedFilters = { ...filters, ...additionalFilters };
+    console.log('Navigate to leads with filters:', combinedFilters);
     navigate('/', { state: { selectedSection: 'Freshworks Leads', filters: combinedFilters, fromAnalytics: true } });
   };
 
@@ -86,12 +88,21 @@ const Sale = () => {
     fetchFilterOptions();
   }, [filters, analyticsCountryFilter]);
 
-  useEffect(() => {
-    if (rawContacts.length > 0) {
-      generateCustomChartData();
-    }
-  }, [customChartConfig, rawContacts]);
+  const openTimeSeriesModal = (chartType, chartTitle) => {
+    setTsModalConfig({
+      isOpen: true,
+      chartType,
+      chartTitle
+    });
+  };
 
+  const closeTimeSeriesModal = () => {
+    setTsModalConfig({
+      isOpen: false,
+      chartType: '',
+      chartTitle: ''
+    });
+  };
 
   const getDateRange = (filterType) => {
     const now = new Date();
@@ -157,7 +168,6 @@ const Sale = () => {
       if (data.success) {
         setAnalyticsData(data.analytics || {});
         setRawContacts(data.data || []);
-        setLeadsOverTime(data.analytics.leadsOverTime || []);
         generateOwnerAnalytics(data.data || []);
       } else {
         setError(data.message || 'Error fetching analytics');
@@ -266,57 +276,6 @@ const Sale = () => {
     }));
     
     setOwnerAnalytics(ownerStats);
-   
-  }; 
-
-  const generateCustomChartData = () => {
-    const { groupBy, metric } = customChartConfig;
-
-    const keyMap = {
-      'leadLevel': 'lead_level',
-      'country': 'country',
-      'contactCategory': 'contact_category',
-      'owner': 'owner_name',
-      'territory': 'territory',
-      'isActive': 'is_active',
-    };
-    const groupByKey = keyMap[groupBy];
-
-    const groupedData = rawContacts.reduce((acc, contact) => {
-      const key = contact[groupByKey] || 'Unassigned';
-      if (!acc[key]) {
-        acc[key] = { items: [] };
-      }
-      acc[key].items.push(contact);
-      return acc;
-    }, {});
-
-    const chartData = Object.entries(groupedData).map(([key, group]) => {
-      const dataPoint = { name: key };
-      const itemCount = group.items.length;
-      
-      switch (metric) {
-        case 'totalContacts':
-          dataPoint.value = itemCount;
-          break;
-        case 'activeLeads':
-          dataPoint.value = group.items.filter(c => c.is_active === 'Yes').length;
-          break;
-        case 'avgEmails':
-          const totalEmails = group.items.reduce((sum, c) => sum + (c.outgoing_emails || 0), 0);
-          dataPoint.value = itemCount > 0 ? parseFloat((totalEmails / itemCount).toFixed(1)) : 0;
-          break;
-        case 'avgCalls':
-          const totalCalls = group.items.reduce((sum, c) => sum + (c.outgoing_calls || 0), 0);
-          dataPoint.value = itemCount > 0 ? parseFloat((totalCalls / itemCount).toFixed(1)) : 0;
-          break;
-        default:
-          dataPoint.value = 0;
-      }
-      return dataPoint;
-    }).sort((a, b) => b.value - a.value);
-
-    setCustomChartData(chartData);
   };
   
   const handleFilterChange = (filterName, value) => {
@@ -366,7 +325,6 @@ const Sale = () => {
     return option ? option.label : '';
   };
 
-
   const clearFilters = () => {
     setFilters({ 
       status: [], owner: [], territory: [], leadLevel: [],
@@ -411,8 +369,6 @@ const Sale = () => {
   const leadLevelByOwnerData = ownerAnalytics.map(owner => { const ownerData = { owner: owner.owner }; Object.entries(owner.leadLevels || {}).forEach(([level, count]) => { ownerData[level] = count; }); return ownerData; });
   const allLeadLevels = [...new Set(ownerAnalytics.flatMap(owner => Object.keys(owner.leadLevels || {})))];
   const dealsWonData = Object.entries(analyticsData.dealsWonBreakdown || {}).map(([owner, count]) => ({ owner: owner || 'Unassigned', count })).sort((a,b) => b.count - a.count);
-  const allOwnersInTimeSeries = leadsOverTime.length > 0 ? Object.keys(leadsOverTime[0]).filter(key => key !== 'date') : [];
-
 
   const renderCustomizedLabel = ({ cx, cy, midAngle, innerRadius, outerRadius, count }) => {
     const RADIAN = Math.PI / 180;
@@ -434,7 +390,6 @@ const Sale = () => {
       </text>
     );
   };
-
   const activeFiltersCount = Object.values(filters).filter((value, index) => {
     const keys = Object.keys(filters);
     const key = keys[index];
@@ -455,20 +410,17 @@ const Sale = () => {
     );
   }
 
-  const customChartOptions = {
-    groupBy: [
-      { value: 'leadLevel', label: 'Lead Level' }, { value: 'country', label: 'Country' },
-      { value: 'contactCategory', label: 'Contact Category' }, { value: 'owner', label: 'Owner' },
-      { value: 'territory', label: 'Territory' }, { value: 'isActive', label: 'Active Status' },
-    ],
-    metric: [
-      { value: 'totalContacts', label: 'Total Contacts' }, { value: 'activeLeads', label: 'Active Leads' },
-      { value: 'avgEmails', label: 'Average Emails' }, { value: 'avgCalls', label: 'Average Calls' },
-    ],
-  };
-
   return (
     <div className="sales-dashboard">
+      <TimeSeriesModal
+        isOpen={tsModalConfig.isOpen}
+        onClose={closeTimeSeriesModal}
+        chartType={tsModalConfig.chartType}
+        chartTitle={tsModalConfig.chartTitle}
+        filters={filters}
+        API_BASE_URL={API_BASE_URL}
+      />
+
       <div className="header-card">
         <div className="header-content">
           <div className="header-info">
@@ -647,7 +599,7 @@ const Sale = () => {
       </div>
 
       <div className="metrics-grid">
-        {[
+         {[
           { icon: '👥', label: 'Total Contacts', value: analyticsData.totalContacts?.toLocaleString() || 0, color: '#3498db' },
           { icon: '✅', label: 'Active Leads', value: analyticsData.activeLeadCount?.toLocaleString() || 0, color: '#27ae60' },
           { icon: '📧', label: 'Avg Emails/Contact', value: analyticsData.avgEmails || '0.0', color: '#e67e22' },
@@ -664,10 +616,13 @@ const Sale = () => {
           </div>
         ))}
       </div>
-      
+
       <div className="charts-grid">
         <div className="chart-container resizable">
-          <div className="chart-header"><h3>📊 Performance by Owner</h3></div>
+          <div className="chart-header">
+            <h3>📊 Performance by Owner</h3>
+            <button className="ts-button" onClick={() => openTimeSeriesModal('performanceByOwner', 'Performance by Owner')}>TS</button>
+          </div>
           <ResponsiveContainer width="100%" height={350}>
             <BarChart data={ownerAnalytics} margin={{ top: 20, right: 30, left: 20, bottom: 60 }}>
               <CartesianGrid strokeDasharray="3 3" stroke="#ecf0f1" />
@@ -680,9 +635,12 @@ const Sale = () => {
             </BarChart>
           </ResponsiveContainer>
         </div>
-        
+
         <div className="chart-container resizable">
-          <div className="chart-header"><h3>📊 Avg Touchpoints by Owner (Calls + Emails)</h3></div>
+          <div className="chart-header">
+            <h3>📊 Avg Touchpoints by Owner (Calls + Emails)</h3>
+            <button className="ts-button" onClick={() => openTimeSeriesModal('avgTouchpointsByOwner', 'Avg Touchpoints by Owner')}>TS</button>
+          </div>
           <ResponsiveContainer width="100%" height={350}>
             <BarChart data={ownerAnalytics} margin={{ top: 20, right: 30, left: 20, bottom: 60 }}>
               <CartesianGrid strokeDasharray="3 3" stroke="#ecf0f1" />
@@ -695,9 +653,12 @@ const Sale = () => {
             </BarChart>
           </ResponsiveContainer>
         </div>
-        
+
         <div className="chart-container resizable">
-          <div className="chart-header"><h3>🏢 Contact Categories</h3></div>
+          <div className="chart-header">
+            <h3>🏢 Contact Categories</h3>
+            <button className="ts-button" onClick={() => openTimeSeriesModal('contactCategories', 'Contact Categories')}>TS</button>
+          </div>
           <ResponsiveContainer width="100%" height={350}>
             <PieChart>
               <Pie data={categoryData} cx="50%" cy="50%" labelLine={false} label={renderCustomizedLabel} outerRadius={100} fill="#8884d8" dataKey="count" nameKey="name">
@@ -712,7 +673,10 @@ const Sale = () => {
         </div>
         
         <div className="chart-container resizable">
-          <div className="chart-header"><h3>📈 Response Rate by Owner</h3></div>
+          <div className="chart-header">
+            <h3>📈 Response Rate by Owner</h3>
+            <button className="ts-button" onClick={() => openTimeSeriesModal('responseRateByOwner', 'Response Rate by Owner')}>TS</button>
+          </div>
           <ResponsiveContainer width="100%" height={350}>
             <BarChart data={ownerAnalytics} margin={{ top: 20, right: 30, left: 20, bottom: 60 }}>
               <CartesianGrid strokeDasharray="3 3" stroke="#ecf0f1" />
@@ -726,7 +690,10 @@ const Sale = () => {
         </div>
         
         <div className="chart-container resizable">
-          <div className="chart-header"><h3>⏰ Avg Sample Timing by Owner</h3></div>
+          <div className="chart-header">
+            <h3>⏰ Avg Sample Timing by Owner</h3>
+            <button className="ts-button" onClick={() => openTimeSeriesModal('avgSampleTimingByOwner', 'Avg Sample Timing by Owner')}>TS</button>
+          </div>
           <ResponsiveContainer width="100%" height={350}>
             <AreaChart data={ownerAnalytics} margin={{ top: 20, right: 30, left: 20, bottom: 60 }}>
               <CartesianGrid strokeDasharray="3 3" stroke="#ecf0f1" />
@@ -739,7 +706,10 @@ const Sale = () => {
         </div>
         
         <div className="chart-container resizable">
-          <div className="chart-header"><h3>📞 Avg First Call Timing by Owner</h3></div>
+          <div className="chart-header">
+            <h3>📞 Avg First Call Timing by Owner</h3>
+            <button className="ts-button" onClick={() => openTimeSeriesModal('avgFirstCallTimingByOwner', 'Avg First Call Timing by Owner')}>TS</button>
+          </div>
           <ResponsiveContainer width="100%" height={350}>
             <LineChart data={ownerAnalytics} margin={{ top: 20, right: 30, left: 20, bottom: 60 }}>
               <CartesianGrid strokeDasharray="3 3" stroke="#ecf0f1" />
@@ -753,7 +723,10 @@ const Sale = () => {
         </div>
         
         <div className="chart-container resizable">
-          <div className="chart-header"><h3>🌡️ Lead Levels Distribution by Owner</h3></div>
+          <div className="chart-header">
+            <h3>🌡️ Lead Levels Distribution by Owner</h3>
+            <button className="ts-button" onClick={() => openTimeSeriesModal('leadLevelsByOwner', 'Lead Levels Distribution')}>TS</button>
+          </div>
           <ResponsiveContainer width="100%" height={350}>
             <BarChart data={leadLevelByOwnerData} margin={{ top: 20, right: 30, left: 20, bottom: 60 }}>
               <CartesianGrid strokeDasharray="3 3" stroke="#ecf0f1" />
@@ -769,7 +742,10 @@ const Sale = () => {
         </div>
         
         <div className="chart-container resizable">
-          <div className="chart-header"><h3>🗺️ Territory Distribution</h3></div>
+          <div className="chart-header">
+            <h3>🗺️ Territory Distribution</h3>
+            <button className="ts-button" onClick={() => openTimeSeriesModal('territoryDistribution', 'Territory Distribution')}>TS</button>
+          </div>
           <ResponsiveContainer width="100%" height={350}>
             <BarChart data={territoryData} margin={{ top: 20, right: 30, left: 20, bottom: 60 }}>
               <CartesianGrid strokeDasharray="3 3" stroke="#ecf0f1" />
@@ -786,7 +762,10 @@ const Sale = () => {
         </div>
 
         <div className="chart-container resizable">
-          <div className="chart-header"><h3>🏆 Deals Won by Owner</h3></div>
+          <div className="chart-header">
+            <h3>🏆 Deals Won by Owner</h3>
+            {/* TS button can be added here as well if the API supports it */}
+          </div>
           {dealsWonData.length > 0 ? (
             <ResponsiveContainer width="100%" height={350}>
               <BarChart data={dealsWonData} margin={{ top: 20, right: 30, left: 20, bottom: 60 }} layout="vertical">
@@ -801,32 +780,13 @@ const Sale = () => {
           ) : (
             <div className="no-data-message" style={{ height: 350 }}>
               <p>No "Won" deals found for the current filters.</p>
-              <small>This chart requires `dealsWonBreakdown` data from the API. The backend should aggregate contacts where `status_name` is "Won".</small>
+              <small>This chart requires `dealsWonBreakdown` data from the API.</small>
             </div>
           )}
         </div>
-
-        <div className="chart-container resizable">
-          <div className="chart-header">
-            <h3>📈 New Leads Over Time by Owner</h3>
-            <small>Updates with date filter</small>
-          </div>
-          <ResponsiveContainer width="100%" height={350}>
-            <LineChart data={leadsOverTime} margin={{ top: 20, right: 30, left: 20, bottom: 60 }}>
-              <CartesianGrid strokeDasharray="3 3" stroke="#ecf0f1" />
-              <XAxis dataKey="date" stroke="#7f8c8d" />
-              <YAxis stroke="#7f8c8d" />
-              <Tooltip />
-              <Legend />
-              {allOwnersInTimeSeries.map((owner, index) => (
-                <Line key={owner} type="monotone" dataKey={owner} stroke={COLORS[index % COLORS.length]} strokeWidth={2} dot={{ r: 3 }} activeDot={{ r: 5 }} />
-              ))}
-            </LineChart>
-          </ResponsiveContainer>
-        </div>
       </div>
-
-      <div className="table-container">
+      
+       <div className="table-container">
         <h3>👥 Detailed Owner Analytics</h3>
         <div className="table-wrapper">
           <table className="analytics-table">
@@ -848,45 +808,6 @@ const Sale = () => {
               ))}
             </tbody>
           </table>
-        </div>
-      </div>
-      
-      <div className="custom-chart-container">
-        <div className="custom-chart-header">
-          <h2>🔬 Custom Analytics Explorer</h2>
-          <p>Build your own chart by selecting a metric and a grouping.</p>
-        </div>
-        <div className="custom-chart-controls">
-          <div className="control-group">
-            <label htmlFor="groupBy-select">Group By (X-Axis)</label>
-            <select id="groupBy-select" value={customChartConfig.groupBy} onChange={(e) => setCustomChartConfig(prev => ({ ...prev, groupBy: e.target.value }))}>
-              {customChartOptions.groupBy.map(opt => (<option key={opt.value} value={opt.value}>{opt.label}</option>))}
-            </select>
-          </div>
-          <div className="control-group">
-            <label htmlFor="metric-select">Show Metric (Y-Axis)</label>
-            <select id="metric-select" value={customChartConfig.metric} onChange={(e) => setCustomChartConfig(prev => ({ ...prev, metric: e.target.value }))}>
-              {customChartOptions.metric.map(opt => (<option key={opt.value} value={opt.value}>{opt.label}</option>))}
-            </select>
-          </div>
-        </div>
-        <div className="custom-chart-wrapper">
-          {customChartData.length > 0 ? (
-            <ResponsiveContainer width="100%" height={400}>
-              <BarChart data={customChartData} margin={{ top: 20, right: 30, left: 20, bottom: 80 }}>
-                <CartesianGrid strokeDasharray="3 3" />
-                <XAxis dataKey="name" angle={-45} textAnchor="end" interval={0} height={100} />
-                <YAxis />
-                <Tooltip formatter={(value, name) => [typeof value === 'number' ? value.toLocaleString() : value, customChartOptions.metric.find(m => m.value === customChartConfig.metric)?.label ]} />
-                <Bar dataKey="value" name={customChartOptions.metric.find(m => m.value === customChartConfig.metric)?.label} fill="#3498db" radius={[4, 4, 0, 0]} />
-              </BarChart>
-            </ResponsiveContainer>
-          ) : (
-             <div className="no-data-message" style={{ height: 400 }}>
-              <p>No data available for the selected combination.</p>
-              <small>Try adjusting the main dashboard filters or your selections above.</small>
-            </div>
-          )}
         </div>
       </div>
     </div>

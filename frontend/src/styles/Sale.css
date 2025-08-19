@@ -406,6 +406,143 @@
   gap: 0.5rem;
 }
 
+/* TS Button Styles */
+.ts-button {
+  background: linear-gradient(135deg, #667eea, #764ba2);
+  color: white;
+  border: none;
+  border-radius: 6px;
+  padding: 0.4rem 0.8rem;
+  font-size: 0.8rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  box-shadow: 0 2px 8px rgba(102, 126, 234, 0.3);
+}
+
+.ts-button:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 4px 12px rgba(102, 126, 234, 0.5);
+  background: linear-gradient(135deg, #764ba2, #667eea);
+}
+
+.ts-button:active {
+  transform: translateY(0);
+  box-shadow: 0 2px 6px rgba(102, 126, 234, 0.4);
+}
+
+/* TimeSeriesModal Styles */
+.timeseries-modal-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(0, 0, 0, 0.75);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1000;
+  -webkit-backdrop-filter: blur(5px);
+  backdrop-filter: blur(5px);
+}
+
+.timeseries-modal {
+  background: white;
+  border-radius: 16px;
+  width: 90vw;
+  max-width: 1200px;
+  height: 80vh;
+  max-height: 800px;
+  box-shadow: 0 20px 50px rgba(0, 0, 0, 0.3);
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  animation: modalSlideIn 0.3s ease-out;
+}
+
+@keyframes modalSlideIn {
+  from {
+    opacity: 0;
+    transform: translateY(-50px) scale(0.95);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+.timeseries-modal-header {
+  background: linear-gradient(135deg, #667eea, #764ba2);
+  color: white;
+  padding: 1.5rem;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  border-radius: 16px 16px 0 0;
+}
+
+.timeseries-modal-header h2 {
+  margin: 0;
+  font-size: 1.5rem;
+  font-weight: 600;
+}
+
+.timeseries-controls {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+}
+
+.timeseries-filter-select {
+  background: rgba(255, 255, 255, 0.2);
+  color: white;
+  border: 1px solid rgba(255, 255, 255, 0.3);
+  border-radius: 6px;
+  padding: 0.5rem 1rem;
+  font-size: 0.9rem;
+  cursor: pointer;
+  transition: all 0.3s ease;
+}
+
+.timeseries-filter-select:focus {
+  outline: none;
+  background: rgba(255, 255, 255, 0.3);
+  border-color: rgba(255, 255, 255, 0.5);
+}
+
+.timeseries-filter-select option {
+  background: #2c3e50;
+  color: white;
+}
+
+.timeseries-close-btn {
+  background: rgba(255, 255, 255, 0.2);
+  color: white;
+  border: none;
+  border-radius: 50%;
+  width: 40px;
+  height: 40px;
+  font-size: 1.2rem;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.timeseries-close-btn:hover {
+  background: rgba(255, 255, 255, 0.3);
+  transform: rotate(90deg);
+}
+
+.timeseries-modal-content {
+  flex: 1;
+  padding: 2rem;
+  overflow: auto;
+  background: #f8f9fa;
+}
+
 /* Custom Tooltip Styles */
 .custom-tooltip {
   background: rgba(44, 62, 80, 0.95);
@@ -553,85 +690,6 @@
   max-width: 80%;
 }
 
-
-/* Custom Analytics Explorer */
-.custom-chart-container {
-  margin-top: 2rem;
-  padding: 2rem;
-  background: white;
-  border-radius: 12px;
-  box-shadow: 0 8px 25px rgba(0, 0, 0, 0.1);
-  border-top: 4px solid #3498db;
-}
-
-.custom-chart-header {
-  text-align: center;
-  margin-bottom: 2rem;
-  padding-bottom: 1.5rem;
-  border-bottom: 2px solid #ecf0f1;
-}
-
-.custom-chart-header h2 {
-  font-size: 1.8rem;
-  color: #2c3e50;
-  margin: 0 0 0.5rem 0;
-  font-weight: 700;
-}
-
-.custom-chart-header p {
-  font-size: 1rem;
-  color: #7f8c8d;
-  margin: 0;
-}
-
-.custom-chart-controls {
-  display: flex;
-  justify-content: center;
-  gap: 2.5rem;
-  margin-bottom: 2.5rem;
-  flex-wrap: wrap;
-}
-
-.control-group {
-  display: flex;
-  flex-direction: column;
-  gap: 0.75rem;
-  min-width: 250px;
-}
-
-.control-group label {
-  font-weight: 600;
-  color: #34495e;
-  font-size: 0.9rem;
-  text-transform: uppercase;
-  letter-spacing: 0.5px;
-}
-
-.control-group select {
-  padding: 0.75rem;
-  border-radius: 8px;
-  border: 2px solid #e9ecef;
-  font-size: 1rem;
-  background-color: #fdfdfd;
-  transition: all 0.3s ease;
-  cursor: pointer;
-  -webkit-appearance: none;
-  -moz-appearance: none;
-  appearance: none;
-  background-image: url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 20 20'%3e%3cpath stroke='%236b7280' stroke-linecap='round' stroke-linejoin='round' stroke-width='1.5' d='M6 8l4 4 4-4'/%3e%3c/svg%3e");
-  background-position: right 0.5rem center;
-  background-repeat: no-repeat;
-  background-size: 1.5em 1.5em;
-  padding-right: 2.5rem;
-}
-
-.control-group select:focus {
-  outline: none;
-  border-color: #3498db;
-  box-shadow: 0 0 0 4px rgba(52, 152, 219, 0.15);
-}
-
-
 /* Responsive Design */
 @media (max-width: 768px) {
   .sales-dashboard {
@@ -674,9 +732,25 @@
     padding: 0.5rem;
   }
 
-  .custom-chart-controls {
+  .timeseries-modal {
+    width: 95vw;
+    height: 90vh;
+  }
+
+  .timeseries-modal-header {
+    padding: 1rem;
     flex-direction: column;
-    gap: 1.5rem;
+    gap: 1rem;
+    align-items: flex-start;
+  }
+
+  .timeseries-controls {
+    width: 100%;
+    justify-content: space-between;
+  }
+
+  .timeseries-modal-content {
+    padding: 1rem;
   }
 }
 
@@ -704,6 +778,10 @@
   .chart-header h3 {
     font-size: 1rem;
   }
+
+  .timeseries-modal-header h2 {
+    font-size: 1.2rem;
+  }
 }
 
 /* Enhanced Animations */
@@ -729,7 +807,7 @@
   }
 }
 
-.header-card, .custom-chart-container {
+.header-card {
   animation: slideInFromTop 0.6s ease-out;
 }
 
@@ -757,21 +835,26 @@
 }
 
 /* Scrollbar Styles */
-.table-wrapper::-webkit-scrollbar {
+.table-wrapper::-webkit-scrollbar,
+.timeseries-modal-content::-webkit-scrollbar {
   height: 8px;
+  width: 8px;
 }
 
-.table-wrapper::-webkit-scrollbar-track {
+.table-wrapper::-webkit-scrollbar-track,
+.timeseries-modal-content::-webkit-scrollbar-track {
   background: #f1f1f1;
   border-radius: 4px;
 }
 
-.table-wrapper::-webkit-scrollbar-thumb {
+.table-wrapper::-webkit-scrollbar-thumb,
+.timeseries-modal-content::-webkit-scrollbar-thumb {
   background: linear-gradient(135deg, #3498db, #2980b9);
   border-radius: 4px;
 }
 
-.table-wrapper::-webkit-scrollbar-thumb:hover {
+.table-wrapper::-webkit-scrollbar-thumb:hover,
+.timeseries-modal-content::-webkit-scrollbar-thumb:hover {
   background: linear-gradient(135deg, #2980b9, #3498db);
 }
 

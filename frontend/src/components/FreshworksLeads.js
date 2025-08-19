@@ -199,7 +199,7 @@ const FreshworksLeads = ({ initialFilters = {} }) => {
         
         if (latestMessage.direction === 'outgoing') {
           const daysSinceLastMessage = (new Date() - new Date(latestMessage.timestamp)) / (1000 * 60 * 60 * 24);
-          needsAction = daysSinceLastMessage > 2; // Need action if no response for 2+ days
+          needsAction = daysSinceLastMessage > 2; 
         }
       }
     }
@@ -218,9 +218,7 @@ const FreshworksLeads = ({ initialFilters = {} }) => {
       lastInteractionDays = Math.floor((new Date() - latestDate) / (1000 * 60 * 60 * 24));
     }
 
-    // Get primary user from CRM analytics
     const primaryUser = contact.crm_analytics?.primary_user || null;
-
     return {
       sampleSentTiming,
       needsAction,
