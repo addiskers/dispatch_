@@ -45,10 +45,9 @@ const LeadSchema = new mongoose.Schema(
     },
     paymentDate: { type: Date, default: null }, 
     contracts: { type: [String], default: [] },
+    researchRequirements: { type: [String], default: [] },
   },
   { timestamps: true } 
 );
-
-
 
 module.exports = mongoose.model("Lead", LeadSchema);

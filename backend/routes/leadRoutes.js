@@ -2,8 +2,8 @@ const express = require("express");
 const router = express.Router();
 const authMiddleware = require("../middleware/auth");
 const leadController = require("../controllers/leadController");
-const { getLeadById, updateLeadById, downloadContract } = require("../controllers/leadController");
-const { uploadContracts } = require("../controllers/uploadContracts");
+const { getLeadById, updateLeadById, downloadContract, downloadResearchRequirement } = require("../controllers/leadController");
+const { uploadContracts, uploadResearchRequirements } = require("../controllers/uploadContracts");
 
 router.get("/download-contract", authMiddleware, downloadContract);
 
@@ -18,6 +18,8 @@ router.get("/next-lead-id", authMiddleware, leadController.getNextLeadId);
 // --- UPLOADER endpoints ---
 router.get("/uploader/list", authMiddleware, leadController.getLeadListForUploader);
 router.patch("/:leadId/done", authMiddleware, leadController.updateDoneStatus);
+router.post('/upload-research-requirements', authMiddleware, uploadResearchRequirements);
+router.get('/download-research-requirement', authMiddleware, downloadResearchRequirement);
 
 // --- ACCOUNTS endpoints ---
 router.get("/accounts/all-leads", authMiddleware, leadController.getAllLeads);

@@ -69,6 +69,32 @@ function LeadDetailsuploader({ token, leadId, onClose }) {
     }
   }
 
+  const downloadResearchRequirement = async (fileKey) => {
+    try {
+      const response = await axios.get(
+        `${process.env.REACT_APP_API_BASE_URL}/api/leads/download-research-requirement?key=${encodeURIComponent(fileKey)}`,
+        {
+          headers: { Authorization: `Bearer ${token}` },
+        }
+      );
+      
+      if (response.data.url) {
+        window.open(response.data.url, '_blank');
+      }
+    } catch (error) {
+      console.error("Error downloading research requirement:", error);
+      alert("Error downloading file. Please try again.");
+    }
+  };
+
+  const getFileNameFromKey = (key) => {
+    const parts = key.split('/');
+    const fileName = parts[parts.length - 1];
+    // Remove timestamp prefix if it exists
+    const nameWithoutTimestamp = fileName.replace(/^\d+-/, '');
+    return nameWithoutTimestamp;
+  };
+
   return (
     <div className="lead-details-popup">
       <div className="popup-header">
@@ -137,6 +163,41 @@ function LeadDetailsuploader({ token, leadId, onClose }) {
                 <p><strong>Created Date:</strong> {new Date(lead.createdAt).toLocaleDateString()}</p>
                 <p><strong>Delivery Date:</strong> {lead.deliveryDate ? new Date(lead.deliveryDate).toLocaleDateString() : "Not Set"}</p>
                 <p><strong>Payment Status:</strong> {lead.paymentStatus || "Not Set"}</p>
+              </div>
+            </div>
+
+            {/* Research Requirements Section */}
+            <div className="section research-requirements-section">
+              <h3>Research Requirements</h3>
+              <div className="research-requirements-list">
+                {lead.researchRequirements && lead.researchRequirements.length > 0 ? (
+                  <ul style={{ listStyle: 'none', padding: 0 }}>
+                    {lead.researchRequirements.map((fileKey, index) => (
+                      <li key={index} style={{ marginBottom: '8px' }}>
+                        <button
+                          onClick={() => downloadResearchRequirement(fileKey)}
+                          style={{
+                            background: '#007bff',
+                            color: 'white',
+                            border: 'none',
+                            padding: '6px 12px',
+                            borderRadius: '4px',
+                            cursor: 'pointer',
+                            fontSize: '14px',
+                            textDecoration: 'none',
+                            display: 'inline-block'
+                          }}
+                          onMouseOver={(e) => e.target.style.background = '#0056b3'}
+                          onMouseOut={(e) => e.target.style.background = '#007bff'}
+                        >
+                          📁 {getFileNameFromKey(fileKey)}
+                        </button>
+                      </li>
+                    ))}
+                  </ul>
+                ) : (
+                  <p style={{ color: '#666', fontStyle: 'italic' }}>N/A</p>
+                )}
               </div>
             </div>
 

@@ -16,6 +16,17 @@ const upload = multer({
       },
     }),
   }).fields([{ name: "contracts", maxCount: 10 }]);
+
+const uploadResearchRequirements = multer({
+    storage: multerS3({
+      s3,
+      bucket: process.env.S3_BUCKET_NAME,
+      key: function (req, file, cb) {
+        const uniqueName = `research-requirements/${req.body.leadId}/${Date.now()}-${file.originalname}`;
+        cb(null, uniqueName);
+      },
+    }),
+  }).fields([{ name: "researchRequirements", maxCount: 10 }]);
   
 
   exports.uploadContracts = [
@@ -53,6 +64,43 @@ const upload = multer({
       }
     },
   ];
+
+  exports.uploadResearchRequirements = [
+    uploadResearchRequirements,
+    async (req, res) => {
+      try {
+        if (!["sales", "superadmin","accounts"].includes(req.user.role)) {
+          return res.status(403).json({ message: "Access denied: Only sales and superadmin can upload research requirements." });
+        }
+  
+        const { leadId } = req.body;
+        const lead = await Lead.findOne({ leadId });
+        if (!lead) {
+          return res.status(404).json({ message: "Lead not found." });
+        }
+  
+        if (!Array.isArray(lead.researchRequirements)) {
+          lead.researchRequirements = [];
+        }
+  
+        if (req.files?.researchRequirements) {
+          req.files.researchRequirements.forEach((file) => {
+            lead.researchRequirements.push(file.key);
+          });
+          await lead.save();
+        }
+  
+        res.status(200).json({
+          message: "Research requirements uploaded successfully",
+          researchRequirementKeys: req.files.researchRequirements.map((f) => f.key),
+        });
+      } catch (error) {
+        console.error("Error uploading research requirements:", error);
+        res.status(500).json({ message: "Research requirements upload failed", error: error.message });
+      }
+    },
+  ];
+
   exports.sendInvoiceEmail = async (req, res) => {
     try {
       const { leadId, toEmails, ccEmails, files } = req.body;
@@ -143,7 +191,7 @@ const upload = multer({
         });
       }
   
-      const transporter = nodemailer.createTransport({
+      const transporter = nodemailer.createTransporter({
         host: "smtp-mail.outlook.com",
         port: 587,
         secure: false,

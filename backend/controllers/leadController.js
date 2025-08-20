@@ -5,7 +5,6 @@ const { generatePresignedUrl } = require("../controllers/generatePresignedUrlFil
 const { sendNotificationEmail } = require("../utils/emailService");
 const { createOutlookEvent } = require("../utils/outlookService");
 
-
 const logActivity = async (userId, action, details) => {
   try {
     console.log("Logging activity:", { userId, action, details });
@@ -19,6 +18,7 @@ const logActivity = async (userId, action, details) => {
     console.error("Error logging activity:", error);
   }
 };
+
 /**
  * Create a new lead
  */
@@ -137,9 +137,6 @@ exports.createLead = async (req, res) => {
   }
 };
 
-
-
-
 /**
  * Get leads belonging to the logged-in sales user
  */
@@ -242,7 +239,6 @@ exports.deleteLead = async (req, res) => {
   }
 };
 
-
 /**
  * Get lead list for uploaders
  */
@@ -329,8 +325,6 @@ exports.getAllLeads = async (req, res) => {
     res.status(500).json({ message: "Error fetching leads", error });
   }
 };
-
-
 
 exports.updateLeadById = async (req, res) => {
   try {
@@ -446,6 +440,37 @@ exports.downloadContract = async (req, res) => {
     res.status(500).json({ message: "Error generating download URL.", error: error.message || error });
   }
 };
+
+exports.downloadResearchRequirement = async (req, res) => {
+    try {
+    const { key } = req.query;
+
+    if (!key) {
+      return res.status(400).json({ message: "File key is required." });
+    }
+    const leadId = key.split("/")[1];
+    console.log("Extracted leadId:", leadId);
+
+    const lead = await Lead.findOne({ leadId });
+    console.log("Lead query result:", lead);
+
+    if (!lead) {
+      return res.status(404).json({ message: "Lead not found." });
+    }
+
+    if (!lead.researchRequirements.includes(key)) {
+      console.log("Key not found in research requirements:", key);
+      return res.status(404).json({ message: "Research requirement not found for the specified lead." });
+    }
+    const url = await generatePresignedUrl(key);
+      
+    return res.status(200).json({ url });
+  } catch (error) {
+    console.error("Error generating research requirement download URL:", error.message || error);
+    res.status(500).json({ message: "Error generating research requirement download URL.", error: error.message || error });
+  }
+};
+
 exports.getPaymentStatus = async (req, res) => {
   try {
     const { leadId } = req.params;

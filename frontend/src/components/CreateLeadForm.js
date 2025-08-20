@@ -19,6 +19,7 @@ function CreateLeadForm({ token, onLeadCreated }) {
     sqcode: "",
   });
   const [contracts, setContracts] = useState([]);
+  const [researchRequirements, setResearchRequirements] = useState([]); // New state for research requirements
   const [nameInput, setNameInput] = useState("");
   const [emailInput, setEmailInput] = useState("");
   const [error, setError] = useState("");
@@ -43,6 +44,7 @@ function CreateLeadForm({ token, onLeadCreated }) {
       console.error("Error fetching next lead ID:", error);
     }
   };
+
   const handleCreateLead = async (e) => {
     e.preventDefault();
     setError("");
@@ -64,16 +66,17 @@ function CreateLeadForm({ token, onLeadCreated }) {
         }
       );
 
+      // Upload contracts if any
       if (contracts.length > 0) {
-        const formData = new FormData();
-        formData.append("leadId", form.leadId);
+        const contractFormData = new FormData();
+        contractFormData.append("leadId", form.leadId);
         contracts.forEach((file) => {
-          formData.append("contracts", file);
+          contractFormData.append("contracts", file);
         });
 
         await axios.post(
           `${process.env.REACT_APP_API_BASE_URL}/api/leads/upload-contracts`,
-          formData,
+          contractFormData,
           {
             headers: {
               Authorization: `Bearer ${token}`,
@@ -81,7 +84,33 @@ function CreateLeadForm({ token, onLeadCreated }) {
             },
             onUploadProgress: (progressEvent) => {
               const percentCompleted = Math.round(
-                (progressEvent.loaded * 100) / progressEvent.total
+                (progressEvent.loaded * 50) / progressEvent.total // 50% for contracts
+              );
+              setUploadProgress(percentCompleted);
+            },
+          }
+        );
+      }
+
+      // Upload research requirements if any
+      if (researchRequirements.length > 0) {
+        const researchFormData = new FormData();
+        researchFormData.append("leadId", form.leadId);
+        researchRequirements.forEach((file) => {
+          researchFormData.append("researchRequirements", file);
+        });
+
+        await axios.post(
+          `${process.env.REACT_APP_API_BASE_URL}/api/leads/upload-research-requirements`,
+          researchFormData,
+          {
+            headers: {
+              Authorization: `Bearer ${token}`,
+              "Content-Type": "multipart/form-data",
+            },
+            onUploadProgress: (progressEvent) => {
+              const percentCompleted = Math.round(
+                50 + (progressEvent.loaded * 50) / progressEvent.total // 50-100% for research requirements
               );
               setUploadProgress(percentCompleted);
             },
@@ -104,6 +133,7 @@ function CreateLeadForm({ token, onLeadCreated }) {
         sqcode: "",
       });
       setContracts([]);
+      setResearchRequirements([]);
       setUploadProgress(0);
       onLeadCreated();
     } catch (error) {
@@ -126,8 +156,21 @@ function CreateLeadForm({ token, onLeadCreated }) {
     setContracts(files);
   };
 
+  const handleResearchRequirementsChange = (e) => {
+    const files = Array.from(e.target.files);
+    if (files.length > 5) {
+      setError("Maximum 5 files can be uploaded at once");
+      return;
+    }
+    setResearchRequirements(files);
+  };
+
   const removeFile = (index) => {
     setContracts(contracts.filter((_, i) => i !== index));
+  };
+
+  const removeResearchFile = (index) => {
+    setResearchRequirements(researchRequirements.filter((_, i) => i !== index));
   };
 
   const addClientName = (e) => {
@@ -151,6 +194,7 @@ function CreateLeadForm({ token, onLeadCreated }) {
       setEmailInput("");
     }
   };
+
   const handleDateChange = (date, field) => {
     if (!date) {
       setForm(prev => ({ ...prev, [field]: null }));
@@ -172,7 +216,8 @@ function CreateLeadForm({ token, onLeadCreated }) {
   };
  
   return (
-    <div className="container mt-4">
+    // CHANGED: Removed .container class and added full-width styling
+    <div style={{ width: '100%', padding: '90px', boxSizing: 'border-box' }}>
       <h3>Create Lead</h3>
       {error && <p className="text-danger">{error}</p>}
       {uploadProgress > 0 && (
@@ -192,10 +237,9 @@ function CreateLeadForm({ token, onLeadCreated }) {
         </div>
       )}
       <Form onSubmit={handleCreateLead}>
-        {/* Existing form groups remain the same until the contracts section */}
         
         <Row>
-        <Col md={1}>
+        <Col md={2}>
             <Form.Group className="mb-3">
               <Form.Label>Lead Type</Form.Label>
               <Form.Select
@@ -216,7 +260,7 @@ function CreateLeadForm({ token, onLeadCreated }) {
               <Form.Control type="text" value={form.leadId} readOnly />
             </Form.Group>
           </Col>
-          <Col md={6}>
+          <Col md={5}>
             <Form.Group className="mb-3">
               <Form.Label>Client Company</Form.Label>
               <Form.Control
@@ -360,7 +404,7 @@ function CreateLeadForm({ token, onLeadCreated }) {
         </Col>
       </Row>
 
-        {/* Updated Contracts Section */}
+        {/* Contracts Section */}
         <Form.Group className="mb-3">
           <Form.Label>Upload Contracts (Max 5 files)</Form.Label>
           <Form.Control
@@ -371,7 +415,7 @@ function CreateLeadForm({ token, onLeadCreated }) {
           />
           {contracts.length > 0 && (
             <div className="mt-2">
-              <h6>Selected Files:</h6>
+              <h6>Selected Contract Files:</h6>
               <ul className="list-unstyled">
                 {contracts.map((file, index) => (
                   <li key={index} className="mb-1">
@@ -380,6 +424,36 @@ function CreateLeadForm({ token, onLeadCreated }) {
                       variant="link"
                       className="text-danger p-0 ms-2"
                       onClick={() => removeFile(index)}
+                    >
+                      Remove
+                    </Button>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          )}
+        </Form.Group>
+
+        {/* Research Requirements Section */}
+        <Form.Group className="mb-3">
+          <Form.Label>Upload Research Requirements (Max 5 files)</Form.Label>
+          <Form.Control
+            type="file"
+            multiple
+            onChange={handleResearchRequirementsChange}
+            accept=".pdf,.doc,.docx,.txt,.xls,.xlsx"
+          />
+          {researchRequirements.length > 0 && (
+            <div className="mt-2">
+              <h6>Selected Research Requirement Files:</h6>
+              <ul className="list-unstyled">
+                {researchRequirements.map((file, index) => (
+                  <li key={index} className="mb-1">
+                    {file.name}
+                    <Button
+                      variant="link"
+                      className="text-danger p-0 ms-2"
+                      onClick={() => removeResearchFile(index)}
                     >
                       Remove
                     </Button>
