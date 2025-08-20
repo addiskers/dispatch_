@@ -33,7 +33,8 @@ services:
       - ./backend/.env:/app/.env
     working_dir: /app
     command: ["node", "server.js"]
-
+    networks:
+      - shared-network  
   contact-sync:
     build:
       context: ./backend
@@ -52,7 +53,8 @@ services:
     command: ["node", "syncContacts.js"]
     depends_on:
       - backend
-
+    networks:
+      - shared-network  
   frontend:
     build:
       context: ./frontend
@@ -63,3 +65,5 @@ services:
     volumes:
       - ./frontend:/app
     working_dir: /app
+    networks:
+      - shared-network  
