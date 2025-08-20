@@ -10,11 +10,9 @@ const authRoutes = require("./routes/authRoutes");
 const leadRoutes = require("./routes/leadRoutes");
 const uploadRoutes = require("./routes/uploadRoutes");
 const logRoutes = require("./routes/logRoutes");
-const freshworksRoutes = require("./routes/freshworksRoutes");
 const conactsRoutes = require("./routes/contactRoutes");
 connectDB(process.env.MONGO_URI);
 const helmet = require("helmet");
-const analyticsRoutes = require('./routes/analytics');
 
 const app = express();
 
@@ -42,14 +40,12 @@ app.use(cors({
 
 app.use(helmet());  
 // Routes
-app.use('/api/analytics', analyticsRoutes);
 app.use("/api/auth", authRoutes);
 app.use("/api/leads", leadRoutes);
 app.use("/api/upload", uploadRoutes);
 app.use("/api/logs", logRoutes);
 app.use("/api/chats", chatRoutes);
 app.use("/onedrive", onedriveRoutes);
-app.use("/api/freshworks", freshworksRoutes);
 app.use("/api/contacts", conactsRoutes);
 
 const PORT = process.env.PORT || 5000;

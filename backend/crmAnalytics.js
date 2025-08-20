@@ -2,24 +2,19 @@
  * Calculate comprehensive CRM analytics for a contact with IST timestamps and user tracking
  */
 function calculateCRMAnalytics(contact) {
-  // Check if we have full conversations (during sync) 
   const conversations = contact.conversations || [];
   const conversationSummaries = contact.conversation_summaries || [];
   
-  // Use full conversations if available
   const hasFullConversations = conversations.length > 0;
   
   const createdDate = new Date(contact.created_at);
   const now = new Date();
-  
-  // Helper function to convert to IST format
   const toISTFormat = (date) => {
     if (!date) return null;
     const istDate = new Date(date.getTime() + (5.5 * 60 * 60 * 1000)); 
     return istDate.toISOString().replace('Z', '+05:30');
   };
 
-  // Helper function to check if email should be ignored (template content)
   const shouldIgnoreEmail = (message) => {
     if (!message || !message.content) return false;
     
@@ -33,7 +28,6 @@ function calculateCRMAnalytics(contact) {
     return ignorePatterns.some(pattern => content.includes(pattern.toLowerCase()));
   };
 
-  // Helper function to check if email has attachment
   const hasAttachment = (message) => {
     return message.attachments && message.attachments.length > 0;
   };
@@ -48,7 +42,6 @@ function calculateCRMAnalytics(contact) {
     first_email_with_attachment: null,
     last_contact: null,
     
-    // User activity tracking - WHO is working this lead
     user_activities: {}, 
     primary_user: null,  
     
@@ -58,8 +51,8 @@ function calculateCRMAnalytics(contact) {
       incoming_emails: 0,
       outgoing_calls: 0,
       incoming_calls: 0,
-      connected_calls: 0,      // Calls > 90 seconds
-      not_connected_calls: 0,  // Calls <= 90 seconds
+      connected_calls: 0,      
+      not_connected_calls: 0,  
       email_opens: 0,
       email_clicks: 0,
       email_replies: 0,
@@ -97,13 +90,11 @@ function calculateCRMAnalytics(contact) {
     }
   };
 
-  // If we have existing CRM analytics and no full conversations
   if (!hasFullConversations && contact.crm_analytics) {
     const existingAnalytics = contact.crm_analytics;
     
     Object.assign(analytics, existingAnalytics);
     
-    // Update basic calculated fields
     analytics.lead_progression.days_in_pipeline = Math.ceil((now - createdDate) / (1000 * 60 * 60 * 24));
     
     // Calculate basic stats from conversation summaries
@@ -113,7 +104,6 @@ function calculateCRMAnalytics(contact) {
       const emailThreads = conversationSummaries.filter(c => c.type === 'email_thread');
       const phoneCalls = conversationSummaries.filter(c => c.type === 'phone');
       
-      // Basic counting from summaries
       analytics.engagement.outgoing_emails = emailThreads.length; // Approximation
       analytics.engagement.outgoing_calls = phoneCalls.filter(c => c.direction === 'outgoing').length;
       analytics.engagement.incoming_calls = phoneCalls.filter(c => c.direction === 'incoming').length;
@@ -150,7 +140,6 @@ function calculateCRMAnalytics(contact) {
   
   conversations.forEach(conversation => {
     if (conversation.type === 'email_thread') {
-      // Process email thread
       conversation.messages.forEach(message => {
         const messageDate = new Date(message.timestamp);
         const interaction = {
@@ -172,7 +161,6 @@ function calculateCRMAnalytics(contact) {
         
         allInteractions.push(interaction);
         
-        // Track specific email types
         if (message.direction === 'outgoing' && !interaction.should_ignore && !interaction.is_automated) {
           validOutgoingEmails.push(interaction);
         }
@@ -186,7 +174,6 @@ function calculateCRMAnalytics(contact) {
         }
       });
     } else if (conversation.type === 'phone') {
-      // Process phone call
       const callDate = new Date(conversation.created_at);
       const duration = conversation.call_duration || 0;
       const isConnected = duration > 90;
@@ -205,7 +192,6 @@ function calculateCRMAnalytics(contact) {
         conversation: conversation
       });
     } else if (conversation.type === 'note') {
-      // Process notes
       const noteDate = new Date(conversation.created_at);
       allInteractions.push({
         date: noteDate,
@@ -274,7 +260,6 @@ function calculateCRMAnalytics(contact) {
       if (interaction.duration) {
         userActivity.call_duration_total += interaction.duration;
         
-        // Track connected vs not connected calls
         if (interaction.is_connected) {
           userActivity.connected_calls++;
           userActivity.connected_call_duration_total += interaction.duration;
@@ -540,7 +525,6 @@ function isAutomatedEmail(message) {
     subject.includes(pattern) || content.includes(pattern)
   );
   
-  // Additional checks
   const senderEmail = message.sender?.email?.toLowerCase() || '';
   const hasNoReplyEmail = senderEmail.includes('noreply') || 
                           senderEmail.includes('no-reply') || 

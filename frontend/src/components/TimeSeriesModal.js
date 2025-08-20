@@ -23,17 +23,17 @@ const CustomTooltip = ({ active, payload, label }) => {
   return null;
 };
 
-const TimeSeriesModal = ({ isOpen, onClose, chartType, chartTitle, filters, API_BASE_URL }) => {
+const TimeSeriesModal = ({ isOpen, onClose, chartType, chartTitle, filters, API_BASE_URL, token }) => {
   const [data, setData] = useState(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
   const [timeFilter, setTimeFilter] = useState('monthly');
 
   useEffect(() => {
-    if (isOpen) {
+    if (isOpen && token) {
       fetchTimeSeriesData();
     }
-  }, [isOpen, chartType, timeFilter, filters]);
+  }, [isOpen, chartType, timeFilter, filters, token]);
 
   const fetchTimeSeriesData = async () => {
     setLoading(true);
@@ -60,8 +60,18 @@ const TimeSeriesModal = ({ isOpen, onClose, chartType, chartTitle, filters, API_
         startDate: dateRange.startDate,
         endDate: dateRange.endDate,
       });
+      
+      const headers = {
+        'Authorization': `Bearer ${token}`,
+        'Content-Type': 'application/json'
+      };
 
-      const response = await fetch(`${API_BASE_URL}/contacts/timeseries?${params}`);
+      const response = await fetch(`${API_BASE_URL}/contacts/timeseries?${params}`, { headers });
+
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
+
       const result = await response.json();
 
       if (result.success) {

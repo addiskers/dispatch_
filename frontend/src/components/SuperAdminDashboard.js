@@ -66,9 +66,9 @@ function SuperAdminDashboard({ token, onLogout }) {
       case "Sample":
         return <SampleManagementPage token={token} />;
       case "Freshworks Leads":
-        return <FreshworksLeads key={navigationKey} initialFilters={navigationFilters} />; 
+        return <FreshworksLeads key={navigationKey} initialFilters={navigationFilters} token={token} />; 
       case "Analytics":
-        return <Sale />;
+        return <Sale token={token} />;
       case "GII":
         return <GIIForm token={token} />;
       default:

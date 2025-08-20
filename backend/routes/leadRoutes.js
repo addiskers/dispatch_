@@ -5,7 +5,6 @@ const leadController = require("../controllers/leadController");
 const { getLeadById, updateLeadById, downloadContract } = require("../controllers/leadController");
 const { uploadContracts } = require("../controllers/uploadContracts");
 
-// Move the download-contract route to the top of the routes list
 router.get("/download-contract", authMiddleware, downloadContract);
 
 // --- SALES endpoints ---

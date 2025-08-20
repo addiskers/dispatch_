@@ -1,6 +1,7 @@
-// routes/contacts.js
+// routes/contactRoutes.js
 const express = require('express');
 const router = express.Router();
+const auth = require('../middleware/auth'); // Import the auth middleware
 const {
   getContactsTable,
   getAllContacts,
@@ -12,6 +13,11 @@ const {
   getFilterOptions,
   getTimeSeriesData 
 } = require('../controllers/contactController');
+
+// Apply authentication middleware to all routes
+router.use(auth);
+
+// Now all routes are protected
 router.get('/table', getContactsTable);
 router.get('/filters', getFilterOptions);
 router.get('/stats', getContactStats);

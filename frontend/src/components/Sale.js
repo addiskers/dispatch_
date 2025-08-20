@@ -9,7 +9,7 @@ import {
 import '../styles/Sale.css';
 import TimeSeriesModal from './TimeSeriesModal';
 
-const Sale = () => {
+const Sale = ({ token }) => { 
   const navigate = useNavigate(); 
 
   const [analyticsData, setAnalyticsData] = useState({
@@ -69,6 +69,11 @@ const Sale = () => {
 
   const API_BASE_URL = `${process.env.REACT_APP_API_BASE_URL || 'https://www.theskyquestt.org'}/api`;
 
+  // Create headers object for API requests
+  const getAuthHeaders = () => ({
+    'Authorization': `Bearer ${token}`,
+    'Content-Type': 'application/json'
+  });
 
   const priorityCountries = [
     'United States', 'United Kingdom', 'France', 'Italy', 
@@ -85,9 +90,11 @@ const Sale = () => {
   const TERRITORY_COLORS = ['#3498db', '#e74c3c', '#2ecc71', '#f39c12', '#9b59b6', '#1abc9c', '#e67e22', '#34495e', '#16a085', '#c0392b', '#8e44ad', '#2980b9'];
 
   useEffect(() => {
-    fetchAnalytics();
-    fetchFilterOptions();
-  }, [filters, analyticsCountryFilter]);
+    if (token) {
+      fetchAnalytics();
+      fetchFilterOptions();
+    }
+  }, [filters, analyticsCountryFilter, token]);
 
   const openTimeSeriesModal = (chartType, chartTitle) => {
     setTsModalConfig({
@@ -163,7 +170,14 @@ const Sale = () => {
         analyticsCountryFilter: JSON.stringify(analyticsCountryFilter)
       });
 
-      const response = await fetch(`${API_BASE_URL}/contacts/table?${params}`);
+      const response = await fetch(`${API_BASE_URL}/contacts/table?${params}`, {
+        headers: getAuthHeaders()
+      });
+
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
+
       const data = await response.json();
 
       if (data.success) {
@@ -175,7 +189,7 @@ const Sale = () => {
       }
     } catch (err) {
       console.error('Fetch error:', err);
-      setError('Failed to fetch analytics');
+      setError('Failed to fetch analytics. Please check your authentication.');
     } finally {
       setLoading(false);
     }
@@ -183,7 +197,14 @@ const Sale = () => {
 
   const fetchFilterOptions = async () => {
     try {
-      const response = await fetch(`${API_BASE_URL}/contacts/filters`);
+      const response = await fetch(`${API_BASE_URL}/contacts/filters`, {
+        headers: getAuthHeaders()
+      });
+
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
+
       const data = await response.json();
       if (data.success) {
         setFilterOptions({
@@ -400,12 +421,38 @@ const Sale = () => {
     return Array.isArray(value) ? value.length > 0 : Boolean(value);
   }).length;
 
+  // Show error if no token
+  if (!token) {
+    return (
+      <div className="loading-container">
+        <div className="loading-content">
+          <h3>Authentication Required</h3>
+          <p>Please log in to view analytics.</p>
+        </div>
+      </div>
+    );
+  }
+
   if (loading && !analyticsData.totalContacts) {
     return (
       <div className="loading-container">
         <div className="loading-content">
           <div className="spinner"></div>
           <h3>Loading Sales Analytics...</h3>
+        </div>
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="loading-container">
+        <div className="loading-content">
+          <h3>Error Loading Analytics</h3>
+          <p>{error}</p>
+          <button onClick={handleRefresh} className="refresh-btn">
+            Try Again
+          </button>
         </div>
       </div>
     );
@@ -420,6 +467,7 @@ const Sale = () => {
         chartTitle={tsModalConfig.chartTitle}
         filters={filters}
         API_BASE_URL={API_BASE_URL}
+        token={token}
       />
 
       <div className="header-card">

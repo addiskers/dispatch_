@@ -3,8 +3,8 @@ import { useLocation, useNavigate } from "react-router-dom";
 import CreateLeadForm from "./CreateLeadForm";
 import LeadsTable from "./LeadsTable";
 import ContractPage from "./ContractPage";
-import FreshworksLeads from "./FreshworksLeads"; // Add this import
-import Sale from "./Sale"; // Add this import
+import FreshworksLeads from "./FreshworksLeads"; 
+import Sale from "./Sale"; 
 import "../styles/superAdminDashboard.css";
 
 function SalesDashboard({ token, onLogout, userRole }) {
@@ -23,7 +23,6 @@ function SalesDashboard({ token, onLogout, userRole }) {
       if (location.state.filters) {
         setNavigationFilters(location.state.filters);
       }
-      // Clear the location state
       navigate(location.pathname, { replace: true, state: {} });
     }
   }, [location.state, navigate, location.pathname]);
@@ -79,7 +78,6 @@ function SalesDashboard({ token, onLogout, userRole }) {
   const handleMenuClick = (section) => {
     setSelectedSection(section);
     setIsSidebarOpen(false);
-    // Clear navigation filters when manually selecting a different section
     if (section !== "Freshworks Leads") {
       setNavigationFilters(null);
     }
