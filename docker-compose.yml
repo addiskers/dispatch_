@@ -67,3 +67,6 @@ services:
     working_dir: /app
     networks:
       - shared-network  
+networks:
+  shared-network:
+    external: true 
