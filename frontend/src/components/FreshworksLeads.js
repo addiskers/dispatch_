@@ -115,6 +115,8 @@ const FreshworksLeads = ({ initialFilters = {}, token }) => {
 
   const filtersInitialized = useRef(false);
   const API_BASE_URL = `${process.env.REACT_APP_API_BASE_URL || 'https://www.theskyquestt.org'}/api`;
+  
+  // Conversations modal state
   const [showConversationsModal, setShowConversationsModal] = useState(false);
   const [selectedContact, setSelectedContact] = useState(null);
   const [conversations, setConversations] = useState([]);
@@ -584,7 +586,6 @@ const FreshworksLeads = ({ initialFilters = {}, token }) => {
 
   // Updated conversation counting function - counts all email messages, not just threads
   const getConversationCounts = () => {
-    // Count individual email messages instead of threads
     const emailMessageCount = conversations.reduce((total, conversation) => {
       if (conversation.type === 'email_thread') {
         return total + (conversation.messages?.length || 0);
@@ -603,7 +604,7 @@ const FreshworksLeads = ({ initialFilters = {}, token }) => {
     };
   };
 
-  // Updated function to expand/collapse all emails in a thread
+  //  function to expand/collapse all emails in a thread
   const toggleAllEmailsInThread = (conversationId) => {
     const conversation = conversations.find(c => c.conversation_id === conversationId);
     if (!conversation || conversation.type !== 'email_thread' || !conversation.messages) return;
@@ -1538,252 +1539,253 @@ const FreshworksLeads = ({ initialFilters = {}, token }) => {
           )}
         </div>
 
+        {/* Analytics Section */}
         <div className={`analytics-section bg-light border rounded p-3 mb-3 ${loading ? 'loading' : ''}`}>
-        <div className="row g-3">
-          <div className="col-md-12 mb-2">
-            <div className="d-flex justify-content-between align-items-center">
-              <h6 className="fw-bold text-primary mb-3">
-                📊 Analytics for All Filtered Results ({analytics.totalContacts?.toLocaleString() || 0} contacts)
-                {loading && <span className="spinner-border spinner-border-sm ms-2" role="status"></span>}
-              </h6>
-              
-              {/* Analytics Country Filter */}
-              <div className="analytics-country-filter">
-                <label className="form-label fw-bold text-muted small me-2">FOCUS COUNTRIES:</label>
-                <div className="btn-group flex-wrap" role="group">
-                  {priorityCountries.map(country => (
-                    <button
-                      key={country}
-                      type="button"
-                      className={`btn btn-sm ${analyticsCountryFilter.includes(country) ? 'btn-primary' : 'btn-outline-primary'}`}
-                      onClick={() => handleAnalyticsCountryFilter(country)}
-                    >
-                      {country} {analytics.priorityCountries?.[country] ? `(${analytics.priorityCountries[country]})` : '(0)'}
-                    </button>
-                  ))}
-                </div>
-              </div>
-            </div>
-          </div>
-          
-          {/* First Row - Core Metrics */}
-          <div className="col-lg-3 col-md-6 col-sm-6">
-            <div className="analytics-card bg-white p-3 rounded border" title="Total number of contacts matching current filters">
-              <div className="d-flex align-items-center">
-                <div className="analytics-icon bg-primary text-white rounded-circle p-2 me-3">
-                  👥
-                </div>
-                <div>
-                  <div className="analytics-number text-primary fw-bold fs-4">
-                    {loading ? '...' : (analytics.totalContacts || 0).toLocaleString()}
+          <div className="row g-3">
+            <div className="col-md-12 mb-2">
+              <div className="d-flex justify-content-between align-items-center">
+                <h6 className="fw-bold text-primary mb-3">
+                  📊 Analytics for All Filtered Results ({analytics.totalContacts?.toLocaleString() || 0} contacts)
+                  {loading && <span className="spinner-border spinner-border-sm ms-2" role="status"></span>}
+                </h6>
+                
+                {/* Analytics Country Filter */}
+                <div className="analytics-country-filter">
+                  <label className="form-label fw-bold text-muted small me-2">FOCUS COUNTRIES:</label>
+                  <div className="btn-group flex-wrap" role="group">
+                    {priorityCountries.map(country => (
+                      <button
+                        key={country}
+                        type="button"
+                        className={`btn btn-sm ${analyticsCountryFilter.includes(country) ? 'btn-primary' : 'btn-outline-primary'}`}
+                        onClick={() => handleAnalyticsCountryFilter(country)}
+                      >
+                        {country} {analytics.priorityCountries?.[country] ? `(${analytics.priorityCountries[country]})` : '(0)'}
+                      </button>
+                    ))}
                   </div>
-                  <div className="analytics-label text-muted small">Total Contacts</div>
                 </div>
               </div>
             </div>
-          </div>
+            
+            {/* First Row - Core Metrics */}
+            <div className="col-lg-3 col-md-6 col-sm-6">
+              <div className="analytics-card bg-white p-3 rounded border" title="Total number of contacts matching current filters">
+                <div className="d-flex align-items-center">
+                  <div className="analytics-icon bg-primary text-white rounded-circle p-2 me-3">
+                    👥
+                  </div>
+                  <div>
+                    <div className="analytics-number text-primary fw-bold fs-4">
+                      {loading ? '...' : (analytics.totalContacts || 0).toLocaleString()}
+                    </div>
+                    <div className="analytics-label text-muted small">Total Contacts</div>
+                  </div>
+                </div>
+              </div>
+            </div>
 
-          <div className="col-lg-3 col-md-6 col-sm-6">
-            <div className="analytics-card bg-white p-3 rounded border" title="Number of active/responsive leads">
-              <div className="d-flex align-items-center">
-                <div className="analytics-icon bg-success text-white rounded-circle p-2 me-3">
-                  ✅
-                </div>
-                <div>
-                  <div className="analytics-number text-success fw-bold fs-4">
-                    {loading ? '...' : (analytics.activeLeadCount || 0).toLocaleString()}
+            <div className="col-lg-3 col-md-6 col-sm-6">
+              <div className="analytics-card bg-white p-3 rounded border" title="Number of active/responsive leads">
+                <div className="d-flex align-items-center">
+                  <div className="analytics-icon bg-success text-white rounded-circle p-2 me-3">
+                    ✅
                   </div>
-                  <div className="analytics-label text-muted small">Active Leads</div>
+                  <div>
+                    <div className="analytics-number text-success fw-bold fs-4">
+                      {loading ? '...' : (analytics.activeLeadCount || 0).toLocaleString()}
+                    </div>
+                    <div className="analytics-label text-muted small">Active Leads</div>
+                  </div>
                 </div>
               </div>
             </div>
-          </div>
 
-          <div className="col-lg-3 col-md-6 col-sm-6">
-            <div className="analytics-card bg-white p-3 rounded border" title="Number of unique countries represented">
-              <div className="d-flex align-items-center">
-                <div className="analytics-icon bg-info text-white rounded-circle p-2 me-3">
-                  🌍
-                </div>
-                <div>
-                  <div className="analytics-number text-info fw-bold fs-4">
-                    {loading ? '...' : Object.keys(analytics.countryBreakdown || {}).length}
+            <div className="col-lg-3 col-md-6 col-sm-6">
+              <div className="analytics-card bg-white p-3 rounded border" title="Number of unique countries represented">
+                <div className="d-flex align-items-center">
+                  <div className="analytics-icon bg-info text-white rounded-circle p-2 me-3">
+                    🌍
                   </div>
-                  <div className="analytics-label text-muted small">Countries</div>
+                  <div>
+                    <div className="analytics-number text-info fw-bold fs-4">
+                      {loading ? '...' : Object.keys(analytics.countryBreakdown || {}).length}
+                    </div>
+                    <div className="analytics-label text-muted small">Countries</div>
+                  </div>
                 </div>
               </div>
             </div>
-          </div>
 
-          <div className="col-lg-3 col-md-6 col-sm-6">
-            <div className="analytics-card bg-white p-3 rounded border" title={`Average minutes between contact creation and first call attempt (${analytics.firstCallsCount || 0} calls made)`}>
-              <div className="d-flex align-items-center">
-                <div className="analytics-icon bg-warning text-white rounded-circle p-2 me-3">
-                  📞
-                </div>
-                <div>
-                  <div className="analytics-number text-warning fw-bold fs-4">
-                    {loading ? '...' : `${analytics.avgFirstCallMinutes || '0.0'}m`}
+            <div className="col-lg-3 col-md-6 col-sm-6">
+              <div className="analytics-card bg-white p-3 rounded border" title={`Average minutes between contact creation and first call attempt (${analytics.firstCallsCount || 0} calls made)`}>
+                <div className="d-flex align-items-center">
+                  <div className="analytics-icon bg-warning text-white rounded-circle p-2 me-3">
+                    📞
                   </div>
-                  <div className="analytics-label text-muted small">Avg First Call Timing</div>
+                  <div>
+                    <div className="analytics-number text-warning fw-bold fs-4">
+                      {loading ? '...' : `${analytics.avgFirstCallMinutes || '0.0'}m`}
+                    </div>
+                    <div className="analytics-label text-muted small">Avg First Call Timing</div>
+                  </div>
                 </div>
               </div>
             </div>
-          </div>
+            {/* Corporate contacts count card */}
+            <div className="col-lg-3 col-md-6 col-sm-6">
+              <div className="analytics-card bg-white p-3 rounded border" title={`Corporate contacts. Available categories: ${getAllContactCategoryValues().join(', ')}`}>
+                <div className="d-flex align-items-center">
+                  <div className="analytics-icon bg-primary text-white rounded-circle p-2 me-3">
+                    🏢
+                  </div>
+                  <div>
+                    <div className="analytics-number text-primary fw-bold fs-4">
+                      {loading ? '...' : (() => {
+                        const breakdown = analytics.contactCategoryBreakdown || {};
+                        console.log('Contact category breakdown for Corporate:', breakdown);
+                        
+                        const corporate = breakdown['Corporate'] || breakdown['corporate'] || 
+                                      breakdown['CORPORATE'] || breakdown['CORP'] || 
+                                      breakdown['Corp'] || 0;
+                        
+                        console.log('Corporate count found:', corporate);
+                        return corporate.toLocaleString();
+                      })()}
+                    </div>
+                    <div className="analytics-label text-muted small">Corporate</div>
+                  </div>
+                </div>
+              </div>
+            </div>
 
-          {/* Second Row - Category Breakdowns */}
-          <div className="col-lg-3 col-md-6 col-sm-6">
-            <div className="analytics-card bg-white p-3 rounded border" title={`Corporate contacts. Available categories: ${getAllContactCategoryValues().join(', ')}`}>
-              <div className="d-flex align-items-center">
-                <div className="analytics-icon bg-primary text-white rounded-circle p-2 me-3">
-                  🏢
-                </div>
-                <div>
-                  <div className="analytics-number text-primary fw-bold fs-4">
-                    {loading ? '...' : (() => {
-                      const breakdown = analytics.contactCategoryBreakdown || {};
-                      console.log('Contact category breakdown for Corporate:', breakdown);
-                      
-                      // Try different case variations
-                      const corporate = breakdown['Corporate'] || breakdown['corporate'] || 
-                                    breakdown['CORPORATE'] || breakdown['CORP'] || 
-                                    breakdown['Corp'] || 0;
-                      
-                      console.log('Corporate count found:', corporate);
-                      return corporate.toLocaleString();
-                    })()}
+            {/* Generic contacts count card */}
+            <div className="col-lg-3 col-md-6 col-sm-6">
+              <div className="analytics-card bg-white p-3 rounded border" title="Generic contacts count">
+                <div className="d-flex align-items-center">
+                  <div className="analytics-icon bg-success text-white rounded-circle p-2 me-3">
+                    📧
                   </div>
-                  <div className="analytics-label text-muted small">Corporate</div>
+                  <div>
+                    <div className="analytics-number text-success fw-bold fs-4">
+                      {loading ? '...' : (() => {
+                        const breakdown = analytics.contactCategoryBreakdown || {};
+                        console.log('Contact category breakdown for Generic:', breakdown);
+                        
+                        const generic = breakdown['Generic'] || breakdown['generic'] || 
+                                      breakdown['GENERIC'] || breakdown['GEN'] || 
+                                      breakdown['Gen'] || 0;
+                        
+                        console.log('Generic count found:', generic);
+                        return generic.toLocaleString();
+                      })()}
+                    </div>
+                    <div className="analytics-label text-muted small">Generic</div>
+                  </div>
                 </div>
               </div>
             </div>
-          </div>
 
-          <div className="col-lg-3 col-md-6 col-sm-6">
-            <div className="analytics-card bg-white p-3 rounded border" title="Generic contacts count">
-              <div className="d-flex align-items-center">
-                <div className="analytics-icon bg-success text-white rounded-circle p-2 me-3">
-                  📧
-                </div>
-                <div>
-                  <div className="analytics-number text-success fw-bold fs-4">
-                    {loading ? '...' : (() => {
-                      const breakdown = analytics.contactCategoryBreakdown || {};
-                      console.log('Contact category breakdown for Generic:', breakdown);
-                      
-                      const generic = breakdown['Generic'] || breakdown['generic'] || 
-                                    breakdown['GENERIC'] || breakdown['GEN'] || 
-                                    breakdown['Gen'] || 0;
-                      
-                      console.log('Generic count found:', generic);
-                      return generic.toLocaleString();
-                    })()}
+            {/* Average calls made per contact card */}
+            <div className="col-lg-3 col-md-6 col-sm-6">
+              <div className="analytics-card bg-white p-3 rounded border" title="Average calls made per contact">
+                <div className="d-flex align-items-center">
+                  <div className="analytics-icon bg-purple text-white rounded-circle p-2 me-3" style={{background: 'linear-gradient(135deg, #6f42c1, #5a359a)'}}>
+                    📱
                   </div>
-                  <div className="analytics-label text-muted small">Generic</div>
+                  <div>
+                    <div className="analytics-number fw-bold fs-4" style={{color: '#6f42c1'}}>
+                      {loading ? '...' : (analytics.avgCalls || '0.0')}
+                    </div>
+                    <div className="analytics-label text-muted small">Avg Calls Made</div>
+                  </div>
                 </div>
               </div>
             </div>
-          </div>
 
-          {/* Third Row - Response Rate and Sample Metrics */}
-          <div className="col-lg-3 col-md-6 col-sm-6">
-            <div className="analytics-card bg-white p-3 rounded border" title="Average number of touchpoints per contact">
-              <div className="d-flex align-items-center">
-                <div className="analytics-icon bg-info text-white rounded-circle p-2 me-3">
-                  🎯
-                </div>
-                <div>
-                  <div className="analytics-number text-info fw-bold fs-4">
-                    {loading ? '...' : (analytics.avgTouchpoints || '0.0')}
+            {/* Average sample sent timing card */}
+            <div className="col-lg-3 col-md-6 col-sm-6">
+              <div className="analytics-card bg-white p-3 rounded border" title={`Average hours between contact creation and sample report sent (${analytics.samplesSentCount || 0} samples sent)`}>
+                <div className="d-flex align-items-center">
+                  <div className="analytics-icon bg-danger text-white rounded-circle p-2 me-3">
+                    📊
                   </div>
-                  <div className="analytics-label text-muted small">Avg Touchpoints</div>
+                  <div>
+                    <div className="analytics-number text-danger fw-bold fs-4">
+                      {loading ? '...' : `${analytics.avgSampleSentHours || '0.0'}h`}
+                    </div>
+                    <div className="analytics-label text-muted small">Avg Sample Sent Timing</div>
+                  </div>
                 </div>
               </div>
             </div>
-          </div>
 
-          <div className="col-lg-3 col-md-6 col-sm-6">
-            <div className="analytics-card bg-white p-3 rounded border" title="Average emails sent per contact">
-              <div className="d-flex align-items-center">
-                <div className="analytics-icon bg-success text-white rounded-circle p-2 me-3">
-                  📧
-                </div>
-                <div>
-                  <div className="analytics-number text-success fw-bold fs-4">
-                    {loading ? '...' : (analytics.avgEmails || '0.0')}
+            {/* Average connected call duration card */}
+            <div className="col-lg-3 col-md-6 col-sm-6">
+              <div className="analytics-card bg-white p-3 rounded border" title="Average duration of connected calls only (excludes missed/unanswered calls)">
+                <div className="d-flex align-items-center">
+                  <div className="analytics-icon bg-danger text-white rounded-circle p-2 me-3">
+                    ⏱️
                   </div>
-                  <div className="analytics-label text-muted small">Avg Emails Sent</div>
+                  <div>
+                    <div className="analytics-number text-danger fw-bold fs-4">
+                      {loading ? '...' : `${analytics.avgConnectedCallDuration || '0'}s`}
+                    </div>
+                    <div className="analytics-label text-muted small">Avg Connected Call Duration</div>
+                  </div>
+                </div>
+              </div>
+            </div>          
+            {/* Additional metrics continue... */}
+            <div className="col-lg-3 col-md-6 col-sm-6">
+              <div className="analytics-card bg-white p-3 rounded border" title="Average number of touchpoints per contact">
+                <div className="d-flex align-items-center">
+                  <div className="analytics-icon bg-info text-white rounded-circle p-2 me-3">
+                    🎯
+                  </div>
+                  <div>
+                    <div className="analytics-number text-info fw-bold fs-4">
+                      {loading ? '...' : (analytics.avgTouchpoints || '0.0')}
+                    </div>
+                    <div className="analytics-label text-muted small">Avg Touchpoints</div>
+                  </div>
                 </div>
               </div>
             </div>
-          </div>
 
-          <div className="col-lg-3 col-md-6 col-sm-6">
-            <div className="analytics-card bg-white p-3 rounded border" title="Average calls made per contact">
-              <div className="d-flex align-items-center">
-                <div className="analytics-icon bg-purple text-white rounded-circle p-2 me-3" style={{background: 'linear-gradient(135deg, #6f42c1, #5a359a)'}}>
-                  📱
-                </div>
-                <div>
-                  <div className="analytics-number fw-bold fs-4" style={{color: '#6f42c1'}}>
-                    {loading ? '...' : (analytics.avgCalls || '0.0')}
+            <div className="col-lg-3 col-md-6 col-sm-6">
+              <div className="analytics-card bg-white p-3 rounded border" title="Average emails sent per contact">
+                <div className="d-flex align-items-center">
+                  <div className="analytics-icon bg-success text-white rounded-circle p-2 me-3">
+                    📧
                   </div>
-                  <div className="analytics-label text-muted small">Avg Calls Made</div>
+                  <div>
+                    <div className="analytics-number text-success fw-bold fs-4">
+                      {loading ? '...' : (analytics.avgEmails || '0.0')}
+                    </div>
+                    <div className="analytics-label text-muted small">Avg Emails Sent</div>
+                  </div>
                 </div>
               </div>
             </div>
-          </div>
 
-          <div className="col-lg-3 col-md-6 col-sm-6">
-            <div className="analytics-card bg-white p-3 rounded border" title={`Average hours between contact creation and sample report sent (${analytics.samplesSentCount || 0} samples sent)`}>
-              <div className="d-flex align-items-center">
-                <div className="analytics-icon bg-danger text-white rounded-circle p-2 me-3">
-                  📊
-                </div>
-                <div>
-                  <div className="analytics-number text-danger fw-bold fs-4">
-                    {loading ? '...' : `${analytics.avgSampleSentHours || '0.0'}h`}
+            <div className="col-lg-3 col-md-6 col-sm-6">
+              <div className="analytics-card bg-white p-3 rounded border" title="Response rate percentage">
+                <div className="d-flex align-items-center">
+                  <div className="analytics-icon bg-secondary text-white rounded-circle p-2 me-3">
+                    📈
                   </div>
-                  <div className="analytics-label text-muted small">Avg Sample Sent Timing</div>
-                </div>
-              </div>
-            </div>
-          </div>
-
-          {/*  This card now uses avgConnectedCallDuration instead of avgCallDuration */}
-          <div className="col-lg-3 col-md-6 col-sm-6">
-            <div className="analytics-card bg-white p-3 rounded border" title="Average duration of connected calls only (excludes missed/unanswered calls)">
-              <div className="d-flex align-items-center">
-                <div className="analytics-icon bg-danger text-white rounded-circle p-2 me-3">
-                  ⏱️
-                </div>
-                <div>
-                  <div className="analytics-number text-danger fw-bold fs-4">
-                    {loading ? '...' : `${analytics.avgConnectedCallDuration || '0'}s`}
+                  <div>
+                    <div className="analytics-number text-secondary fw-bold fs-4">
+                      {loading ? '...' : `${analytics.responseRate || '0.0'}%`}
+                    </div>
+                    <div className="analytics-label text-muted small">Response Rate</div>
                   </div>
-                  <div className="analytics-label text-muted small">Avg Connected Call Duration</div>
-                </div>
-              </div>
-            </div>
-          </div>
-          
-          <div className="col-lg-3 col-md-6 col-sm-6">
-            <div className="analytics-card bg-white p-3 rounded border" title="Response rate percentage">
-              <div className="d-flex align-items-center">
-                <div className="analytics-icon bg-secondary text-white rounded-circle p-2 me-3">
-                  📈
-                </div>
-                <div>
-                  <div className="analytics-number text-secondary fw-bold fs-4">
-                    {loading ? '...' : `${analytics.responseRate || '0.0'}%`}
-                  </div>
-                  <div className="analytics-label text-muted small">Response Rate</div>
                 </div>
               </div>
             </div>
           </div>
         </div>
-      </div>
 
         {/* Table */}
         <div className="table-responsive">
@@ -1921,8 +1923,7 @@ const FreshworksLeads = ({ initialFilters = {}, token }) => {
         </div>
       </div>
 
-      {/* Conversations Modal and other modals remain the same as they were in the original component */}
-      {/* Enhanced Professional Conversations Modal */}
+      {/* Conversations Modal */}
       {showConversationsModal && (
         <div className="modal-overlay" onClick={() => {
             setShowConversationsModal(false);
@@ -1948,15 +1949,14 @@ const FreshworksLeads = ({ initialFilters = {}, token }) => {
                     <div className="conversation-metrics">
                       {/* Owner Information */}
                       <div className="metric-item owner-info">
-                        <div className="metric-icon"></div>
+                        <div className="metric-icon">👤</div>
                         <div className="metric-content">
                           <span className="metric-label">Owner</span>
                           <span className="metric-value">{metrics.ownerName}</span>
                         </div>
                       </div>
 
-                     
-                      {/* Sample Timing using first_email_with_attachment */}
+                      {/* Sample Timing */}
                       {metrics.sampleSentTiming && (
                         <div className="metric-item sample-timing">
                           <div className="metric-icon">📊</div>
@@ -1966,8 +1966,6 @@ const FreshworksLeads = ({ initialFilters = {}, token }) => {
                           </div>
                         </div>
                       )}
-                      
-                     
                       
                       {metrics.needsAction && (
                         <div className="metric-item needs-action">
@@ -1998,14 +1996,14 @@ const FreshworksLeads = ({ initialFilters = {}, token }) => {
               </div>
               
               <button 
-                    className="close-button-professional" 
-                    onClick={() => {
-                      setShowConversationsModal(false);
-                      setExpandedThreads(new Set()); 
-                      setExpandedEmails(new Set());
-                    }}
-                    aria-label="Close"
-                  >
+                className="close-button-professional" 
+                onClick={() => {
+                  setShowConversationsModal(false);
+                  setExpandedThreads(new Set()); 
+                  setExpandedEmails(new Set());
+                }}
+                aria-label="Close"
+              >
                 <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
                   <line x1="18" y1="6" x2="6" y2="18"></line>
                   <line x1="6" y1="6" x2="18" y2="18"></line>
@@ -2100,14 +2098,312 @@ const FreshworksLeads = ({ initialFilters = {}, token }) => {
                 </div>
               )}
 
-              {/* Rest of the conversations modal implementation remains the same */}
-              {/* I'll truncate this since the modal code is identical to the original */}
+              {/* Conversations List */}
+              {!conversationsLoading && !conversationsError && conversations.length > 0 && (
+                <div className="conversations-list-professional">
+                  {getFilteredConversations()
+                    .sort((a, b) => {
+                      const dateA = new Date(a.last_message_date || a.created_at);
+                      const dateB = new Date(b.last_message_date || b.created_at);
+                      return dateB - dateA;
+                    })
+                    .map((conversation, index) => (
+                    <div key={conversation.conversation_id || index} 
+                      className={`conversation-item-professional conversation-${conversation.type} ${
+                        conversation.type === 'email_thread' && isThreadExpanded(conversation.conversation_id) ? 'expanded' : ''
+                      }`}>
+
+                      {/* Email Thread */}
+                      {conversation.type === 'email_thread' && (
+                        <div className={`email-thread-professional ${isThreadExpanded(conversation.conversation_id) ? 'expanded' : 'collapsed'}`}>
+                          <div className="conversation-header-professional">
+                            <div className="conversation-type-info">
+                              <div className="type-badge email-badge">
+                                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                                  <path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"></path>
+                                  <polyline points="22,6 12,13 2,6"></polyline>
+                                </svg>
+                                Email Thread
+                              </div>
+                              <div className="message-count-prominent">
+                                <span className="message-count-number">{conversation.messages?.length || 0}</span>
+                                <span className="message-count-text">messages</span>
+                              </div>
+                            </div>
+                            
+                            <div className="conversation-date-range">
+                              <span>{formatDateTime(conversation.first_message_date)}</span>
+                              <span className="date-separator">→</span>
+                              <span>{formatDateTime(conversation.last_message_date)}</span>
+                            </div>
+                          </div>
+                          
+                          {/* Clickable thread subject */}
+                          <div 
+                            className="thread-subject-professional clickable-header"
+                            onClick={() => toggleThreadVisibility(conversation.conversation_id)}
+                            style={{ cursor: 'pointer' }}
+                          >
+                            <div className="subject-header-content">
+                              <h5>{conversation.subject || 'No Subject'}</h5>
+                              <div className="expand-all-indicator">
+                                {isThreadExpanded(conversation.conversation_id) ? (
+                                  <span className="expand-icon">📖 Click to collapse thread</span>
+                                ) : (
+                                  <span className="expand-icon">📧 Click to view all {conversation.messages?.length || 0} emails</span>
+                                )}
+                              </div>
+                            </div>
+                          </div>
+                          
+                          {/* Thread stats and messages - only show when expanded */}
+                          {isThreadExpanded(conversation.conversation_id) && (
+                            <>
+                              <div className="thread-stats-professional">
+                                <div className="stat-item">
+                                  <span className="stat-icon">📤</span>
+                                  <span className="stat-text">{conversation.stats?.outgoing_messages || 0} Sent</span>
+                                </div>
+                                <div className="stat-item">
+                                  <span className="stat-icon">📥</span>
+                                  <span className="stat-text">{conversation.stats?.incoming_messages || 0} Received</span>
+                                </div>
+                                {conversation.stats?.total_attachments > 0 && (
+                                  <div className="stat-item">
+                                    <span className="stat-icon">📎</span>
+                                    <span className="stat-text">{conversation.stats.total_attachments} Attachments</span>
+                                  </div>
+                                )}
+                                <div className="stat-item expand-all-action" onClick={(e) => {
+                                  e.stopPropagation();
+                                  toggleAllEmailsInThread(conversation.conversation_id);
+                                }}>
+                                  <span className="stat-icon">
+                                    {areAllEmailsExpanded(conversation.conversation_id) ? '📝' : '📄'}
+                                  </span>
+                                  <span className="stat-text">
+                                    {areAllEmailsExpanded(conversation.conversation_id) ? 'Collapse All Content' : 'Expand All Content'}
+                                  </span>
+                                </div>
+                              </div>
+
+                              {/* Messages */}
+                              <div className="messages-container-professional">
+                                {conversation.messages
+                                  ?.sort((a, b) => new Date(a.timestamp) - new Date(b.timestamp)) 
+                                  ?.map((message, msgIndex) => {
+                                  const expandKey = `${conversation.conversation_id}-${message.message_id || msgIndex}`;
+                                  const isExpanded = expandedEmails.has(expandKey);
+                                  const shouldTruncate = message.content && message.content.length > 300;
+                                  
+                                  return (
+                                    <div key={message.message_id || msgIndex} className={`message-item-professional ${message.direction}`}>
+                                      <div className="message-header-professional">
+                                        <div className="sender-info-professional">
+                                          <div className="sender-avatar">
+                                            {message.direction === 'incoming' ? '👤' : '🏢'}
+                                          </div>
+                                          <div className="sender-details">
+                                            <span className="sender-name">{message.sender?.name || 'Unknown'}</span>
+                                            <span className="message-number">Message {msgIndex + 1} of {conversation.messages.length}</span>
+                                          </div>
+                                          <div className={`direction-badge-professional ${message.direction}`}>
+                                            {message.direction === 'incoming' ? '📥 Received' : '📤 Sent'}
+                                          </div>
+                                        </div>
+                                        <div className="message-timestamp">
+                                          {formatDateTime(message.timestamp)}
+                                        </div>
+                                      </div>
+                                      
+                                      {message.attachments?.length > 0 && (
+                                        <div className="attachments-professional">
+                                          <div className="attachments-header">
+                                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                                              <path d="M21.44 11.05l-9.19 9.19a6 6 0 0 1-8.49-8.49l9.19-9.19a4 4 0 0 1 5.66 5.66l-9.2 9.19a2 2 0 0 1-2.83-2.83l8.49-8.48"></path>
+                                            </svg>
+                                            Attachments:
+                                          </div>
+                                          <div className="attachments-list">
+                                            {message.attachments.map((attachment, attIndex) => (
+                                              <div key={attIndex} className="attachment-item-professional">
+                                                <span className="attachment-name">{attachment.name}</span>
+                                                <span className="attachment-size">({(attachment.size / 1024).toFixed(1)}KB)</span>
+                                              </div>
+                                            ))}
+                                          </div>
+                                        </div>
+                                      )}
+                                      
+                                      <div className="message-content-professional">
+                                        {message.content ? (
+                                          <div 
+                                            className={`content-text ${shouldTruncate && !isExpanded ? 'truncated' : ''}`}
+                                            dangerouslySetInnerHTML={{ 
+                                              __html: shouldTruncate && !isExpanded 
+                                                ? message.content.substring(0, 300) + '...'
+                                                : message.content
+                                            }} 
+                                          />
+                                        ) : (
+                                          <em className="no-content">No content available</em>
+                                        )}
+                                        
+                                        {shouldTruncate && (
+                                          <button 
+                                            className="expand-button"
+                                            onClick={() => toggleEmailExpansion(conversation.conversation_id, message.message_id || msgIndex)}
+                                          >
+                                            {isExpanded ? 'Show Less' : 'Show Full Email'}
+                                          </button>
+                                        )}
+                                      </div>
+
+                                      {message.engagement && (
+                                        <div className="engagement-info-professional">
+                                          {message.engagement.opened && (
+                                            <div className="engagement-stat">
+                                              <span className="engagement-icon">👁️</span>
+                                              <span>Opened</span>
+                                            </div>
+                                          )}
+                                          {message.engagement.clicked && (
+                                            <div className="engagement-stat">
+                                              <span className="engagement-icon">🖱️</span>
+                                              <span>Clicked</span>
+                                            </div>
+                                          )}
+                                          {message.engagement.bounced && (
+                                            <div className="engagement-stat bounced">
+                                              <span className="engagement-icon">⚠️</span>
+                                              <span>Bounced</span>
+                                            </div>
+                                          )}
+                                        </div>
+                                      )}
+                                    </div>
+                                  );
+                                })}
+                              </div>
+                            </>
+                          )}
+                        </div>
+                      )}
+
+                      {/* Phone Call */}
+                      {conversation.type === 'phone' && (
+                        <div className="phone-call-professional">
+                          <div className="conversation-header-professional">
+                            <div className="conversation-type-info">
+                              <div className="type-badge phone-badge">
+                                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                                  <path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 22 16.92z"></path>
+                                </svg>
+                                Phone Call
+                              </div>
+                              <div className={`call-direction-badge ${conversation.call_direction}`}>
+                                {conversation.call_direction === 'incoming' ? '📞 Incoming' : '📱 Outgoing'}
+                              </div>
+                            </div>
+                            
+                            <div className="conversation-date-range">
+                              {formatDateTime(conversation.created_at)}
+                            </div>
+                          </div>
+                          
+                          <div className="call-details-professional">
+                            <div className="call-metrics">
+                              <div className="metric-card">
+                                <div className="metric-icon">⏱️</div>
+                                <div className="metric-info">
+                                  <span className="metric-label">Duration</span>
+                                  <span className="metric-value">{formatDuration(conversation.call_duration || 0)}</span>
+                                </div>
+                              </div>
+                              
+                              <div className="metric-card">
+                                <div className={`metric-icon ${conversation.call_duration > 90 ? 'success' : 'error'}`}>
+                                  {conversation.call_duration > 90 ? '✅' : '❌'}
+                                </div>
+                                <div className="metric-info">
+                                  <span className="metric-label">Status</span>
+                                  <span className="metric-value">
+                                    {conversation.call_duration > 90 ? 'Connected' : 'Not Connected'}
+                                  </span>
+                                </div>
+                              </div>
+                              
+                              {conversation.phone_number && (
+                                <div className="metric-card">
+                                  <div className="metric-icon">📞</div>
+                                  <div className="metric-info">
+                                    <span className="metric-label">Number</span>
+                                    <span className="metric-value">{conversation.phone_number}</span>
+                                  </div>
+                                </div>
+                              )}
+                            </div>                           
+                            {conversation.call_recording_url && (
+                              <div className="recording-info-professional">
+                                <a href={conversation.call_recording_url} target="_blank" rel="noopener noreferrer" className="recording-link">
+                                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                                    <polygon points="5,3 19,12 5,21"></polygon>
+                                  </svg>
+                                  Listen to Recording
+                                </a>
+                              </div>
+                            )}
+                          </div>
+                        </div>
+                      )}
+
+                      {/* Note */}
+                      {conversation.type === 'note' && (
+                        <div className="note-item-professional">
+                          <div className="conversation-header-professional">
+                            <div className="conversation-type-info">
+                              <div className="type-badge note-badge">
+                                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                                  <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
+                                  <polyline points="14,2 14,8 20,8"></polyline>
+                                  <line x1="16" y1="13" x2="8" y2="13"></line>
+                                  <line x1="16" y1="17" x2="8" y2="17"></line>
+                                  <polyline points="10,9 9,9 8,9"></polyline>
+                                </svg>
+                                Note
+                              </div>
+                            </div>
+                            
+                            <div className="conversation-date-range">
+                              {formatDateTime(conversation.created_at)}
+                            </div>
+                          </div>
+                          
+                          <div className="note-content-professional">
+                            <h5>{conversation.subject || 'Note'}</h5>
+                            <div className="note-text">
+                              {conversation.content || 'No content available'}
+                            </div>
+                          </div>
+
+                          {conversation.participants?.length > 0 && (
+                            <div className="note-creator-professional">
+                              <div className="creator-avatar">👤</div>
+                              <span>Created by {conversation.participants[0].name}</span>
+                            </div>
+                          )}
+                        </div>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              )}
             </div>
           </div>
         </div>
       )}
 
-      {/* Column Customizer Modal remains the same */}
+      {/* Column Customizer Modal */}
       {showColumnCustomizer && (
         <div className="modal-overlay" onClick={cancelColumnChanges}>
           <div className="customize-table-modal" onClick={(e) => e.stopPropagation()}>
