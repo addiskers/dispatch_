@@ -57,9 +57,9 @@ function SalesDashboard({ token, onLogout, userRole }) {
     } else if (selectedSection === "Contracts") {
       return <ContractPage token={token} />;
     } else if (selectedSection === "Freshworks Leads") {
-      return <FreshworksLeads initialFilters={navigationFilters} />;
+      return <FreshworksLeads initialFilters={navigationFilters} token={token} />; 
     } else if (selectedSection === "Analytics") {
-      return <Sale />;
+      return <Sale token={token} />;
     }
   }
 
@@ -129,4 +129,4 @@ function SalesDashboard({ token, onLogout, userRole }) {
   );
 }
 
-export default SalesDashboard;  
+export default SalesDashboard;
