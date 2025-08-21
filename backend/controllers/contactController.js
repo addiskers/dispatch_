@@ -372,7 +372,7 @@ const getContactsTable = async (req, res) => {
       }));
 
     const allFilteredContacts = await Contact.find(query)
-      .select('custom_field crm_analytics created_at country territory_name')
+      .select('custom_field crm_analytics created_at country territory_name status_name owner_name')
       .lean();
 
     const calculateEnhancedAnalytics = (contacts, analyticsCountries) => {
@@ -430,7 +430,7 @@ const getContactsTable = async (req, res) => {
   const leadLevelBreakdown = {};
   const contactCategoryBreakdown = {};
   const priorityCountries = {};
-
+  const dealsWonBreakdown = {};
   const priorityCountryList = [
     'United States', 'United Kingdom', 'France', 'Italy', 
     'Germany', 'Spain', 'Japan', 'Korea, Republic of'
@@ -457,6 +457,10 @@ const getContactsTable = async (req, res) => {
 
     const contactCategory = contact.custom_field?.cf_contact_category || 'Unassigned';
     contactCategoryBreakdown[contactCategory] = (contactCategoryBreakdown[contactCategory] || 0) + 1;
+    if (contact.status_name && contact.status_name.toLowerCase() === 'won') {
+      const owner = contact.owner_name || 'Unassigned';
+      dealsWonBreakdown[owner] = (dealsWonBreakdown[owner] || 0) + 1;
+    }
   });
 
   analyticsContacts.forEach(contact => {
@@ -545,7 +549,8 @@ const getContactsTable = async (req, res) => {
     activeLeadCount, 
     leadLevelBreakdown,
     contactCategoryBreakdown,
-    priorityCountries
+    priorityCountries,
+    dealsWonBreakdown  
   };
 };
 
@@ -1539,6 +1544,25 @@ const getTimeSeriesData = async (req, res) => {
         ];
         break;
 
+        case 'dealsWonByOwner':
+        aggregationPipeline = [
+          { $match: finalQuery },
+          { $match: { "status_name": { $regex: /^won$/i } } },
+          {
+            $group: {
+              _id: { period: dateGrouping, owner: { $ifNull: ["$owner_name", "Unassigned"] } },
+              dealsWon: { $sum: 1 }
+            }
+          },
+          {
+            $group: {
+              _id: "$_id.period",
+              owners: { $push: { owner: "$_id.owner", dealsWon: "$dealsWon" } }
+            }
+          },
+          { $sort: { "_id": 1 } }
+        ];
+        break;
 
       default:
         return res.status(400).json({ success: false, message: 'Invalid chart type' });
@@ -1601,11 +1625,13 @@ const getTimeSeriesData = async (req, res) => {
           case 'territoryDistribution':
               processGroup('territories', 'territory', 'count', 'territory');
               break;
+          case 'dealsWonByOwner':
+              processGroup('owners', 'owner', 'dealsWon', 'owner');
+  break;
       }
       timeSeriesData.push(dataPoint);
     });
 
-    // ... (rest of the function is unchanged)
     timeSeriesData.forEach(dp => {
         Object.keys(dynamicKeys).forEach(group => {
             dynamicKeys[group].forEach(key => {

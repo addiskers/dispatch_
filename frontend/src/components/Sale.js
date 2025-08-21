@@ -811,9 +811,9 @@ const Sale = ({ token }) => {
         </div>
 
         <div className="chart-container resizable">
-          <div className="chart-header">
+         <div className="chart-header">
             <h3>🏆 Deals Won by Owner</h3>
-            {/* TS button can be added here as well if the API supports it */}
+            <button className="ts-button" onClick={() => openTimeSeriesModal('dealsWonByOwner', 'Deals Won by Owner')}>TS</button>
           </div>
           {dealsWonData.length > 0 ? (
             <ResponsiveContainer width="100%" height={350}>
