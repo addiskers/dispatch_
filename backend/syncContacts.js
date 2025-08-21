@@ -28,6 +28,12 @@ let apiCallCount = 0;
 const MAX_CALLS_PER_KEY = 1900; 
 const RATE_LIMIT_RESET_TIME = 60 * 60 * 1000; // 1 hour in milliseconds
 
+// Add sync state tracking
+let isSyncRunning = false;
+let lastSyncStartTime = null;
+let lastSyncEndTime = null;
+let syncAttempts = 0;
+
 console.log(`Initialized with ${API_KEYS.length} API keys for rate limiting`);
 const IGNORED_EMAIL_DOMAINS = ['skyquestt.com', 'gii.co.jp','freshchat.com'];
 
@@ -750,10 +756,93 @@ async function storeConversationsAndGetSummaries(contactId, conversations, db) {
 }
 
 /**
+ * Store sync run status in database
+ */
+async function updateSyncRunStatus(db, status, details = {}) {
+  const stateCol = db.collection('sync_state');
+  
+  const updateData = {
+    sync_status: status,
+    last_status_update: new Date(),
+    ...details
+  };
+  
+  if (status === 'running') {
+    updateData.sync_start_time = new Date();
+    updateData.process_id = process.pid;
+  } else if (status === 'completed' || status === 'failed') {
+    updateData.sync_end_time = new Date();
+    if (details.sync_start_time) {
+      updateData.sync_duration_ms = new Date() - details.sync_start_time;
+    }
+  }
+  
+  await stateCol.updateOne(
+    { _id: 'contacts_sync' },
+    { $set: updateData },
+    { upsert: true }
+  );
+}
+
+/**
+ * Check if sync is currently running
+ */
+async function isSyncCurrentlyRunning() {
+  const client = new MongoClient(MONGO_URI);
+  
+  try {
+    await client.connect();
+    const db = client.db();
+    const stateCol = db.collection('sync_state');
+    
+    const state = await stateCol.findOne({ _id: 'contacts_sync' });
+    
+    if (!state || !state.sync_status) {
+      return false;
+    }
+    
+    if (state.sync_status === 'running') {
+      const lastUpdate = new Date(state.last_status_update || state.sync_start_time);
+      const sixHoursAgo = new Date(Date.now() - 6 * 60 * 60 * 1000);
+      
+      if (lastUpdate < sixHoursAgo) {
+        console.log('🔄 Found stale running sync status, clearing it...');
+        await stateCol.updateOne(
+          { _id: 'contacts_sync' },
+          { $set: { sync_status: 'stale', last_status_update: new Date() } }
+        );
+        return false;
+      }
+      
+      return true;
+    }
+    
+    return false;
+  } finally {
+    await client.close();
+  }
+}
+
+/**
  * Main sync function - syncs contacts from Freshworks to MongoDB
  */
 async function syncContacts() {
+  // Check if sync is already running
+  if (isSyncRunning) {
+    console.log('⚠️ Sync is already running in this process. Skipping...');
+    return false;
+  }
+  
+  const isRunningInDB = await isSyncCurrentlyRunning();
+  if (isRunningInDB) {
+    console.log('⚠️ Sync is already running in another process. Skipping...');
+    return false;
+  }
+  
   const client = new MongoClient(MONGO_URI);
+  isSyncRunning = true;
+  lastSyncStartTime = new Date();
+  syncAttempts++;
   
   try {
     await client.connect();
@@ -762,12 +851,20 @@ async function syncContacts() {
     const conversationsCol = db.collection('conversations');
     const stateCol = db.collection('sync_state');
 
+    // Mark sync as running
+    await updateSyncRunStatus(db, 'running', { 
+      sync_start_time: lastSyncStartTime,
+      sync_attempt: syncAttempts 
+    });
+
+    console.log(`Starting sync #${syncAttempts} at ${lastSyncStartTime.toLocaleString()}`);
+
     const state = await stateCol.findOne({ _id: 'contacts_sync' });
     let lastSync = state ? state.lastSyncAt : "2020-01-01T00:00:00+05:30";
     const isFirstRun = !state;
     
     console.log(isFirstRun ? 'First run - getting ALL contacts' : `Continuing sync from: ${lastSync}`);
-    console.log(`🔑 Starting sync with API Key ${currentKeyIndex + 1}/${API_KEYS.length}`);
+    console.log(`Starting sync with API Key ${currentKeyIndex + 1}/${API_KEYS.length}`);
 
     let page = 1;
     let keepGoing = true;
@@ -799,7 +896,6 @@ async function syncContacts() {
       let pageHasNewData = false;
 
       for (const contact of contacts) {
-        // Check if contact should be skipped
         const skipResult = shouldSkipContact(contact);
         if (skipResult.skip) {
           if (skipResult.reason === 'ignored_email_domain') {
@@ -850,7 +946,6 @@ async function syncContacts() {
           shouldFetchConversations = true;
         }
         
-        // Add sync metadata
         const currentSyncTime = new Date().toLocaleString('sv-SE', { timeZone: 'Asia/Kolkata' }).replace(' ', 'T') + '+05:30';
         contact.syncedAt = currentSyncTime;
         contact.lastUpdatedAt = contact.updated_at;
@@ -960,6 +1055,21 @@ async function syncContacts() {
       await new Promise(resolve => setTimeout(resolve, 100));
     }
 
+    // Update sync state with completion
+    await updateSyncRunStatus(db, 'completed', {
+      sync_start_time: lastSyncStartTime,
+      lastSyncAt: newestContactSeen,
+      lastSyncCompleted: new Date(),
+      totalProcessed,
+      newRecords,
+      updatedRecords,
+      conversationsProcessed,
+      ignoredByEmailDomain,
+      ignoredByMarketName,
+      apiKeyUsed: currentKeyIndex + 1,
+      totalApiCalls: apiCallCount
+    });
+
     await stateCol.updateOne(
       { _id: 'contacts_sync' },
       { 
@@ -979,25 +1089,71 @@ async function syncContacts() {
       { upsert: true }
     );
 
+    lastSyncEndTime = new Date();
+    const duration = lastSyncEndTime - lastSyncStartTime;
+
     // Log summary
-    console.log(`Sync completed successfully!`);
-    console.log(`Total processed: ${totalProcessed}`);
-    console.log(`New records: ${newRecords}`);
-    console.log(`Updated records: ${updatedRecords}`);
-    console.log(`Records with field changes: ${recordsWithChanges}`);
-    console.log(`Total conversations processed: ${conversationsProcessed}`);
-    console.log(`Ignored by email domain: ${ignoredByEmailDomain}`);
-    console.log(`Ignored by missing/invalid market name: ${ignoredByMarketName}`);
-    console.log(`Total ignored contacts: ${ignoredByEmailDomain + ignoredByMarketName}`);
+    console.log(`✅ Sync #${syncAttempts} completed successfully!`);
+    console.log(`⏱️ Duration: ${Math.round(duration / 1000)}s (${Math.round(duration / 60000)}m)`);
+    console.log(`📊 Total processed: ${totalProcessed}`);
+    console.log(`🆕 New records: ${newRecords}`);
+    console.log(`📝 Updated records: ${updatedRecords}`);
+    console.log(`🔄 Records with field changes: ${recordsWithChanges}`);
+    console.log(`💬 Total conversations processed: ${conversationsProcessed}`);
+    console.log(`🚫 Ignored by email domain: ${ignoredByEmailDomain}`);
+    console.log(`🚫 Ignored by missing/invalid market name: ${ignoredByMarketName}`);
+    console.log(`🚫 Total ignored contacts: ${ignoredByEmailDomain + ignoredByMarketName}`);
     console.log(`🔑 Ended sync using API Key ${currentKeyIndex + 1}/${API_KEYS.length} (${apiCallCount} calls made)`);
-    console.log(`Next sync will start from: ${newestContactSeen}`);
+    console.log(`⏭️ Next sync will start from: ${newestContactSeen}`);
     console.log(`📚 Conversations stored separately for efficient querying`);
 
+    return true;
+
   } catch (error) {
-    console.error('Sync failed:', error);
+    console.error('❌ Sync failed:', error);
+    
+    // Update sync state with failure
+    const client2 = new MongoClient(MONGO_URI);
+    try {
+      await client2.connect();
+      const db = client2.db();
+      await updateSyncRunStatus(db, 'failed', {
+        sync_start_time: lastSyncStartTime,
+        error_message: error.message,
+        error_stack: error.stack
+      });
+    } catch (dbError) {
+      console.error('Failed to update sync status with error:', dbError);
+    } finally {
+      await client2.close();
+    }
+    
     throw error;
   } finally {
+    isSyncRunning = false;
+    lastSyncEndTime = new Date();
     await client.close();
+  }
+}
+
+/**
+ * Scheduled sync wrapper that handles collision detection
+ */
+async function scheduledSync() {
+  const now = new Date();
+  console.log(`\n🕒 Scheduled sync triggered at ${now.toLocaleString()}`);
+  
+  try {
+    const syncStarted = await syncContacts();
+    
+    if (!syncStarted) {
+      console.log(`⏭️ Sync skipped at ${now.toLocaleString()} - another sync is already running`);
+      console.log(`⏰ Next sync attempt will be in 3 hours at ${new Date(now.getTime() + 3 * 60 * 60 * 1000).toLocaleString()}`);
+    } else {
+      console.log(`✅ Sync completed successfully at ${new Date().toLocaleString()}`);
+    }
+  } catch (error) {
+    console.error(`❌ Scheduled sync failed at ${now.toLocaleString()}:`, error.message);
   }
 }
 
@@ -1037,40 +1193,53 @@ async function getSyncStatus() {
       { $limit: 10 }
     ]).toArray();
 
-    console.log('Current Sync Status:');
+    console.log('\n📊 Current Sync Status:');
     console.log(`🔑 Available API Keys: ${API_KEYS.length}`);
     console.log(`🔑 Current API Key: ${currentKeyIndex + 1}/${API_KEYS.length} (${apiCallCount}/${MAX_CALLS_PER_KEY} calls used)`);
+    console.log(`🏃‍♂️ Current process sync running: ${isSyncRunning ? 'YES' : 'NO'}`);
     
     if (state) {
-      console.log(`   Last sync: ${state.lastSyncAt}`);
-      console.log(`   Last completed: ${state.lastSyncCompleted}`);
-      console.log(`   Last run stats: ${state.newRecords} new, ${state.updatedRecords} updated`);
-      console.log(`   Conversations processed: ${state.conversationsProcessed || 0}`);
-      console.log(`   Ignored by email domain: ${state.ignoredByEmailDomain || 0}`);
-      console.log(`   Ignored by market name: ${state.ignoredByMarketName || 0}`);
-      console.log(`   API Key used in last sync: ${state.apiKeyUsed || 1}`);
-      console.log(`   Total API calls in last sync: ${state.totalApiCalls || 0}`);
+      console.log(`📊 Database sync status: ${state.sync_status || 'unknown'}`);
+      console.log(`⏰ Last sync: ${state.lastSyncAt}`);
+      console.log(`✅ Last completed: ${state.lastSyncCompleted}`);
+      
+      if (state.sync_start_time && state.sync_end_time) {
+        const duration = new Date(state.sync_end_time) - new Date(state.sync_start_time);
+        console.log(`⏱️ Last sync duration: ${Math.round(duration / 1000)}s`);
+      }
+      
+      console.log(`📈 Last run stats: ${state.newRecords || 0} new, ${state.updatedRecords || 0} updated`);
+      console.log(`💬 Conversations processed: ${state.conversationsProcessed || 0}`);
+      console.log(`🚫 Ignored by email domain: ${state.ignoredByEmailDomain || 0}`);
+      console.log(`🚫 Ignored by market name: ${state.ignoredByMarketName || 0}`);
+      console.log(`🔑 API Key used in last sync: ${state.apiKeyUsed || 1}`);
+      console.log(`📞 Total API calls in last sync: ${state.totalApiCalls || 0}`);
     } else {
-      console.log('   No sync history found - first run will get all contacts');
+      console.log('❗ No sync history found - first run will get all contacts');
     }
-    console.log(`   Total contacts in DB: ${totalContacts}`);
-    console.log(`   Contacts with conversations: ${contactsWithConversations}`);
-    console.log(`   Total conversations stored: ${totalConversations}`);
-    console.log(`   Conversation breakdown:`, conversationsByType);
-    console.log(`   Ignored email domains: ${IGNORED_EMAIL_DOMAINS.join(', ')}`);
+    
+    console.log(`📁 Total contacts in DB: ${totalContacts}`);
+    console.log(`💬 Contacts with conversations: ${contactsWithConversations}`);
+    console.log(`📚 Total conversations stored: ${totalConversations}`);
+    console.log(`📊 Conversation breakdown:`, conversationsByType);
+    console.log(`🚫 Ignored email domains: ${IGNORED_EMAIL_DOMAINS.join(', ')}`);
     
     if (territoryStats.length > 0) {
-      console.log('   Territory Distribution:');
-      territoryStats.forEach(stat => {
+      console.log('🌍 Territory Distribution:');
+      territoryStats.slice(0, 5).forEach(stat => {
         console.log(`     ${stat._id || 'Unknown'}: ${stat.count} contacts`);
       });
     }
 
     if (marketStats.length > 0) {
-      console.log('   Top Market Names:');
+      console.log('🏢 Top Market Names:');
       marketStats.forEach(stat => {
         console.log(`     ${stat._id || 'Unknown'}: ${stat.count} contacts`);
       });
+    }
+    
+    if (lastSyncStartTime) {
+      console.log(`🚀 Process stats: ${syncAttempts} attempts, last started: ${lastSyncStartTime.toLocaleString()}`);
     }
     
     return state;
@@ -1083,35 +1252,45 @@ async function getSyncStatus() {
  * Initialize the service
  */
 async function initialize() {
-  console.log('Starting Freshworks Contact Sync Service...');
-  console.log(`Email domains to ignore: ${IGNORED_EMAIL_DOMAINS.join(', ')}`);
-  console.log('Only syncing contacts with valid market names (cf_report_name)');
+  console.log('🚀 Starting Freshworks Contact Sync Service...');
+  console.log(`🚫 Email domains to ignore: ${IGNORED_EMAIL_DOMAINS.join(', ')}`);
+  console.log('✅ Only syncing contacts with valid market names (cf_report_name)');
   console.log('📚 Using separate conversations collection for efficient storage');
+  console.log('⏰ Scheduled to run every 3 hours with collision detection');
   
   await getSyncStatus();
   
-  console.log('Running initial sync...');
-  await syncContacts();
+  console.log('\n🏃‍♂️ Running initial sync...');
+  await scheduledSync();
   
-  // Schedule hourly sync
-  cron.schedule('0 2 * * *', () => {
-    console.log('Running scheduled contacts sync...');
-    syncContacts().catch(error => {
-      console.error('Scheduled sync failed:', error);
-    });
+  // Schedule sync every 3 hours: 0:00, 3:00, 6:00, 9:00, 12:00, 15:00, 18:00, 21:00
+  cron.schedule('0 */3 * * *', scheduledSync, {
+    timezone: "Asia/Kolkata"
   });
   
-  console.log('Service initialized. Syncing every hour at minute 0.');
-  console.log('Press Ctrl+C to stop.');
+  console.log('\n✅ Service initialized successfully!');
+  console.log('⏰ Syncing every 3 hours (0:00, 3:00, 6:00, 9:00, 12:00, 15:00, 18:00, 21:00)');
+  console.log('🔒 Collision detection enabled - skips if already running');
+  console.log('🛑 Press Ctrl+C to stop.');
+  
+  // Status check every hour
+  cron.schedule('0 * * * *', () => {
+    console.log('\n📊 Hourly Status Check:');
+    getSyncStatus().catch(console.error);
+  }, {
+    timezone: "Asia/Kolkata"
+  });
 }
 
 process.on('SIGINT', () => {
-  console.log('\nShutting down gracefully...');
+  console.log('\n🛑 Shutting down gracefully...');
+  isSyncRunning = false;
   process.exit(0);
 });
 
 process.on('SIGTERM', () => {
-  console.log('\nShutting down gracefully...');
+  console.log('\n🛑 Shutting down gracefully...');
+  isSyncRunning = false;
   process.exit(0);
 });
 
@@ -1168,6 +1347,6 @@ function getEmptyAnalytics(contact) {
 }
 
 initialize().catch(error => {
-  console.error('Failed to initialize:', error);
+  console.error('❌ Failed to initialize:', error);
   process.exit(1);
 });
