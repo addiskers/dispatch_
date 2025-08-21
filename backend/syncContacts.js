@@ -1252,11 +1252,9 @@ async function getSyncStatus() {
  * Initialize the service
  */
 async function initialize() {
-  console.log('🚀 Starting Freshworks Contact Sync Service...');
-  console.log(`🚫 Email domains to ignore: ${IGNORED_EMAIL_DOMAINS.join(', ')}`);
-  console.log('✅ Only syncing contacts with valid market names (cf_report_name)');
-  console.log('📚 Using separate conversations collection for efficient storage');
-  console.log('⏰ Scheduled to run every 3 hours with collision detection');
+  console.log(' Starting Freshworks Contact Sync Service...');
+  console.log(`🚫Email domains to ignore: ${IGNORED_EMAIL_DOMAINS.join(', ')}`);
+
   
   await getSyncStatus();
   
@@ -1268,10 +1266,7 @@ async function initialize() {
     timezone: "Asia/Kolkata"
   });
   
-  console.log('\n✅ Service initialized successfully!');
-  console.log('⏰ Syncing every 3 hours (0:00, 3:00, 6:00, 9:00, 12:00, 15:00, 18:00, 21:00)');
-  console.log('🔒 Collision detection enabled - skips if already running');
-  console.log('🛑 Press Ctrl+C to stop.');
+
   
   // Status check every hour
   cron.schedule('0 * * * *', () => {

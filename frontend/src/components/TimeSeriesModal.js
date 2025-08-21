@@ -141,6 +141,20 @@ const TimeSeriesModal = ({ isOpen, onClose, chartType, chartTitle, filters, API_
           </LineChart>
         );
 
+      case 'dealsWonByOwner':
+        return (
+          <BarChart data={data.data}>
+            <XAxis dataKey="period" />
+            <YAxis label={{ value: 'Deals Won', angle: -90, position: 'insideLeft' }} />
+            <Tooltip content={<CustomTooltip />} />
+            <Legend />
+            <CartesianGrid stroke="#f5f5f5" />
+            {data.owners?.map((owner, index) => (
+              <Bar key={owner} dataKey={`owner_${owner.replace(/\s+/g, '_')}`} fill={COLORS[index % COLORS.length]} name={owner} />
+            ))}
+          </BarChart>
+        );
+
       case 'leadLevelsByOwner':
       case 'contactCategories':
       case 'territoryDistribution':
@@ -157,7 +171,7 @@ const TimeSeriesModal = ({ isOpen, onClose, chartType, chartTitle, filters, API_
                <Area key={key} type="monotone" dataKey={`${prefix}_${key.replace(/\s+/g, '_')}`} stackId="1" stroke={COLORS[index % COLORS.length]} fill={COLORS[index % COLORS.length]} name={key} />
             ))}
           </AreaChart>
-        )
+        );
 
       default:
         return <div className="no-data-message"><p>This chart type is not supported yet.</p></div>;

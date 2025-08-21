@@ -174,39 +174,65 @@ const getContactsTable = async (req, res) => {
     };
 
     // Add date range filter with proper timezone handling
-    if (startDate || endDate) {
-      query.$expr = query.$expr || { $and: [] };
-      if (!Array.isArray(query.$expr.$and)) {
-        query.$expr.$and = [];
-      }
-      
-      if (startDate) {
-        const startDateObj = new Date(startDate);
-        console.log('Original startDate:', startDate);
-        console.log('Parsed startDate:', startDateObj);
+      if (startDate || endDate) {
+        query.$and = query.$and || [];
         
-        query.$expr.$and.push({
-          $gte: [
-            { $dateFromString: { dateString: "$created_at" } },
-            startDateObj
-          ]
-        });
-      }
-      
-      if (endDate) {
-        const endDateObj = new Date(endDate);
-        console.log('Original endDate:', endDate);
-        console.log('Parsed endDate:', endDateObj);
+        if (startDate) {
+          console.log('Start date filter (original):', startDate);
+          const startDateObj = new Date(startDate);
+          console.log('Start date parsed:', startDateObj);
+          
+          query.$and.push({
+            $expr: {
+              $gte: [
+                {
+                  $dateFromString: { 
+                    dateString: {
+                      $cond: {
+                        if: { $regexMatch: { input: "$created_at", regex: /[+-]\d{2}:\d{2}$/ } },
+                        then: "$created_at", 
+                        else: { $concat: ["$created_at", "Z"] } 
+                      }
+                    },
+                    onError: null,
+                    onNull: null
+                  }
+                },
+                startDateObj
+              ]
+            }
+          });
+        }
         
-        query.$expr.$and.push({
-          $lte: [
-            { $dateFromString: { dateString: "$created_at" } },
-            endDateObj
-          ]
-        });
+        if (endDate) {
+          console.log('End date filter (original):', endDate);
+          const endDateObj = new Date(endDate);
+          console.log('End date parsed:', endDateObj);
+          
+          query.$and.push({
+            $expr: {
+              $lte: [
+                {
+                  $dateFromString: { 
+                    dateString: {
+                      $cond: {
+                        if: { $regexMatch: { input: "$created_at", regex: /[+-]\d{2}:\d{2}$/ } },
+                        then: "$created_at",
+                        else: { $concat: ["$created_at", "Z"] }
+                      }
+                    },
+                    onError: null,
+                    onNull: null
+                  }
+                },
+                endDateObj
+              ]
+            }
+          });
+        }
+        
+        console.log('Date filters applied successfully');
       }
-    }
-
     console.log('Final MongoDB query:', JSON.stringify(query, null, 2));
 
     const skip = (parseInt(page) - 1) * parseInt(limit);

@@ -326,24 +326,31 @@ const FreshworksLeads = ({ initialFilters = {}, token }) => {
   }, [initialFilters]);
 
   // Helper function to get date ranges
-  const getDateRange = (filterType) => {
+ const getDateRange = (filterType) => {
     const now = new Date();
     const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
     
     switch (filterType) {
       case 'today':
+        const todayStart = new Date(today);
+        todayStart.setHours(0, 0, 0, 0);
+        
         const todayEnd = new Date(today);
         todayEnd.setHours(23, 59, 59, 999);
+        
         return {
-          startDate: today.toISOString(),
+          startDate: todayStart.toISOString(),
           endDate: todayEnd.toISOString()
         };
       
       case 'yesterday':
         const yesterday = new Date(today);
         yesterday.setDate(yesterday.getDate() - 1);
+        yesterday.setHours(0, 0, 0, 0);
+        
         const yesterdayEnd = new Date(yesterday);
         yesterdayEnd.setHours(23, 59, 59, 999);
+        
         return {
           startDate: yesterday.toISOString(),
           endDate: yesterdayEnd.toISOString()
@@ -352,8 +359,11 @@ const FreshworksLeads = ({ initialFilters = {}, token }) => {
       case 'week':
         const weekAgo = new Date(today);
         weekAgo.setDate(weekAgo.getDate() - 7);
+        weekAgo.setHours(0, 0, 0, 0);
+        
         const todayEndWeek = new Date(today);
         todayEndWeek.setHours(23, 59, 59, 999);
+        
         return {
           startDate: weekAgo.toISOString(),
           endDate: todayEndWeek.toISOString()
@@ -362,8 +372,11 @@ const FreshworksLeads = ({ initialFilters = {}, token }) => {
       case 'month':
         const monthAgo = new Date(today);
         monthAgo.setDate(monthAgo.getDate() - 30);
+        monthAgo.setHours(0, 0, 0, 0);
+        
         const todayEndMonth = new Date(today);
         todayEndMonth.setHours(23, 59, 59, 999);
+        
         return {
           startDate: monthAgo.toISOString(),
           endDate: todayEndMonth.toISOString()
@@ -578,10 +591,32 @@ const FreshworksLeads = ({ initialFilters = {}, token }) => {
   };
 
   const handleCustomDateChange = (dateType, value) => {
-    setFilters(prev => ({
-      ...prev,
-      [dateType]: value
-    }));
+    if (value) {
+      const [year, month, day] = value.split('-').map(Number);
+      const selectedDate = new Date(year, month - 1, day); 
+      
+      if (dateType === 'startDate') {
+        selectedDate.setHours(0, 0, 0, 0); 
+      } else if (dateType === 'endDate') {
+        selectedDate.setHours(23, 59, 59, 999); 
+      }
+      
+      console.log(`Selected ${dateType}:`, {
+        inputValue: value,
+        localDate: selectedDate.toLocaleString(),
+        isoString: selectedDate.toISOString()
+      });
+      
+      setFilters(prev => ({
+        ...prev,
+        [dateType]: selectedDate.toISOString()
+      }));
+    } else {
+      setFilters(prev => ({
+        ...prev,
+        [dateType]: ''
+      }));
+    }
   };
 
   // Updated conversation counting function - counts all email messages, not just threads
@@ -1388,33 +1423,37 @@ const FreshworksLeads = ({ initialFilters = {}, token }) => {
 
               {/* Custom Date Range Picker */}
               {showCustomDatePicker && (
-                <div className="row g-3 mt-2 p-3 border rounded bg-white">
-                  <div className="col-md-6">
-                    <label className="form-label fw-bold text-muted small">START DATE</label>
-                    <input
-                      type="date"
-                      className="form-control"
-                      value={filters.startDate ? filters.startDate.split('T')[0] : ''}
-                      onChange={(e) => {
-                        const date = e.target.value ? `${e.target.value}T00:00:00.000Z` : '';
-                        handleCustomDateChange('startDate', date);
-                      }}
+              <div className="custom-date-picker">
+                <div className="date-picker-row">
+                  <div className="date-picker-group">
+                    <label className="filter-label">START DATE</label>
+                    <input 
+                      type="date" 
+                      value={
+                        filters.startDate 
+                          ? new Date(filters.startDate).toLocaleDateString('en-CA')
+                          : ''
+                      } 
+                      onChange={(e) => handleCustomDateChange('startDate', e.target.value)} 
+                      className="filter-select" 
                     />
                   </div>
-                  <div className="col-md-6">
-                    <label className="form-label fw-bold text-muted small">END DATE</label>
-                    <input
-                      type="date"
-                      className="form-control"
-                      value={filters.endDate ? filters.endDate.split('T')[0] : ''}
-                      onChange={(e) => {
-                        const date = e.target.value ? `${e.target.value}T23:59:59.999Z` : '';
-                        handleCustomDateChange('endDate', date);
-                      }}
+                  <div className="date-picker-group">
+                    <label className="filter-label">END DATE</label>
+                    <input 
+                      type="date" 
+                      value={
+                        filters.endDate 
+                          ? new Date(filters.endDate).toLocaleDateString('en-CA')
+                          : ''
+                      } 
+                      onChange={(e) => handleCustomDateChange('endDate', e.target.value)} 
+                      className="filter-select" 
                     />
                   </div>
                 </div>
-              )}
+              </div>
+            )}
 
               {/* Additional Multi-Select Filters */}
               <div className="row g-3 mt-2">
