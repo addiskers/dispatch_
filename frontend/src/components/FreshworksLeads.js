@@ -7,6 +7,7 @@ const FreshworksLeads = ({ initialFilters = {}, token }) => {
   const location = useLocation(); 
   const navigate = useNavigate(); 
   const [contacts, setContacts] = useState([]);
+  const [sampleStatuses, setSampleStatuses] = useState({}); 
   const [analytics, setAnalytics] = useState({
     totalContacts: 0,
     avgTouchpoints: '0.0',
@@ -65,7 +66,8 @@ const FreshworksLeads = ({ initialFilters = {}, token }) => {
   const [showCustomDatePicker, setShowCustomDatePicker] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
   const [showColumnCustomizer, setShowColumnCustomizer] = useState(false);
-  
+  const [showSampleModal, setShowSampleModal] = useState(false);
+  const [currentSampleContact, setCurrentSampleContact] = useState(null);
   const [analyticsCountryFilter, setAnalyticsCountryFilter] = useState([]);
   const priorityCountries = [
     'United States', 'United Kingdom', 'France', 'Italy', 
@@ -124,7 +126,13 @@ const FreshworksLeads = ({ initialFilters = {}, token }) => {
   const [conversationsError, setConversationsError] = useState(null);
   const [expandedEmails, setExpandedEmails] = useState(new Set());
   const [conversationFilter, setConversationFilter] = useState('all'); 
-
+  const [sampleForm, setSampleForm] = useState({
+    querySource: 'SQ',
+    priority: 'medium',
+    clientRequirement: '',
+    clientDepartment: '',
+    dueDate: ''
+  });
   // Create headers object for API requests
   const getAuthHeaders = () => {
     if (!token) {
@@ -146,23 +154,159 @@ const FreshworksLeads = ({ initialFilters = {}, token }) => {
     { value: 'custom', label: 'Custom Range' }
   ];
 
+   const fetchSampleStatuses = async (contactIds) => {
+    try {
+      const statusPromises = contactIds.map(async (contactId) => {
+        try {
+          const response = await fetch(`${API_BASE_URL}/samples/contact/${contactId}/status`, {
+            headers: getAuthHeaders()
+          });
+          const data = await response.json();
+          if (data.success && data.data.length > 0) {
+            // Get the latest sample status
+            const latestSample = data.data[0];
+            return { contactId, status: latestSample.status, sampleId: latestSample.sampleId };
+          }
+          return { contactId, status: null, sampleId: null };
+        } catch (error) {
+          console.error(`Error fetching sample status for contact ${contactId}:`, error);
+          return { contactId, status: null, sampleId: null };
+        }
+      });
+
+      const statuses = await Promise.all(statusPromises);
+      const statusMap = {};
+      statuses.forEach(({ contactId, status, sampleId }) => {
+        statusMap[contactId] = { status, sampleId };
+      });
+      setSampleStatuses(statusMap);
+    } catch (error) {
+      console.error('Error fetching sample statuses:', error);
+    }
+  };
+
   // Handle Request Sample button click
   const handleRequestSample = async (contact) => {
     try {
-      console.log('Requesting sample for contact:', contact);
-      
-      if (window.confirm(`Request sample for ${contact.display_name} at ${contact.company}?`)) {
-        // You can add an API call here
-        // await fetch(`${API_BASE_URL}/contacts/${contact.id}/request-sample`, {
-        //   method: 'POST',
-        //   headers: getAuthHeaders()
-        // });
+      const existingStatus = sampleStatuses[contact.id];
+      if (existingStatus && existingStatus.status) {
+        if (existingStatus.status === 'done') {
+          alert(`Sample already completed for ${contact.display_name}`);
+        } else {
+          alert(`Sample already ${existingStatus.status} for ${contact.display_name}`);
+        }
+        return;
+      }
+
+      setCurrentSampleContact(contact);
+      setShowSampleModal(true);
+    } catch (error) {
+      console.error('Error checking sample status:', error);
+    }
+  };
+
+  // Handle sample request submission
+  const handleSampleRequestSubmit = async () => {
+    try {
+      if (!sampleForm.clientRequirement.trim()) {
+        alert('Client requirement is required');
+        return;
+      }
+
+      const requestData = {
+        contactId: currentSampleContact.id,
+        reportName: currentSampleContact.market_name || 'Unknown Report',
+        querySource: sampleForm.querySource,
+        reportIndustry: currentSampleContact.custom_field?.cf_industry || 'Unknown Industry',
+        salesPerson: currentSampleContact.owner_name || 'Unassigned',
+        clientCompany: currentSampleContact.company || 'Unknown Company',
+        clientDesignation: currentSampleContact.job_title || 'Unknown Designation',
+        clientDepartment: sampleForm.clientDepartment || 'Not Specified',
+        clientCountry: currentSampleContact.country || 'Unknown Country',
+        clientRequirement: sampleForm.clientRequirement,
+        priority: sampleForm.priority,
+        dueDate: sampleForm.dueDate || null
+      };
+
+      const response = await fetch(`${API_BASE_URL}/samples`, {
+        method: 'POST',
+        headers: getAuthHeaders(),
+        body: JSON.stringify(requestData)
+      });
+
+      const data = await response.json();
+
+      if (data.success) {
+        alert(`Sample request created successfully: ${data.data.sampleId}`);
+        setShowSampleModal(false);
+        setSampleForm({
+          querySource: 'SQ',
+          priority: 'medium',
+          clientRequirement: '',
+          clientDepartment: '',
+          dueDate: ''
+        });
+        setCurrentSampleContact(null);
         
-        alert(`Sample request sent for ${contact.display_name}!`);
+        setSampleStatuses(prev => ({
+          ...prev,
+          [currentSampleContact.id]: { 
+            status: 'requested', 
+            sampleId: data.data.sampleId 
+          }
+        }));
+      } else {
+        alert(`Error creating sample request: ${data.message}`);
       }
     } catch (error) {
-      console.error('Error requesting sample:', error);
-      alert('Error sending sample request. Please try again.');
+      console.error('Error creating sample request:', error);
+      alert('Error creating sample request. Please try again.');
+    }
+  };
+
+  // Get sample button display
+  const getSampleButtonDisplay = (contact) => {
+    const sampleStatus = sampleStatuses[contact.id];
+    
+    if (!sampleStatus || !sampleStatus.status) {
+      return {
+        text: '📋 Request Sample',
+        className: 'btn btn-sm btn-primary request-sample-btn',
+        disabled: false
+      };
+    }
+
+    switch (sampleStatus.status) {
+      case 'requested':
+        return {
+          text: '📋 Requested',
+          className: 'btn btn-sm btn-warning sample-status-btn',
+          disabled: true
+        };
+      case 'in_progress':
+        return {
+          text: '🔄 In Progress',
+          className: 'btn btn-sm btn-info sample-status-btn',
+          disabled: true
+        };
+      case 'done':
+        return {
+          text: '✅ Done',
+          className: 'btn btn-sm btn-success sample-status-btn',
+          disabled: true
+        };
+      case 'cancelled':
+        return {
+          text: '❌ Cancelled',
+          className: 'btn btn-sm btn-secondary sample-status-btn',
+          disabled: true
+        };
+      default:
+        return {
+          text: '📋 Request Sample',
+          className: 'btn btn-sm btn-primary request-sample-btn',
+          disabled: false
+        };
     }
   };
 
@@ -468,10 +612,7 @@ const FreshworksLeads = ({ initialFilters = {}, token }) => {
         startDate: dateRange.startDate,
         endDate: dateRange.endDate,
         analyticsCountryFilter: JSON.stringify(analyticsCountryFilter)
-      });
-
-      console.log('Fetching with params:', Object.fromEntries(params));
-
+      }); 
       const response = await fetch(`${API_BASE_URL}/contacts/table?${params}`, {
         headers: getAuthHeaders()
       });
@@ -507,6 +648,10 @@ const FreshworksLeads = ({ initialFilters = {}, token }) => {
         });
         setTotalPages(data.pagination.totalPages);
         setTotalCount(data.pagination.totalCount);
+        if (data.data && data.data.length > 0) {
+          const contactIds = data.data.map(contact => contact.id);
+          await fetchSampleStatuses(contactIds);
+        }
       } else {
         setError(data.message || 'Error fetching contacts');
       }
@@ -517,7 +662,6 @@ const FreshworksLeads = ({ initialFilters = {}, token }) => {
       setLoading(false);
     }
   };
-
   const fetchFilterOptions = async () => {
     try {
       const response = await fetch(`${API_BASE_URL}/contacts/filters`, {
@@ -941,18 +1085,21 @@ const FreshworksLeads = ({ initialFilters = {}, token }) => {
   const renderCellContent = (columnKey, contact) => {
     // Handle the new Request Sample button column
     if (columnKey === 'request_sample') {
+      const buttonDisplay = getSampleButtonDisplay(contact);
       return (
         <button
-          className="btn btn-sm btn-primary request-sample-btn"
-          onClick={() => handleRequestSample(contact)}
-          title={`Request sample for ${contact.display_name}`}
+          className={buttonDisplay.className}
+          onClick={() => !buttonDisplay.disabled && handleRequestSample(contact)}
+          title={buttonDisplay.disabled ? `Sample status: ${buttonDisplay.text.substring(2)}` : `Request sample for ${contact.display_name}`}
+          disabled={buttonDisplay.disabled}
           style={{
             fontSize: '0.75rem',
             padding: '0.25rem 0.5rem',
-            whiteSpace: 'nowrap'
+            whiteSpace: 'nowrap',
+            cursor: buttonDisplay.disabled ? 'not-allowed' : 'pointer'
           }}
         >
-          📋 Request Sample
+          {buttonDisplay.text}
         </button>
       );
     }
@@ -1827,7 +1974,7 @@ const FreshworksLeads = ({ initialFilters = {}, token }) => {
         </div>
 
         {/* Table */}
-        <div className="table-responsive">
+         <div className="table-responsive">
           <table className="table leads-table" style={{ tableLayout: 'fixed', width: '100%' }}>
             <colgroup>
               {visibleColumns.map(([columnKey, config]) => (
@@ -1961,7 +2108,165 @@ const FreshworksLeads = ({ initialFilters = {}, token }) => {
           </div>
         </div>
       </div>
-
+       {/* Sample Request Modal */}
+      {showSampleModal && currentSampleContact && (
+        <div className="modal-overlay" onClick={() => setShowSampleModal(false)}>
+          <div className="modal-content sample-request-modal" onClick={(e) => e.stopPropagation()}>
+            <div className="modal-header">
+              <h3>Request Sample - {currentSampleContact.display_name}</h3>
+              <button 
+                onClick={() => setShowSampleModal(false)}
+                className="close-button"
+              >
+                ✕
+              </button>
+            </div>
+            <div className="modal-body">
+              <div className="sample-form">
+                <div className="form-row">
+                  <div className="form-group">
+                    <label>Report Name:</label>
+                    <input 
+                      type="text" 
+                      value={currentSampleContact.market_name || 'Unknown Report'} 
+                      disabled 
+                      className="form-control"
+                    />
+                  </div>
+                  <div className="form-group">
+                    <label>Query Source:</label>
+                    <select
+                      value={sampleForm.querySource}
+                      onChange={(e) => setSampleForm(prev => ({ ...prev, querySource: e.target.value }))}
+                      className="form-control"
+                    >
+                      <option value="SQ">SQ</option>
+                      <option value="GII">GII</option>
+                    </select>
+                  </div>
+                </div>
+                
+                <div className="form-row">
+                  <div className="form-group">
+                    <label>Industry:</label>
+                    <input 
+                      type="text" 
+                      value={currentSampleContact.custom_field?.cf_industry || 'Unknown Industry'} 
+                      disabled 
+                      className="form-control"
+                    />
+                  </div>
+                  <div className="form-group">
+                    <label>Sales Person:</label>
+                    <input 
+                      type="text" 
+                      value={currentSampleContact.owner_name || 'Unassigned'} 
+                      disabled 
+                      className="form-control"
+                    />
+                  </div>
+                </div>
+                
+                <div className="form-row">
+                  <div className="form-group">
+                    <label>Client Company:</label>
+                    <input 
+                      type="text" 
+                      value={currentSampleContact.company || 'Unknown Company'} 
+                      disabled 
+                      className="form-control"
+                    />
+                  </div>
+                  <div className="form-group">
+                    <label>Client Designation:</label>
+                    <input 
+                      type="text" 
+                      value={currentSampleContact.job_title || 'Unknown Designation'} 
+                      disabled 
+                      className="form-control"
+                    />
+                  </div>
+                </div>
+                
+                <div className="form-row">
+                  <div className="form-group">
+                    <label>Client Department:</label>
+                    <input
+                      type="text"
+                      value={sampleForm.clientDepartment}
+                      onChange={(e) => setSampleForm(prev => ({ ...prev, clientDepartment: e.target.value }))}
+                      placeholder="Enter client department (optional)"
+                      className="form-control"
+                    />
+                  </div>
+                  <div className="form-group">
+                    <label>Client Country:</label>
+                    <input 
+                      type="text" 
+                      value={currentSampleContact.country || 'Unknown Country'} 
+                      disabled 
+                      className="form-control"
+                    />
+                  </div>
+                </div>
+                
+                <div className="form-group full-width">
+                  <label>Client Requirement: *</label>
+                  <textarea
+                    value={sampleForm.clientRequirement}
+                    onChange={(e) => setSampleForm(prev => ({ ...prev, clientRequirement: e.target.value }))}
+                    placeholder="Enter detailed client requirement..."
+                    className="form-control"
+                    rows="4"
+                    required
+                  />
+                </div>
+                
+                <div className="form-row">
+                  <div className="form-group">
+                    <label>Priority:</label>
+                    <select
+                      value={sampleForm.priority}
+                      onChange={(e) => setSampleForm(prev => ({ ...prev, priority: e.target.value }))}
+                      className="form-control"
+                    >
+                      <option value="low">Low</option>
+                      <option value="medium">Medium</option>
+                      <option value="high">High</option>
+                      <option value="urgent">Urgent</option>
+                    </select>
+                  </div>
+                  <div className="form-group">
+                    <label>Due Date (Optional):</label>
+                    <input
+                      type="date"
+                      value={sampleForm.dueDate}
+                      onChange={(e) => setSampleForm(prev => ({ ...prev, dueDate: e.target.value }))}
+                      className="form-control"
+                    />
+                  </div>
+                </div>
+              </div>
+              
+              <div className="modal-actions">
+                <button
+                  onClick={handleSampleRequestSubmit}
+                  className="btn btn-primary"
+                  disabled={!sampleForm.clientRequirement.trim()}
+                >
+                  Create Sample Request
+                </button>
+                <button
+                  onClick={() => setShowSampleModal(false)}
+                  className="btn btn-outline"
+                >
+                  Cancel
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}            
       {/* Conversations Modal */}
       {showConversationsModal && (
         <div className="modal-overlay" onClick={() => {

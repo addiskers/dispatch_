@@ -2,9 +2,10 @@ import React, { useState, useEffect, useRef } from "react";
 import LeadsTableUploader from "./LeadsTableuploader.js";
 import MultipleFileUpload from "./MultipleFileUpload.js";
 import "../styles/superAdminDashboard.css";
+import SampleTable from "./SampleTable";
 
-function UploaderDashboard({ token, onLogout }) {
-  const [selectedSection, setSelectedSection] = useState("Leads Table");
+function UploaderDashboard({ token, onLogout, currentUser }) {
+  const [selectedSection, setSelectedSection] = useState("Sample Table");
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
   const sidebarRef = useRef(null);
 
@@ -26,16 +27,22 @@ function UploaderDashboard({ token, onLogout }) {
   }, []);
 
   const renderSection = () => {
-    if (selectedSection === "Leads Table") {
-      return <LeadsTableUploader token={token} userRole="uploader" />;
-    } else if (selectedSection === "Uploads") {
-      return <MultipleFileUpload token={token} />;
+    switch(selectedSection) {
+      case "Sample Table":
+        return <SampleTable token={token} userRole="uploader" currentUser={currentUser} />;
+      case "Leads Table":
+        return <LeadsTableUploader token={token} userRole="uploader" />;
+      case "Uploads":
+        return <MultipleFileUpload token={token} />;
+      default:
+        return <SampleTable token={token} userRole="uploader" currentUser={currentUser} />;
     }
   };
 
   const menuItems = [
+    { name: "Sample Management", section: "Sample Table" },
     { name: "Leads Table", section: "Leads Table" },
-    { name: "Uploads", section: "Uploads" },
+    { name: "File Uploads", section: "Uploads" }
   ];
 
   const handleMenuClick = (section) => {
@@ -61,7 +68,7 @@ function UploaderDashboard({ token, onLogout }) {
         ref={sidebarRef}
         className={`sidebar ${isSidebarOpen ? "open" : ""}`}
       >
-        <h3>Researcher's Dashboard</h3>
+        <h3>Researcher Dashboard</h3>
         <ul>
           {menuItems.map((item) => (
             <li

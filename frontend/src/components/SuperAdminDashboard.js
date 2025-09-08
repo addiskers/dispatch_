@@ -3,13 +3,13 @@ import { useLocation, useNavigate } from "react-router-dom";
 import LeadsSection from "./LeadsSection"; 
 import ManageAccessSection from "./ManageAccessSection"; 
 import LogsSection from "./LogsSection"; 
-import SampleManagementPage from "./SampleManagementPage"; 
 import ContractPage from "./ContractPage"; 
 import MultipleFileUpload from "./MultipleFileUpload";
 import FreshworksLeads from "./FreshworksLeads"; 
 import Sale from "./Sale";
 import GIIForm from "./GIIForm";
 import "../styles/superAdminDashboard.css";
+import SampleTable from "./SampleTable";
 
 function SuperAdminDashboard({ token, onLogout }) {
   const location = useLocation();
@@ -63,14 +63,14 @@ function SuperAdminDashboard({ token, onLogout }) {
         return <ContractPage token={token} />; 
       case "Uploads":
         return <MultipleFileUpload token={token} />;
-      case "Sample":
-        return <SampleManagementPage token={token} />;
       case "Freshworks Leads":
         return <FreshworksLeads key={navigationKey} initialFilters={navigationFilters} token={token} />; 
       case "Analytics":
         return <Sale token={token} />;
       case "GII":
         return <GIIForm token={token} />;
+      case "Sample Table":
+        return <SampleTable token={token} />;
       default:
         return <ManageAccessSection token={token} />;
     }
@@ -84,6 +84,7 @@ function SuperAdminDashboard({ token, onLogout }) {
     { name: "GII", section: "GII" },
     { name: "Contracts", section: "Contracts" },
     { name: "Upload", section: "Uploads" },
+    {name: "Sample Table", section: "Sample Table" },
     { name: "Sample", section: "Sample" },
     { name: "Logs", section: "Logs" },
   ];
