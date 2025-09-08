@@ -677,7 +677,7 @@
   .action-buttons {
     flex-direction: column;
   }
-} Fixed Modal Styles - Higher specificity and z-index */
+} 
 .sample-table-container .modal-overlay {
   position: fixed !important;
   top: 0 !important;
