@@ -382,7 +382,8 @@ const getContactsTable = async (req, res) => {
         created_at: contact.created_at,
         last_contacted_mode: formatValue(contact.last_contacted_mode),
         last_contacted_time: contact.last_contacted || null,
-        
+        custom_field: contact.custom_field,
+
         // CRM Analytics fields
         last_email_received: contact.crm_analytics?.last_email_received?.date || null,
         first_email_with_attachment: contact.crm_analytics?.first_email_with_attachment?.date || null,

@@ -15,9 +15,10 @@ const transporter = nodemailer.createTransport({
  * @param {string[]} recipients - Array of email addresses.
  * @param {string} subject - Email subject.
  * @param {string} html - Email HTML content.
- * @param {boolean} includeCc - Whether to include the CC email.
+ * @param {boolean} includeCc - Whether to include the default CC email.
+ * @param {string[]} customCcList - Custom CC email addresses array.
  */
-const sendNotificationEmail = async (recipients, subject, html, includeCc = true) => {
+const sendNotificationEmail = async (recipients, subject, html, includeCc = true, customCcList = []) => {
   try {
     const mailOptions = {
       from: '"Dispatch Notification" <matt@theskyquestt.org>',
@@ -26,13 +27,32 @@ const sendNotificationEmail = async (recipients, subject, html, includeCc = true
       html,
     };
 
+    let ccEmails = [];
+    
     if (includeCc) {
-      mailOptions.cc = "sd@skyquestt.com";
+      ccEmails.push("sd@skyquestt.com");
+    }
+    
+    if (customCcList && Array.isArray(customCcList)) {
+      ccEmails = [...ccEmails, ...customCcList];
+    }
+    
+    if (ccEmails.length > 0) {
+      const uniqueCcEmails = [...new Set(ccEmails)];
+      mailOptions.cc = uniqueCcEmails.join(", ");
     }
 
+    console.log('Sending email with options:', {
+      to: mailOptions.to,
+      cc: mailOptions.cc,
+      subject: mailOptions.subject
+    });
+
     await transporter.sendMail(mailOptions);
+    console.log('Email sent successfully');
   } catch (error) {
     console.error("Error sending notification email:", error);
+    throw error; 
   }
 };
 

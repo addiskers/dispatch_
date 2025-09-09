@@ -126,14 +126,15 @@ const FreshworksLeads = ({ initialFilters = {}, token }) => {
   const [conversationsError, setConversationsError] = useState(null);
   const [expandedEmails, setExpandedEmails] = useState(new Set());
   const [conversationFilter, setConversationFilter] = useState('all'); 
+  const [clientRequirementFiles, setClientRequirementFiles] = useState([]);
+  const clientRequirementFileInputRef = useRef(null);
   const [sampleForm, setSampleForm] = useState({
     querySource: 'SQ',
     priority: 'medium',
-    clientRequirement: '',
-    clientDepartment: '',
+    salesRequirement: '',
     dueDate: ''
   });
-  // Create headers object for API requests
+
   const getAuthHeaders = () => {
     if (!token) {
       return { 'Content-Type': 'application/json' };
@@ -206,63 +207,92 @@ const FreshworksLeads = ({ initialFilters = {}, token }) => {
   };
 
   // Handle sample request submission
-  const handleSampleRequestSubmit = async () => {
-    try {
-      if (!sampleForm.clientRequirement.trim()) {
-        alert('Client requirement is required');
-        return;
-      }
+const handleSampleRequestSubmit = async () => {
+  try {
+    const requestData = {
+      contactId: currentSampleContact.id,
+      reportName: currentSampleContact.market_name || 'Unknown Report',
+      querySource: sampleForm.querySource,
+      reportIndustry: currentSampleContact.custom_field?.cf_industry || 'Unknown Industry',
+      salesPerson: currentSampleContact.owner_name || 'Unassigned',
+      clientCompany: currentSampleContact.company || 'Unknown Company',
+      clientDesignation: currentSampleContact.job_title || 'Unknown Designation',
+      clientCountry: currentSampleContact.country || 'Unknown Country',
+      salesRequirement: sampleForm.salesRequirement,
+      priority: sampleForm.priority,
+      dueDate: sampleForm.dueDate || null
+    };
 
-      const requestData = {
-        contactId: currentSampleContact.id,
-        reportName: currentSampleContact.market_name || 'Unknown Report',
-        querySource: sampleForm.querySource,
-        reportIndustry: currentSampleContact.custom_field?.cf_industry || 'Unknown Industry',
-        salesPerson: currentSampleContact.owner_name || 'Unassigned',
-        clientCompany: currentSampleContact.company || 'Unknown Company',
-        clientDesignation: currentSampleContact.job_title || 'Unknown Designation',
-        clientDepartment: sampleForm.clientDepartment || 'Not Specified',
-        clientCountry: currentSampleContact.country || 'Unknown Country',
-        clientRequirement: sampleForm.clientRequirement,
-        priority: sampleForm.priority,
-        dueDate: sampleForm.dueDate || null
-      };
+    const response = await fetch(`${API_BASE_URL}/samples`, {
+      method: 'POST',
+      headers: getAuthHeaders(),
+      body: JSON.stringify(requestData)
+    });
 
-      const response = await fetch(`${API_BASE_URL}/samples`, {
-        method: 'POST',
-        headers: getAuthHeaders(),
-        body: JSON.stringify(requestData)
-      });
+    const data = await response.json();
 
-      const data = await response.json();
+    if (data.success) {
+      // Upload requirement files if any exist
+      if (clientRequirementFiles && clientRequirementFiles.length > 0) {
+        try {
+          const formData = new FormData();
+          
+          Array.from(clientRequirementFiles).forEach(file => {
+            formData.append('requirementFiles', file);
+          });
 
-      if (data.success) {
-        alert(`Sample request created successfully: ${data.data.sampleId}`);
-        setShowSampleModal(false);
-        setSampleForm({
-          querySource: 'SQ',
-          priority: 'medium',
-          clientRequirement: '',
-          clientDepartment: '',
-          dueDate: ''
-        });
-        setCurrentSampleContact(null);
-        
-        setSampleStatuses(prev => ({
-          ...prev,
-          [currentSampleContact.id]: { 
-            status: 'requested', 
-            sampleId: data.data.sampleId 
+          const fileUploadResponse = await fetch(`${API_BASE_URL}/samples/${data.data._id}/upload-requirements`, {
+            method: 'POST',
+            headers: {
+              'Authorization': `Bearer ${token}`,
+              // DO NOT set Content-Type header - let browser set it automatically with boundary
+            },
+            body: formData
+          });
+
+          const fileUploadData = await fileUploadResponse.json();
+          
+          if (!fileUploadData.success) {
+            console.error('File upload failed:', fileUploadData);
+            alert(`Sample created successfully: ${data.data.sampleId}, but file upload failed: ${fileUploadData.message}`);
+          } else {
+            console.log('Files uploaded successfully:', fileUploadData);
           }
-        }));
-      } else {
-        alert(`Error creating sample request: ${data.message}`);
+        } catch (fileError) {
+          console.error('Error uploading requirement files:', fileError);
+          alert(`Sample created successfully: ${data.data.sampleId}, but file upload failed.`);
+        }
       }
-    } catch (error) {
-      console.error('Error creating sample request:', error);
-      alert('Error creating sample request. Please try again.');
+
+      alert(`Sample request created successfully: ${data.data.sampleId}`);
+      setShowSampleModal(false);
+      setSampleForm({
+        querySource: 'SQ',
+        priority: 'medium',
+        salesRequirement: '', 
+        dueDate: ''
+      });
+      setClientRequirementFiles([]);
+      if (clientRequirementFileInputRef.current) {
+        clientRequirementFileInputRef.current.value = '';
+      }
+      setCurrentSampleContact(null);
+      
+      setSampleStatuses(prev => ({
+        ...prev,
+        [currentSampleContact.id]: { 
+          status: 'requested', 
+          sampleId: data.data.sampleId 
+        }
+      }));
+    } else {
+      alert(`Error creating sample request: ${data.message}`);
     }
-  };
+  } catch (error) {
+    console.error('Error creating sample request:', error);
+    alert('Error creating sample request. Please try again.');
+  }
+};
 
   // Get sample button display
   const getSampleButtonDisplay = (contact) => {
@@ -1080,6 +1110,19 @@ const FreshworksLeads = ({ initialFilters = {}, token }) => {
     if (tagLower.includes('demo')) return 'bg-purple';
     if (tagLower.includes('quote')) return 'bg-dark';
     return 'bg-light text-dark';
+  };
+
+  const truncateContent = (content, maxLength = 200) => {
+    if (!content || content.length <= maxLength) return content;
+    
+    let truncateIndex = maxLength;
+    while (truncateIndex > 0 && content[truncateIndex] !== ' ') {
+      truncateIndex--;
+    }
+    
+    if (truncateIndex === 0) truncateIndex = maxLength;
+    
+    return content.substring(0, truncateIndex) + '...';
   };
 
   const renderCellContent = (columnKey, contact) => {
@@ -2110,163 +2153,250 @@ const FreshworksLeads = ({ initialFilters = {}, token }) => {
       </div>
        {/* Sample Request Modal */}
       {showSampleModal && currentSampleContact && (
-        <div className="modal-overlay" onClick={() => setShowSampleModal(false)}>
-          <div className="modal-content sample-request-modal" onClick={(e) => e.stopPropagation()}>
-            <div className="modal-header">
-              <h3>Request Sample - {currentSampleContact.display_name}</h3>
-              <button 
-                onClick={() => setShowSampleModal(false)}
-                className="close-button"
-              >
-                ✕
-              </button>
-            </div>
-            <div className="modal-body">
-              <div className="sample-form">
-                <div className="form-row">
-                  <div className="form-group">
-                    <label>Report Name:</label>
-                    <input 
-                      type="text" 
-                      value={currentSampleContact.market_name || 'Unknown Report'} 
-                      disabled 
-                      className="form-control"
-                    />
-                  </div>
-                  <div className="form-group">
-                    <label>Query Source:</label>
-                    <select
-                      value={sampleForm.querySource}
-                      onChange={(e) => setSampleForm(prev => ({ ...prev, querySource: e.target.value }))}
-                      className="form-control"
-                    >
-                      <option value="SQ">SQ</option>
-                      <option value="GII">GII</option>
-                    </select>
-                  </div>
-                </div>
-                
-                <div className="form-row">
-                  <div className="form-group">
-                    <label>Industry:</label>
-                    <input 
-                      type="text" 
-                      value={currentSampleContact.custom_field?.cf_industry || 'Unknown Industry'} 
-                      disabled 
-                      className="form-control"
-                    />
-                  </div>
-                  <div className="form-group">
-                    <label>Sales Person:</label>
-                    <input 
-                      type="text" 
-                      value={currentSampleContact.owner_name || 'Unassigned'} 
-                      disabled 
-                      className="form-control"
-                    />
-                  </div>
-                </div>
-                
-                <div className="form-row">
-                  <div className="form-group">
-                    <label>Client Company:</label>
-                    <input 
-                      type="text" 
-                      value={currentSampleContact.company || 'Unknown Company'} 
-                      disabled 
-                      className="form-control"
-                    />
-                  </div>
-                  <div className="form-group">
-                    <label>Client Designation:</label>
-                    <input 
-                      type="text" 
-                      value={currentSampleContact.job_title || 'Unknown Designation'} 
-                      disabled 
-                      className="form-control"
-                    />
-                  </div>
-                </div>
-                
-                <div className="form-row">
-                  <div className="form-group">
-                    <label>Client Department:</label>
-                    <input
-                      type="text"
-                      value={sampleForm.clientDepartment}
-                      onChange={(e) => setSampleForm(prev => ({ ...prev, clientDepartment: e.target.value }))}
-                      placeholder="Enter client department (optional)"
-                      className="form-control"
-                    />
-                  </div>
-                  <div className="form-group">
-                    <label>Client Country:</label>
-                    <input 
-                      type="text" 
-                      value={currentSampleContact.country || 'Unknown Country'} 
-                      disabled 
-                      className="form-control"
-                    />
-                  </div>
-                </div>
-                
-                <div className="form-group full-width">
-                  <label>Client Requirement: *</label>
-                  <textarea
-                    value={sampleForm.clientRequirement}
-                    onChange={(e) => setSampleForm(prev => ({ ...prev, clientRequirement: e.target.value }))}
-                    placeholder="Enter detailed client requirement..."
-                    className="form-control"
-                    rows="4"
-                    required
-                  />
-                </div>
-                
-                <div className="form-row">
-                  <div className="form-group">
-                    <label>Priority:</label>
-                    <select
-                      value={sampleForm.priority}
-                      onChange={(e) => setSampleForm(prev => ({ ...prev, priority: e.target.value }))}
-                      className="form-control"
-                    >
-                      <option value="low">Low</option>
-                      <option value="medium">Medium</option>
-                      <option value="high">High</option>
-                      <option value="urgent">Urgent</option>
-                    </select>
-                  </div>
-                  <div className="form-group">
-                    <label>Due Date (Optional):</label>
-                    <input
-                      type="date"
-                      value={sampleForm.dueDate}
-                      onChange={(e) => setSampleForm(prev => ({ ...prev, dueDate: e.target.value }))}
-                      className="form-control"
-                    />
-                  </div>
-                </div>
-              </div>
+  <div className="modal-overlay" onClick={() => setShowSampleModal(false)}>
+    <div className="modal-content sample-request-modal" onClick={(e) => e.stopPropagation()}>
+      <div className="modal-header">
+        <h3>Request Sample - {currentSampleContact.display_name}</h3>
+        <button 
+          onClick={() => setShowSampleModal(false)}
+          className="close-button"
+        >
+          ✕
+        </button>
+      </div>
+      <div className="modal-body">
+        <div className="sample-form">
+          {/* Contact Research Requirement - Read Only Section */}
+          {currentSampleContact.custom_field?.cf_research_requirement && (
+            <div className="contact-requirement-section" style={{
+              border: '2px solid #17a2b8', 
+              padding: '15px', 
+              marginBottom: '20px', 
+              backgroundColor: '#f0f9ff',
+              borderRadius: '5px'
+            }}>
+              <label className="requirement-label" style={{fontWeight: 'bold', color: '#17a2b8', marginBottom: '10px', display: 'block'}}>
+                📋 Contact Research Requirement (From Contact Profile):
+              </label>
               
-              <div className="modal-actions">
-                <button
-                  onClick={handleSampleRequestSubmit}
-                  className="btn btn-primary"
-                  disabled={!sampleForm.clientRequirement.trim()}
-                >
-                  Create Sample Request
-                </button>
-                <button
-                  onClick={() => setShowSampleModal(false)}
-                  className="btn btn-outline"
-                >
-                  Cancel
-                </button>
+              <div className="contact-requirement-box" style={{
+                padding: '12px',
+                backgroundColor: '#ffffff',
+                border: '1px solid #17a2b8',
+                borderRadius: '4px',
+                minHeight: '60px',
+                maxHeight: '150px',
+                overflowY: 'auto'
+              }}>
+                <p style={{margin: '0', fontSize: '14px', lineHeight: '1.4', whiteSpace: 'pre-line'}}>
+                  {currentSampleContact.custom_field.cf_research_requirement}
+                </p>
               </div>
+              <small className="text-muted" style={{display: 'block', marginTop: '8px', fontSize: '12px', color: '#666'}}>
+                This requirement is automatically captured from the contact's profile and cannot be edited here.
+              </small>
+            </div>
+          )}
+
+          <div className="form-row">
+            <div className="form-group">
+              <label>Report Name:</label>
+              <input 
+                type="text" 
+                value={currentSampleContact.market_name || currentSampleContact.custom_field?.cf_report_name || 'Unknown Report'} 
+                disabled 
+                className="form-control"
+              />
+            </div>
+            <div className="form-group">
+              <label>Query Source:</label>
+              <select
+                value={sampleForm.querySource}
+                onChange={(e) => setSampleForm(prev => ({ ...prev, querySource: e.target.value }))}
+                className="form-control"
+              >
+                <option value="SQ">SQ</option>
+                <option value="GII">GII</option>
+              </select>
+            </div>
+          </div>
+          
+          <div className="form-row">
+            <div className="form-group">
+              <label>Industry:</label>
+              <input 
+                type="text" 
+                value={currentSampleContact.custom_field?.cf_industry || 'Unknown Industry'} 
+                disabled 
+                className="form-control"
+              />
+            </div>
+            <div className="form-group">
+              <label>Sales Person:</label>
+              <input 
+                type="text" 
+                value={currentSampleContact.owner_name || 'Unassigned'} 
+                disabled 
+                className="form-control"
+              />
+            </div>
+          </div>
+          
+          <div className="form-row">
+            <div className="form-group">
+              <label>Client Company:</label>
+              <input 
+                type="text" 
+                value={currentSampleContact.company || currentSampleContact.custom_field?.cf_company_name || 'Unknown Company'} 
+                disabled 
+                className="form-control"
+              />
+            </div>
+            <div className="form-group">
+              <label>Client Designation:</label>
+              <input 
+                type="text" 
+                value={currentSampleContact.job_title || 'Unknown Designation'} 
+                disabled 
+                className="form-control"
+              />
+            </div>
+          </div>
+          
+          <div className="form-row">
+            <div className="form-group">
+              <label>Client Country:</label>
+              <input 
+                type="text" 
+                value={currentSampleContact.country || 'Unknown Country'} 
+                disabled 
+                className="form-control"
+              />
+            </div>
+            <div className="form-group">
+              <label>Priority:</label>
+              <select
+                value={sampleForm.priority}
+                onChange={(e) => setSampleForm(prev => ({ ...prev, priority: e.target.value }))}
+                className="form-control"
+              >
+                <option value="low">Low</option>
+                <option value="medium">Medium</option>
+                <option value="high">High</option>
+                <option value="urgent">Urgent</option>
+              </select>
+            </div>
+          </div>
+          
+          {/* Sales Requirement - Editable Section */}
+          <div className="sales-requirement-section" style={{
+            border: '2px solid #28a745', 
+            padding: '15px', 
+            marginBottom: '20px', 
+            backgroundColor: '#f8fff9',
+            borderRadius: '5px'
+          }}>
+            <div className="form-group full-width">
+              <label className="requirement-label" style={{fontWeight: 'bold', color: '#28a745', marginBottom: '10px', display: 'block'}}>
+                ✏️ Sales Requirement (Your Input - Optional ):
+              </label>
+              <textarea
+                value={sampleForm.salesRequirement}
+                onChange={(e) => setSampleForm(prev => ({ ...prev, salesRequirement: e.target.value }))}
+                placeholder="Enter your specific requirement details for this sample request..."
+                className="form-control sales-requirement-textarea"
+                rows="4"
+                style={{
+                  border: '2px solid #28a745',
+                  borderRadius: '4px',
+                  padding: '10px',
+                  resize: 'vertical',
+                  minHeight: '100px'
+                }}
+              />
+              <small className="form-help-text" style={{color: '#666', fontSize: '12px', marginTop: '5px', display: 'block'}}>
+                Describe what the client needs, specific focus areas, or any special requirements for this sample.
+              </small>
+            </div>
+            
+            <div className="form-group full-width">
+              <label className="requirement-label" style={{fontWeight: 'bold', color: '#28a745', marginBottom: '10px', display: 'block'}}>
+                📎 Sales Requirement Files (Optional - up to 5 files):
+              </label>
+              <input
+                ref={clientRequirementFileInputRef}
+                type="file"
+                multiple
+                onChange={(e) => setClientRequirementFiles(e.target.files)}
+                className="file-input"
+                accept=".pdf,.doc,.docx,.xls,.xlsx,.txt,.jpg,.jpeg,.png"
+                style={{
+                  border: '1px solid #28a745',
+                  borderRadius: '4px',
+                  padding: '8px'
+                }}
+              />
+              <small className="form-help-text" style={{color: '#666', fontSize: '12px', marginTop: '5px', display: 'block'}}>
+                Upload any additional files that help clarify the requirement (RFP, specification docs, etc.)
+              </small>
+              {clientRequirementFiles && clientRequirementFiles.length > 0 && (
+                <div className="selected-files" style={{
+                  marginTop: '10px',
+                  padding: '10px',
+                  backgroundColor: '#e8f5e8',
+                  borderRadius: '4px',
+                  border: '1px solid #28a745'
+                }}>
+                  <p className="files-count" style={{margin: '0 0 8px 0', fontWeight: 'bold'}}>
+                    Selected {clientRequirementFiles.length} file(s):
+                  </p>
+                  <ul className="files-list" style={{margin: '0', paddingLeft: '20px'}}>
+                    {Array.from(clientRequirementFiles).map((file, index) => (
+                      <li key={index} className="file-item" style={{marginBottom: '4px'}}>
+                        <span className="file-name" style={{fontWeight: 'bold'}}>{file.name}</span>
+                        <span className="file-size" style={{color: '#666', marginLeft: '8px'}}>
+                          ({(file.size / 1024 / 1024).toFixed(2)} MB)
+                        </span>
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              )}
+            </div>
+          </div>
+          
+          <div className="form-row">
+            <div className="form-group">
+              <label>Due Date (Optional):</label>
+              <input
+                type="date"
+                value={sampleForm.dueDate}
+                onChange={(e) => setSampleForm(prev => ({ ...prev, dueDate: e.target.value }))}
+                className="form-control"
+              />
             </div>
           </div>
         </div>
-      )}            
+        
+        <div className="modal-actions">
+          <button
+            onClick={handleSampleRequestSubmit}
+            className="btn btn-primary"
+          >
+            Create Sample Request
+          </button>
+          <button
+            onClick={() => setShowSampleModal(false)}
+            className="btn btn-outline"
+          >
+            Cancel
+          </button>
+        </div>
+      </div>
+    </div>
+  </div>
+)}
+
       {/* Conversations Modal */}
       {showConversationsModal && (
         <div className="modal-overlay" onClick={() => {
@@ -2583,9 +2713,14 @@ const FreshworksLeads = ({ initialFilters = {}, token }) => {
                                         {message.content ? (
                                           <div 
                                             className={`content-text ${shouldTruncate && !isExpanded ? 'truncated' : ''}`}
+                                            style={{
+                                              maxHeight: shouldTruncate && !isExpanded ? '120px' : 'none',
+                                              overflow: shouldTruncate && !isExpanded ? 'hidden' : 'visible',
+                                              transition: 'max-height 0.3s ease'
+                                            }}
                                             dangerouslySetInnerHTML={{ 
                                               __html: shouldTruncate && !isExpanded 
-                                                ? message.content.substring(0, 300) + '...'
+                                                ? truncateContent(message.content, 300)
                                                 : message.content
                                             }} 
                                           />
@@ -2597,8 +2732,19 @@ const FreshworksLeads = ({ initialFilters = {}, token }) => {
                                           <button 
                                             className="expand-button"
                                             onClick={() => toggleEmailExpansion(conversation.conversation_id, message.message_id || msgIndex)}
+                                            style={{
+                                              background: 'linear-gradient(135deg, #007bff, #0056b3)',
+                                              color: 'white',
+                                              border: 'none',
+                                              borderRadius: '4px',
+                                              padding: '6px 12px',
+                                              fontSize: '12px',
+                                              cursor: 'pointer',
+                                              marginTop: '8px',
+                                              transition: 'all 0.2s ease'
+                                            }}
                                           >
-                                            {isExpanded ? 'Show Less' : 'Show Full Email'}
+                                            {isExpanded ? '📄 Show Less' : '📖 Show Full Email'}
                                           </button>
                                         )}
                                       </div>

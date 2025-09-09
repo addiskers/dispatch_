@@ -6,8 +6,9 @@ import ContractPage from "./ContractPage";
 import FreshworksLeads from "./FreshworksLeads"; 
 import Sale from "./Sale"; 
 import "../styles/superAdminDashboard.css";
+import SampleTable from "./SampleTable";
 
-function SalesDashboard({ token, onLogout, userRole }) {
+function SalesDashboard({ token, onLogout, userRole, currentUser }) {
   const location = useLocation();
   const navigate = useNavigate();
   const [selectedSection, setSelectedSection] = useState("Create Lead");
@@ -16,7 +17,6 @@ function SalesDashboard({ token, onLogout, userRole }) {
   const [navigationFilters, setNavigationFilters] = useState(null);
   const sidebarRef = useRef(null);
 
-  // Handle navigation state from analytics
   useEffect(() => {
     if (location.state?.selectedSection) {
       setSelectedSection(location.state.selectedSection);
@@ -60,6 +60,8 @@ function SalesDashboard({ token, onLogout, userRole }) {
       return <FreshworksLeads initialFilters={navigationFilters} token={token} />; 
     } else if (selectedSection === "Analytics") {
       return <Sale token={token} />;
+    } else if (selectedSection === "Samples Table") {
+      return <SampleTable token={token} userRole={userRole} currentUser={currentUser} />;
     }
   }
 
@@ -70,6 +72,7 @@ function SalesDashboard({ token, onLogout, userRole }) {
   const menuItems = [
     { name: "Create Lead", section: "Create Lead" },
     { name: "Leads Table", section: "Leads Table" },
+    { name: "Sample Table", section: "Samples Table" }, 
     { name: "Contracts", section: "Contracts" },
     { name: "Freshworks Leads", section: "Freshworks Leads" },
     { name: "Analytics", section: "Analytics" },

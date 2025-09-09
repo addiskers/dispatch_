@@ -40,7 +40,7 @@ function UploaderDashboard({ token, onLogout, currentUser }) {
   };
 
   const menuItems = [
-    { name: "Sample Management", section: "Sample Table" },
+    { name: "Sample Table", section: "Sample Table" },
     { name: "Leads Table", section: "Leads Table" },
     { name: "File Uploads", section: "Uploads" }
   ];

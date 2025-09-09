@@ -184,7 +184,6 @@ const SampleTable = ({ token, userRole, currentUser }) => {
       setUploadLoading(true);
       const formData = new FormData();
       
-      // Add all selected files
       Array.from(uploadFiles).forEach(file => {
         formData.append('files', file);
       });
@@ -217,12 +216,13 @@ const SampleTable = ({ token, userRole, currentUser }) => {
     }
   };
 
-  const handleDownloadFile = async (sampleId, fileId, filename) => {
+  const handleDownloadFile = async (sampleId, fileId, filename, isRequirement = false) => {
     try {
-      const response = await axios.get(
-        `${API_BASE_URL}/samples/${sampleId}/download/${fileId}`,
-        { headers: getAuthHeaders() }
-      );
+      const endpoint = isRequirement 
+        ? `${API_BASE_URL}/samples/${sampleId}/download-requirement/${fileId}`
+        : `${API_BASE_URL}/samples/${sampleId}/download/${fileId}`;
+        
+      const response = await axios.get(endpoint, { headers: getAuthHeaders() });
 
       if (response.data.success) {
         window.open(response.data.downloadUrl, '_blank');
@@ -242,7 +242,6 @@ const SampleTable = ({ token, userRole, currentUser }) => {
       );
 
       if (response.data.success) {
-        // Open each file in a new tab
         response.data.files.forEach(file => {
           window.open(file.downloadUrl, '_blank');
         });
@@ -252,6 +251,43 @@ const SampleTable = ({ token, userRole, currentUser }) => {
     } catch (err) {
       console.error('Error downloading files:', err);
       alert('Error downloading files');
+    }
+  };
+
+  // Enhanced timing functions
+  const getTimingSinceRequest = (sample) => {
+    const requestedDate = new Date(sample.requestedAt);
+    const now = new Date();
+    const diffMs = now - requestedDate;
+    const diffDays = Math.floor(diffMs / (1000 * 60 * 60 * 24));
+    const diffHours = Math.floor((diffMs % (1000 * 60 * 60 * 24)) / (1000 * 60 * 60));
+    
+    if (diffDays > 0) {
+      return `${diffDays}d ${diffHours}h ago`;
+    } else if (diffHours > 0) {
+      return `${diffHours}h ago`;
+    } else {
+      const diffMinutes = Math.floor((diffMs % (1000 * 60 * 60)) / (1000 * 60));
+      return `${diffMinutes}m ago`;
+    }
+  };
+
+  const getCompletionTime = (sample) => {
+    if (!sample.completedAt) return '-';
+    
+    const requestedDate = new Date(sample.requestedAt);
+    const completedDate = new Date(sample.completedAt);
+    const diffMs = completedDate - requestedDate;
+    const diffDays = Math.floor(diffMs / (1000 * 60 * 60 * 24));
+    const diffHours = Math.floor((diffMs % (1000 * 60 * 60 * 24)) / (1000 * 60 * 60));
+    const diffMinutes = Math.floor((diffMs % (1000 * 60 * 60)) / (1000 * 60));
+    
+    if (diffDays > 0) {
+      return `${diffDays}d ${diffHours}h ${diffMinutes}m`;
+    } else if (diffHours > 0) {
+      return `${diffHours}h ${diffMinutes}m`;
+    } else {
+      return `${diffMinutes}m`;
     }
   };
 
@@ -315,9 +351,9 @@ const SampleTable = ({ token, userRole, currentUser }) => {
     return Array.isArray(value) ? value.length > 0 : Boolean(value);
   }).length;
 
-  // Permission helpers
+  // Permission helpers - Updated to allow downloads for all roles
   const canUpload = () => ['uploader', 'superadmin'].includes(userRole);
-  const canDownload = () => ['sales', 'uploader', 'superadmin'].includes(userRole);
+  const canDownload = () => true; // Allow all roles to download
   const canMarkAsDone = () => ['uploader', 'superadmin'].includes(userRole);
 
   if (loading && samples.length === 0) {
@@ -549,10 +585,16 @@ const SampleTable = ({ token, userRole, currentUser }) => {
                 Priority {getSortIcon('priority')}
               </th>
               <th>
-                Upload Timing
+                Time Since Request
+              </th>
+              <th>
+                Completion Time
               </th>
               <th>
                 Files ({samples.reduce((total, sample) => total + (sample.sampleFiles?.length || 0), 0)})
+              </th>
+              <th>
+                Requirements & Downloads
               </th>
               <th onClick={() => handleSort('requestedAt')}>
                 Requested {getSortIcon('requestedAt')}
@@ -577,9 +619,62 @@ const SampleTable = ({ token, userRole, currentUser }) => {
                 <td className="country">{sample.clientCountry}</td>
                 <td className="status">{getStatusBadge(sample.status)}</td>
                 <td className="priority">{getPriorityBadge(sample.priority)}</td>
-                <td className="timing">{getTimingDisplay(sample)}</td>
+                <td className="time-since-request">
+                  <span className="timing-since" title="Time elapsed since request was made">
+                    ⏰ {getTimingSinceRequest(sample)}
+                  </span>
+                </td>
+                <td className="completion-time">
+                  <span className={`timing-completion ${sample.completedAt ? 'completed' : 'pending'}`} 
+                        title={sample.completedAt ? "Time taken from request to completion" : "Not completed yet"}>
+                    {sample.completedAt ? `✅ ${getCompletionTime(sample)}` : '⏳ Pending'}
+                  </span>
+                </td>
                 <td className="files-count">
                   {sample.sampleFiles?.length || 0} files
+                </td>
+                <td className="requirements-downloads">
+                  <div className="requirement-info">
+                    {/* Sales Requirement */}
+                    {sample.salesRequirement && (
+                      <div className="requirement-item">
+                        <span className="req-indicator sales-req" title="Sales Requirement">💼 Sales</span>
+                      </div>
+                    )}
+                    
+                    {/* Contact Requirement */}
+                    {sample.contactRequirement && (
+                      <div className="requirement-item">
+                        <span className="req-indicator contact-req" title="Contact Requirement">📞 Contact</span>
+                      </div>
+                    )}
+                    
+                    {/* Requirement Files (Display Only) */}
+                    {sample.requirementFiles && sample.requirementFiles.length > 0 && (
+                      <div className="requirement-files-section">
+                        <div className="files-header">
+                          <span className="req-file-count" title={`${sample.requirementFiles.length} requirement files`}>
+                            📎 {sample.requirementFiles.length} files
+                          </span>
+                        </div>
+                      </div>
+                    )}
+                    
+                    {/* Sample Files Count (Display Only) */}
+                    {sample.sampleFiles && sample.sampleFiles.length > 0 && (
+                      <div className="sample-files-section">
+                        <div className="files-header">
+                          <span className="sample-file-count" title={`${sample.sampleFiles.length} sample files`}>
+                            📁 {sample.sampleFiles.length} samples
+                          </span>
+                        </div>
+                      </div>
+                    )}
+                    
+                    {!sample.salesRequirement && !sample.contactRequirement && (!sample.requirementFiles || sample.requirementFiles.length === 0) && (!sample.sampleFiles || sample.sampleFiles.length === 0) && (
+                      <span className="no-requirements" title="No requirements or files">-</span>
+                    )}
+                  </div>
                 </td>
                 <td className="requested-date">{formatDate(sample.requestedAt)}</td>
                 <td className="actions">
@@ -609,7 +704,7 @@ const SampleTable = ({ token, userRole, currentUser }) => {
                       </button>
                     )}
 
-                    {canDownload() && sample.sampleFiles && sample.sampleFiles.length > 0 && (
+                    {sample.sampleFiles && sample.sampleFiles.length > 0 && (
                       <button
                         onClick={() => {
                           setSelectedSample(sample);
@@ -720,7 +815,7 @@ const SampleTable = ({ token, userRole, currentUser }) => {
         </div>
       </div>
 
-      {/* Sample Details Modal */}
+      {/* Sample Details Modal - Updated */}
       {showDetailsModal && selectedSample && (
         <div className="modal-overlay" onClick={() => setShowDetailsModal(false)}>
           <div className="modal-content sample-details-modal" onClick={(e) => e.stopPropagation()}>
@@ -767,10 +862,27 @@ const SampleTable = ({ token, userRole, currentUser }) => {
                   <label>Client Country:</label>
                   <span>{selectedSample.clientCountry}</span>
                 </div>
-                <div className="detail-item full-width">
-                  <label>Client Requirement:</label>
-                  <p>{selectedSample.clientRequirement}</p>
-                </div>
+                
+                {/* Sales Requirement Section */}
+                {selectedSample.salesRequirement && (
+                  <div className="detail-item full-width">
+                    <label>Sales Requirement:</label>
+                    <div className="requirement-box sales-requirement">
+                      <p>{selectedSample.salesRequirement}</p>
+                    </div>
+                  </div>
+                )}
+                
+                {/* Contact Requirement Section */}
+                {selectedSample.contactRequirement && (
+                  <div className="detail-item full-width">
+                    <label>Contact Requirement:</label>
+                    <div className="requirement-box contact-requirement">
+                      <p>{selectedSample.contactRequirement}</p>
+                    </div>
+                  </div>
+                )}
+                
                 <div className="detail-item">
                   <label>Status:</label>
                   {getStatusBadge(selectedSample.status)}
@@ -780,8 +892,12 @@ const SampleTable = ({ token, userRole, currentUser }) => {
                   {getPriorityBadge(selectedSample.priority)}
                 </div>
                 <div className="detail-item">
-                  <label>Upload Timing:</label>
-                  {getTimingDisplay(selectedSample)}
+                  <label>Time Since Request:</label>
+                  <span>{getTimingSinceRequest(selectedSample)}</span>
+                </div>
+                <div className="detail-item">
+                  <label>Completion Time:</label>
+                  <span>{getCompletionTime(selectedSample)}</span>
                 </div>
                 <div className="detail-item">
                   <label>Requested:</label>
@@ -795,6 +911,30 @@ const SampleTable = ({ token, userRole, currentUser }) => {
                 )}
               </div>
               
+              {/* Requirement Files */}
+              {selectedSample.requirementFiles && selectedSample.requirementFiles.length > 0 && (
+                <div className="requirement-files">
+                  <h4>Requirement Files ({selectedSample.requirementFiles.length})</h4>
+                  <ul className="file-list">
+                    {selectedSample.requirementFiles.map((file) => (
+                      <li key={file._id} className="file-item">
+                        <span className="file-name">{file.originalName}</span>
+                        <span className="file-date">{formatDate(file.uploadedAt)}</span>
+                        <span className="file-uploader">
+                          by {file.uploadedBy?.username || 'Unknown'}
+                        </span>
+                        <button
+                          onClick={() => handleDownloadFile(selectedSample._id, file._id, file.originalName, true)}
+                          className="btn btn-sm btn-outline"
+                        >
+                          Download
+                        </button>
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              )}
+              
               {/* Sample Files */}
               {selectedSample.sampleFiles && selectedSample.sampleFiles.length > 0 && (
                 <div className="sample-files">
@@ -807,14 +947,12 @@ const SampleTable = ({ token, userRole, currentUser }) => {
                         <span className="file-uploader">
                           by {file.uploadedBy?.username || 'Unknown'}
                         </span>
-                        {canDownload() && (
-                          <button
-                            onClick={() => handleDownloadFile(selectedSample._id, file._id, file.originalName)}
-                            className="btn btn-sm btn-outline"
-                          >
-                            Download
-                          </button>
-                        )}
+                        <button
+                          onClick={() => handleDownloadFile(selectedSample._id, file._id, file.originalName, false)}
+                          className="btn btn-sm btn-outline"
+                        >
+                          Download
+                        </button>
                       </li>
                     ))}
                   </ul>
@@ -880,7 +1018,7 @@ const SampleTable = ({ token, userRole, currentUser }) => {
       )}
 
       {/* Download Multiple Files Modal */}
-      {showDownloadModal && selectedSample && canDownload() && (
+      {showDownloadModal && selectedSample && (
         <div className="modal-overlay" onClick={() => setShowDownloadModal(false)}>
           <div className="modal-content download-modal" onClick={(e) => e.stopPropagation()}>
             <div className="modal-header">

@@ -1,13 +1,12 @@
-// controllers/sampleController.js
 const Sample = require('../models/Sample');
 const Contact = require('../models/Contact');
 const User = require('../models/User');
 const { generatePresignedUrl } = require('./generatePresignedUrlFile');
+const { sendNotificationEmail } = require('../utils/emailService');
 const multer = require("multer");
 const multerS3 = require("multer-s3-v3");
 const s3 = require("../config/s3");
 
-// Configure multer for sample file uploads
 const sampleUpload = multer({
   storage: multerS3({
     s3,
@@ -19,10 +18,9 @@ const sampleUpload = multer({
     },
   }),
   limits: {
-    fileSize: 200 * 1024 * 1024 // 200MB limit per file
+    fileSize: 200 * 1024 * 1024
   },
   fileFilter: (req, file, cb) => {
-    // Allow common document and image formats
     const allowedTypes = [
       'application/pdf',
       'application/msword',
@@ -45,7 +43,165 @@ const sampleUpload = multer({
   }
 });
 
-// Create a new sample request
+const requirementUpload = multer({
+  storage: multerS3({
+    s3,
+    bucket: process.env.S3_BUCKET_NAME,
+    key: function (req, file, cb) {
+      const timestamp = Date.now();
+      const sampleId = req.params.id;
+      const uniqueName = `samples/${sampleId}/requirements/${timestamp}-${file.originalname}`;
+      cb(null, uniqueName);
+    },
+  }),
+  limits: {
+    fileSize: 50 * 1024 * 1024
+  },
+  fileFilter: (req, file, cb) => {
+    const allowedTypes = [
+      'application/pdf',
+      'application/msword',
+      'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+      'application/vnd.ms-excel',
+      'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+      'text/plain',
+      'image/jpeg',
+      'image/png'
+    ];
+    
+    if (allowedTypes.includes(file.mimetype)) {
+      cb(null, true);
+    } else {
+      cb(new Error('File type not allowed for requirements'), false);
+    }
+  }
+});
+
+const sendSampleRequestNotification = async (sample, requestingUser) => {
+  try {
+    const uploaders = await User.find({ role: "uploader" }).select("email username");
+    const salesPersons = await User.find({ role: "sales" }).select("email username");
+    
+    const recipients = [
+      ...uploaders.map(user => user.email),
+      ...salesPersons.map(user => user.email)
+    ].filter(Boolean);
+
+    const ccList = ['samples@skyquestt.com'];
+
+    const subject = `New Sample Request - ${sample.sampleId}: ${sample.reportName}`;
+    const html = `
+      <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
+        <h2 style="color: #2c3e50;">New Sample Request</h2>
+        
+        <div style="background-color: #f8f9fa; padding: 20px; border-radius: 5px; margin: 20px 0;">
+          <h3 style="color: #34495e; margin-top: 0;">Sample Details</h3>
+          <table style="width: 100%; border-collapse: collapse;">
+            <tr><td style="padding: 8px 0; font-weight: bold;">Sample ID:</td><td>${sample.sampleId}</td></tr>
+            <tr><td style="padding: 8px 0; font-weight: bold;">Report Name:</td><td>${sample.reportName}</td></tr>
+            <tr><td style="padding: 8px 0; font-weight: bold;">Client Company:</td><td>${sample.clientCompany}</td></tr>
+            <tr><td style="padding: 8px 0; font-weight: bold;">Sales Person:</td><td>${sample.salesPerson}</td></tr>
+            <tr><td style="padding: 8px 0; font-weight: bold;">Priority:</td><td style="text-transform: uppercase; color: ${getPriorityColor(sample.priority)};">${sample.priority}</td></tr>
+            <tr><td style="padding: 8px 0; font-weight: bold;">Industry:</td><td>${sample.reportIndustry}</td></tr>
+            <tr><td style="padding: 8px 0; font-weight: bold;">Country:</td><td>${sample.clientCountry}</td></tr>
+            ${sample.dueDate ? `<tr><td style="padding: 8px 0; font-weight: bold;">Due Date:</td><td>${new Date(sample.dueDate).toLocaleDateString()}</td></tr>` : ''}
+          </table>
+        </div>
+
+        <div style="background-color: #e8f4fd; padding: 15px; border-radius: 5px; margin: 20px 0;">
+          <h4 style="color: #2980b9; margin-top: 0;">Sales Requirement</h4>
+          <p style="margin: 0;">${sample.salesRequirement}</p>
+        </div>
+
+        ${sample.contactRequirement ? `
+        <div style="background-color: #fff3cd; padding: 15px; border-radius: 5px; margin: 20px 0;">
+          <h4 style="color: #856404; margin-top: 0;">Contact Research Requirement</h4>
+          <p style="margin: 0;">${sample.contactRequirement}</p>
+        </div>
+        ` : ''}
+
+        <div style="background-color: #f8f9fa; padding: 15px; border-radius: 5px; margin: 20px 0;">
+          <p style="margin: 0;"><strong>Requested by:</strong> ${requestingUser.username} (${requestingUser.email})</p>
+          <p style="margin: 5px 0 0 0;"><strong>Requested on:</strong> ${new Date(sample.requestedAt).toLocaleString()}</p>
+        </div>
+
+        <p style="color: #7f8c8d;">Please log in to the system to view full details and upload sample files.</p>
+        
+        <hr style="border: none; border-top: 1px solid #ecf0f1; margin: 30px 0;">
+        <p style="color: #95a5a6; font-size: 12px; text-align: center;">
+          This is an automated notification from the Sample Management System
+        </p>
+      </div>
+    `;
+
+    await sendNotificationEmail(recipients, subject, html, false, ccList);
+    console.log(`Sample request notification sent for ${sample.sampleId}`);
+  } catch (error) {
+    console.error('Error sending sample request notification:', error);
+  }
+};
+
+const sendSampleCompletionNotification = async (sample, completingUser) => {
+  try {
+    const salesPersons = await User.find({ role: "sales" }).select("email username");
+    const requestingUser = await User.findById(sample.requestedBy).select("email username");
+    
+    let recipients = salesPersons.map(user => user.email);
+    if (requestingUser && !recipients.includes(requestingUser.email)) {
+      recipients.push(requestingUser.email);
+    }
+    recipients = recipients.filter(Boolean);
+
+    const ccList = ['samples@skyquestt.com'];
+
+    const subject = `Sample Completed - ${sample.sampleId}: ${sample.reportName}`;
+    const html = `
+      <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
+        <h2 style="color: #27ae60;">Sample Request Completed ✅</h2>
+        
+        <div style="background-color: #f8f9fa; padding: 20px; border-radius: 5px; margin: 20px 0;">
+          <h3 style="color: #34495e; margin-top: 0;">Sample Details</h3>
+          <table style="width: 100%; border-collapse: collapse;">
+            <tr><td style="padding: 8px 0; font-weight: bold;">Sample ID:</td><td>${sample.sampleId}</td></tr>
+            <tr><td style="padding: 8px 0; font-weight: bold;">Report Name:</td><td>${sample.reportName}</td></tr>
+            <tr><td style="padding: 8px 0; font-weight: bold;">Client Company:</td><td>${sample.clientCompany}</td></tr>
+            <tr><td style="padding: 8px 0; font-weight: bold;">Sales Person:</td><td>${sample.salesPerson}</td></tr>
+            <tr><td style="padding: 8px 0; font-weight: bold;">Files Uploaded:</td><td>${sample.sampleFiles ? sample.sampleFiles.length : 0} files</td></tr>
+          </table>
+        </div>
+
+        <div style="background-color: #d4edda; padding: 15px; border-radius: 5px; margin: 20px 0;">
+          <h4 style="color: #155724; margin-top: 0;">Completion Details</h4>
+          <p style="margin: 0;"><strong>Completed by:</strong> ${completingUser.username} (${completingUser.email})</p>
+          <p style="margin: 5px 0 0 0;"><strong>Completed on:</strong> ${new Date().toLocaleString()}</p>
+        </div>
+
+        <p style="color: #7f8c8d;">The sample files are now available for download in the system.</p>
+        
+        <hr style="border: none; border-top: 1px solid #ecf0f1; margin: 30px 0;">
+        <p style="color: #95a5a6; font-size: 12px; text-align: center;">
+          This is an automated notification from the Sample Management System
+        </p>
+      </div>
+    `;
+
+    await sendNotificationEmail(recipients, subject, html, false, ccList);
+    console.log(`Sample completion notification sent for ${sample.sampleId}`);
+  } catch (error) {
+    console.error('Error sending sample completion notification:', error);
+  }
+};
+
+const getPriorityColor = (priority) => {
+  const colors = {
+    low: '#4caf50',
+    medium: '#ff9800',
+    high: '#f44336',
+    urgent: '#e91e63'
+  };
+  return colors[priority] || '#9e9e9e';
+};
+
 const createSampleRequest = async (req, res) => {
   try {
     const {
@@ -58,22 +214,20 @@ const createSampleRequest = async (req, res) => {
       clientDesignation,
       clientDepartment,
       clientCountry,
-      clientRequirement,
+      salesRequirement,
       priority = 'medium',
       dueDate,
       tags = []
     } = req.body;
 
-    // Validate required fields
     if (!contactId || !reportName || !reportIndustry || !salesPerson || 
-        !clientCompany || !clientDesignation || !clientCountry || !clientRequirement) {
+        !clientCompany || !clientDesignation || !clientCountry || !salesRequirement) {
       return res.status(400).json({
         success: false,
         message: 'Missing required fields'
       });
     }
 
-    // Check if contact exists
     const contact = await Contact.findOne({ id: contactId });
     if (!contact) {
       return res.status(404).json({
@@ -82,11 +236,13 @@ const createSampleRequest = async (req, res) => {
       });
     }
 
-    // Generate unique sample ID
+    const contactRequirement = contact.custom_field?.cf_research_requirement;
+
     const sampleCount = await Sample.countDocuments();
     const sampleId = `${querySource}-SAMPLE-${(sampleCount + 1).toString().padStart(6, '0')}`;
 
-    // Create sample
+    const requestingUser = await User.findById(req.user.userId).select('username email');
+
     const sample = new Sample({
       sampleId,
       contactId,
@@ -98,20 +254,23 @@ const createSampleRequest = async (req, res) => {
       clientDesignation,
       clientDepartment: clientDepartment || 'Not Specified',
       clientCountry,
-      clientRequirement,
+      salesRequirement,
+      contactRequirement,
       requestedBy: req.user.userId,
       priority,
       dueDate: dueDate ? new Date(dueDate) : null,
-      tags
+      tags,
+      requirementFiles: []
     });
 
     await sample.save();
 
-    // Populate the sample with user details
     const populatedSample = await Sample.findById(sample._id)
       .populate('requestedBy', 'username email')
       .populate('assignedTo', 'username email')
       .populate('completedBy', 'username email');
+
+    await sendSampleRequestNotification(populatedSample, requestingUser);
 
     res.status(201).json({
       success: true,
@@ -128,7 +287,6 @@ const createSampleRequest = async (req, res) => {
   }
 };
 
-// Get all samples with filtering and timing calculations
 const getAllSamples = async (req, res) => {
   try {
     const {
@@ -145,7 +303,6 @@ const getAllSamples = async (req, res) => {
       sortOrder = 'desc'
     } = req.query;
 
-    // Build query
     const query = {};
     
     if (status) {
@@ -172,27 +329,16 @@ const getAllSamples = async (req, res) => {
       query.$or = [
         { reportName: { $regex: search, $options: 'i' } },
         { clientCompany: { $regex: search, $options: 'i' } },
-        { clientRequirement: { $regex: search, $options: 'i' } },
+        { salesRequirement: { $regex: search, $options: 'i' } },
         { sampleId: { $regex: search, $options: 'i' } }
       ];
     }
 
-    // Date range filter
     if (startDate || endDate) {
       query.requestedAt = {};
       if (startDate) query.requestedAt.$gte = new Date(startDate);
       if (endDate) query.requestedAt.$lte = new Date(endDate);
     }
-
-    // Role-based access control
-    if (req.user.role === 'sales') {
-      // Sales users can only see their own samples
-      const user = await User.findById(req.user.userId);
-      if (user) {
-        query.salesPerson = { $regex: user.username, $options: 'i' };
-      }
-    }
-    // superadmin and uploader can see all samples
 
     const skip = (parseInt(page) - 1) * parseInt(limit);
     const totalCount = await Sample.countDocuments(query);
@@ -202,15 +348,14 @@ const getAllSamples = async (req, res) => {
       .populate('assignedTo', 'username email')
       .populate('completedBy', 'username email')
       .populate('sampleFiles.uploadedBy', 'username email')
+      .populate('requirementFiles.uploadedBy', 'username email')
       .sort({ [sortBy]: sortOrder === 'asc' ? 1 : -1 })
       .skip(skip)
       .limit(parseInt(limit));
 
-    // Calculate timing for each sample
     const samplesWithTiming = samples.map(sample => {
       const sampleObj = sample.toObject();
       
-      // Calculate time between request and first upload
       if (sampleObj.sampleFiles && sampleObj.sampleFiles.length > 0) {
         const firstUpload = sampleObj.sampleFiles.sort((a, b) => 
           new Date(a.uploadedAt) - new Date(b.uploadedAt)
@@ -226,7 +371,6 @@ const getAllSamples = async (req, res) => {
           formatted: `${hoursDiff}h ${minutesDiff}m`
         };
       } else {
-        // Calculate time since request if no upload yet
         const timeDiff = new Date() - new Date(sampleObj.requestedAt);
         const hoursDiff = Math.floor(timeDiff / (1000 * 60 * 60));
         const minutesDiff = Math.floor((timeDiff % (1000 * 60 * 60)) / (1000 * 60));
@@ -265,7 +409,6 @@ const getAllSamples = async (req, res) => {
   }
 };
 
-// Get sample by ID
 const getSampleById = async (req, res) => {
   try {
     const { id } = req.params;
@@ -275,24 +418,14 @@ const getSampleById = async (req, res) => {
       .populate('assignedTo', 'username email')
       .populate('completedBy', 'username email')
       .populate('notes.author', 'username email')
-      .populate('sampleFiles.uploadedBy', 'username email');
+      .populate('sampleFiles.uploadedBy', 'username email')
+      .populate('requirementFiles.uploadedBy', 'username email');
 
     if (!sample) {
       return res.status(404).json({
         success: false,
         message: 'Sample not found'
       });
-    }
-
-    // Check access permissions
-    if (req.user.role === 'sales') {
-      const user = await User.findById(req.user.userId);
-      if (user && !sample.salesPerson.toLowerCase().includes(user.username.toLowerCase())) {
-        return res.status(403).json({
-          success: false,
-          message: 'Access denied'
-        });
-      }
     }
 
     res.json({
@@ -309,11 +442,10 @@ const getSampleById = async (req, res) => {
   }
 };
 
-// Update sample status
 const updateSampleStatus = async (req, res) => {
   try {
     const { id } = req.params;
-    const { status, notes, assignedTo, dueDate, priority } = req.body;
+    const { status, notes, assignedTo, dueDate, priority, salesRequirement } = req.body;
 
     const sample = await Sample.findById(id);
     if (!sample) {
@@ -322,32 +454,23 @@ const updateSampleStatus = async (req, res) => {
         message: 'Sample not found'
       });
     }
+    const updatingUser = await User.findById(req.user.userId).select('username email');
 
-    // Check permissions
-    if (req.user.role === 'sales') {
-      const user = await User.findById(req.user.userId);
-      if (user && !sample.salesPerson.toLowerCase().includes(user.username.toLowerCase())) {
-        return res.status(403).json({
-          success: false,
-          message: 'Access denied'
-        });
-      }
-    }
-
-    // Update fields
     if (status) {
       sample.status = status;
       if (status === 'done') {
         sample.completedBy = req.user.userId;
         sample.completedAt = new Date();
+        
+        await sendSampleCompletionNotification(sample, updatingUser);
       }
     }
     
     if (assignedTo) sample.assignedTo = assignedTo;
     if (dueDate) sample.dueDate = new Date(dueDate);
     if (priority) sample.priority = priority;
+    if (salesRequirement !== undefined) sample.salesRequirement = salesRequirement;
 
-    // Add note if provided
     if (notes) {
       sample.notes.push({
         message: notes,
@@ -377,9 +500,8 @@ const updateSampleStatus = async (req, res) => {
   }
 };
 
-// Upload multiple files to sample
 const uploadSampleFiles = [
-  sampleUpload.array('files', 10), // Allow up to 10 files
+  sampleUpload.array('files', 10),
   async (req, res) => {
     try {
       const { id } = req.params;
@@ -400,7 +522,6 @@ const uploadSampleFiles = [
         });
       }
 
-      // Check permissions - only uploader and superadmin can upload files
       if (!['uploader', 'superadmin'].includes(req.user.role)) {
         return res.status(403).json({
           success: false,
@@ -408,7 +529,6 @@ const uploadSampleFiles = [
         });
       }
 
-      // Process each uploaded file
       const uploadedFiles = files.map(file => ({
         filename: file.key.split('/').pop(),
         originalName: file.originalname,
@@ -416,10 +536,8 @@ const uploadSampleFiles = [
         uploadedBy: req.user.userId
       }));
 
-      // Add all files to sample
       sample.sampleFiles.push(...uploadedFiles);
 
-      // If this is the first upload and status is requested, update to in_progress
       if (sample.status === 'requested') {
         sample.status = 'in_progress';
       }
@@ -448,7 +566,6 @@ const uploadSampleFiles = [
   }
 ];
 
-// Single file upload (backward compatibility)
 const uploadSampleFile = [
   sampleUpload.single('file'),
   async (req, res) => {
@@ -471,7 +588,6 @@ const uploadSampleFile = [
         });
       }
 
-      // Check permissions - only uploader and superadmin can upload files
       if (!['uploader', 'superadmin'].includes(req.user.role)) {
         return res.status(403).json({
           success: false,
@@ -479,7 +595,6 @@ const uploadSampleFile = [
         });
       }
 
-      // Add file info to sample
       sample.sampleFiles.push({
         filename: file.key.split('/').pop(),
         originalName: file.originalname,
@@ -487,7 +602,6 @@ const uploadSampleFile = [
         uploadedBy: req.user.userId
       });
 
-      // If this is the first file and status is requested, update to in_progress
       if (sample.status === 'requested') {
         sample.status = 'in_progress';
       }
@@ -516,7 +630,72 @@ const uploadSampleFile = [
   }
 ];
 
-// Download sample file
+const uploadRequirementFiles = [
+  requirementUpload.array('requirementFiles', 5),
+  async (req, res) => {
+    try {
+      const { id } = req.params;
+      const files = req.files;
+
+      if (!files || files.length === 0) {
+        return res.status(400).json({
+          success: false,
+          message: 'No requirement files uploaded'
+        });
+      }
+
+      const sample = await Sample.findById(id);
+      if (!sample) {
+        return res.status(404).json({
+          success: false,
+          message: 'Sample not found'
+        });
+      }
+
+      if (!['sales', 'superadmin'].includes(req.user.role)) {
+        return res.status(403).json({
+          success: false,
+          message: 'Access denied. Only sales and superadmin users can upload requirement files.'
+        });
+      }
+
+      const uploadedFiles = files.map(file => ({
+        filename: file.key.split('/').pop(),
+        originalName: file.originalname,
+        fileKey: file.key,
+        uploadedBy: req.user.userId,
+        uploadedAt: new Date()
+      }));
+
+      if (!sample.requirementFiles) {
+        sample.requirementFiles = [];
+      }
+      sample.requirementFiles.push(...uploadedFiles);
+
+      await sample.save();
+
+      const updatedSample = await Sample.findById(id)
+        .populate('requestedBy', 'username email')
+        .populate('assignedTo', 'username email')
+        .populate('completedBy', 'username email')
+        .populate('requirementFiles.uploadedBy', 'username email');
+
+      res.json({
+        success: true,
+        message: `${uploadedFiles.length} requirement file(s) uploaded successfully`,
+        data: updatedSample
+      });
+    } catch (error) {
+      console.error('Error uploading requirement files:', error);
+      res.status(500).json({
+        success: false,
+        message: 'Error uploading requirement files',
+        error: error.message
+      });
+    }
+  }
+];
+
 const downloadSampleFile = async (req, res) => {
   try {
     const { id, fileId } = req.params;
@@ -528,18 +707,6 @@ const downloadSampleFile = async (req, res) => {
         message: 'Sample not found'
       });
     }
-
-    // Check access permissions
-    if (req.user.role === 'sales') {
-      const user = await User.findById(req.user.userId);
-      if (user && !sample.salesPerson.toLowerCase().includes(user.username.toLowerCase())) {
-        return res.status(403).json({
-          success: false,
-          message: 'Access denied'
-        });
-      }
-    }
-
     const file = sample.sampleFiles.id(fileId);
     if (!file) {
       return res.status(404).json({
@@ -548,7 +715,6 @@ const downloadSampleFile = async (req, res) => {
       });
     }
 
-    // Generate presigned URL for download
     const downloadUrl = await generatePresignedUrl(file.fileKey);
 
     res.json({
@@ -566,11 +732,10 @@ const downloadSampleFile = async (req, res) => {
   }
 };
 
-// Download multiple files as ZIP
 const downloadMultipleSampleFiles = async (req, res) => {
   try {
     const { id } = req.params;
-    const { fileIds } = req.body; // Array of file IDs to download
+    const { fileIds } = req.body;
     
     const sample = await Sample.findById(id);
     if (!sample) {
@@ -578,17 +743,6 @@ const downloadMultipleSampleFiles = async (req, res) => {
         success: false,
         message: 'Sample not found'
       });
-    }
-
-    // Check access permissions
-    if (req.user.role === 'sales') {
-      const user = await User.findById(req.user.userId);
-      if (user && !sample.salesPerson.toLowerCase().includes(user.username.toLowerCase())) {
-        return res.status(403).json({
-          success: false,
-          message: 'Access denied'
-        });
-      }
     }
 
     if (!fileIds || fileIds.length === 0) {
@@ -625,7 +779,42 @@ const downloadMultipleSampleFiles = async (req, res) => {
   }
 };
 
-// Get sample statistics
+const downloadRequirementFile = async (req, res) => {
+  try {
+    const { id, fileId } = req.params;
+    
+    const sample = await Sample.findById(id);
+    if (!sample) {
+      return res.status(404).json({
+        success: false,
+        message: 'Sample not found'
+      });
+    }
+    const file = sample.requirementFiles.id(fileId);
+    if (!file) {
+      return res.status(404).json({
+        success: false,
+        message: 'Requirement file not found'
+      });
+    }
+
+    const downloadUrl = await generatePresignedUrl(file.fileKey);
+
+    res.json({
+      success: true,
+      downloadUrl,
+      filename: file.originalName
+    });
+  } catch (error) {
+    console.error('Error generating requirement file download URL:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Error generating download URL',
+      error: error.message
+    });
+  }
+};
+
 const getSampleStats = async (req, res) => {
   try {
     const stats = await Sample.aggregate([
@@ -701,7 +890,6 @@ const getSampleStats = async (req, res) => {
   }
 };
 
-// Delete sample (only superadmin)
 const deleteSample = async (req, res) => {
   try {
     const { id } = req.params;
@@ -735,7 +923,6 @@ const deleteSample = async (req, res) => {
   }
 };
 
-// Get sample status by contact ID
 const getSampleStatusByContact = async (req, res) => {
   try {
     const { contactId } = req.params;
@@ -764,9 +951,11 @@ module.exports = {
   getSampleById,
   updateSampleStatus,
   uploadSampleFile,
-  uploadSampleFiles, // New function for multiple files
+  uploadSampleFiles,
+  uploadRequirementFiles,
   downloadSampleFile,
-  downloadMultipleSampleFiles, // New function for multiple downloads
+  downloadMultipleSampleFiles,
+  downloadRequirementFile,
   getSampleStats,
   deleteSample,
   getSampleStatusByContact
