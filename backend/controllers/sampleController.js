@@ -87,7 +87,7 @@ const sendSampleRequestNotification = async (sample, requestingUser) => {
       ...salesPersons.map(user => user.email)
     ].filter(Boolean);
 
-    const ccList = ['samples@skyquestt.com'];
+    const ccList = ['a@skyquestt.com'];
 
     const subject = `New Sample Request - ${sample.sampleId}: ${sample.reportName}`;
     const html = `
@@ -152,7 +152,7 @@ const sendSampleCompletionNotification = async (sample, completingUser) => {
     }
     recipients = recipients.filter(Boolean);
 
-    const ccList = ['samples@skyquestt.com'];
+    const ccList = ['as@skyquestt.com'];
 
     const subject = `Sample Completed - ${sample.sampleId}: ${sample.reportName}`;
     const html = `
@@ -214,17 +214,17 @@ const createSampleRequest = async (req, res) => {
       clientDesignation,
       clientDepartment,
       clientCountry,
-      salesRequirement,
+      salesRequirement, 
       priority = 'medium',
       dueDate,
       tags = []
     } = req.body;
 
     if (!contactId || !reportName || !reportIndustry || !salesPerson || 
-        !clientCompany || !clientDesignation || !clientCountry || !salesRequirement) {
+        !clientCompany || !clientDesignation || !clientCountry) {
       return res.status(400).json({
         success: false,
-        message: 'Missing required fields'
+        message: 'Missing required fields: contactId, reportName, reportIndustry, salesPerson, clientCompany, clientDesignation, clientCountry'
       });
     }
 
@@ -254,7 +254,7 @@ const createSampleRequest = async (req, res) => {
       clientDesignation,
       clientDepartment: clientDepartment || 'Not Specified',
       clientCountry,
-      salesRequirement,
+      salesRequirement: salesRequirement || '',
       contactRequirement,
       requestedBy: req.user.userId,
       priority,
