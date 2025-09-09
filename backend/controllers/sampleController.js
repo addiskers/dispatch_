@@ -87,7 +87,7 @@ const sendSampleRequestNotification = async (sample, requestingUser) => {
       ...salesPersons.map(user => user.email)
     ].filter(Boolean);
 
-    const ccList = ['a@skyquestt.com'];
+    const ccList = ['samples@skyquestt.com'];
 
     const subject = `New Sample Request - ${sample.sampleId}: ${sample.reportName}`;
     const html = `
@@ -152,7 +152,7 @@ const sendSampleCompletionNotification = async (sample, completingUser) => {
     }
     recipients = recipients.filter(Boolean);
 
-    const ccList = ['as@skyquestt.com'];
+    const ccList = ['samples@skyquestt.com'];
 
     const subject = `Sample Completed - ${sample.sampleId}: ${sample.reportName}`;
     const html = `
