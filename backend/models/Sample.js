@@ -171,6 +171,14 @@ const sampleSchema = new mongoose.Schema({
     type: Date,
     default: null
   },
+  queryForSales: {
+  type: String,
+  default: ''
+  },
+  queryIncluded: {
+    type: Boolean,
+    default: false
+  },
   tags: [{
     type: String
   }],
