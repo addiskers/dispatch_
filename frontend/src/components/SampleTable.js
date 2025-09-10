@@ -351,9 +351,8 @@ const SampleTable = ({ token, userRole, currentUser }) => {
     return Array.isArray(value) ? value.length > 0 : Boolean(value);
   }).length;
 
-  // Permission helpers - Updated to allow downloads for all roles
   const canUpload = () => ['uploader', 'superadmin'].includes(userRole);
-  const canDownload = () => true; // Allow all roles to download
+  const canDownload = () => true; 
   const canMarkAsDone = () => ['uploader', 'superadmin'].includes(userRole);
 
   if (loading && samples.length === 0) {

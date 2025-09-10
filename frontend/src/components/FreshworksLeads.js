@@ -8,6 +8,8 @@ const FreshworksLeads = ({ initialFilters = {}, token }) => {
   const navigate = useNavigate(); 
   const [contacts, setContacts] = useState([]);
   const [sampleStatuses, setSampleStatuses] = useState({}); 
+  const [sampleRequestLoading, setSampleRequestLoading] = useState(false);
+
   const [analytics, setAnalytics] = useState({
     totalContacts: 0,
     avgTouchpoints: '0.0',
@@ -206,9 +208,12 @@ const FreshworksLeads = ({ initialFilters = {}, token }) => {
     }
   };
 
-  // Handle sample request submission
 const handleSampleRequestSubmit = async () => {
+  if (sampleRequestLoading) return;
+  
   try {
+    setSampleRequestLoading(true); 
+    
     const requestData = {
       contactId: currentSampleContact.id,
       reportName: currentSampleContact.market_name || 'Unknown Report',
@@ -218,7 +223,7 @@ const handleSampleRequestSubmit = async () => {
       clientCompany: currentSampleContact.company || 'Unknown Company',
       clientDesignation: currentSampleContact.job_title || 'Unknown Designation',
       clientCountry: currentSampleContact.country || 'Unknown Country',
-      salesRequirement: sampleForm.salesRequirement,
+      salesRequirement: sampleForm.salesRequirement || '',
       priority: sampleForm.priority,
       dueDate: sampleForm.dueDate || null
     };
@@ -245,7 +250,6 @@ const handleSampleRequestSubmit = async () => {
             method: 'POST',
             headers: {
               'Authorization': `Bearer ${token}`,
-              // DO NOT set Content-Type header - let browser set it automatically with boundary
             },
             body: formData
           });
@@ -291,6 +295,8 @@ const handleSampleRequestSubmit = async () => {
   } catch (error) {
     console.error('Error creating sample request:', error);
     alert('Error creating sample request. Please try again.');
+  } finally {
+    setSampleRequestLoading(false); // Stop loading
   }
 };
 
@@ -2382,14 +2388,38 @@ const handleSampleRequestSubmit = async () => {
           <button
             onClick={handleSampleRequestSubmit}
             className="btn btn-primary"
+            disabled={sampleRequestLoading}
+            style={{
+              position: 'relative',
+              minWidth: '180px',
+              opacity: sampleRequestLoading ? 0.7 : 1,
+              cursor: sampleRequestLoading ? 'not-allowed' : 'pointer'
+            }}
           >
-            Create Sample Request
+            {sampleRequestLoading ? (
+              <>
+                <span 
+                  className="spinner-border spinner-border-sm me-2" 
+                  role="status" 
+                  aria-hidden="true"
+                  style={{ width: '1rem', height: '1rem' }}
+                ></span>
+                Creating Sample Request...
+              </>
+            ) : (
+              'Create Sample Request'
+            )}
           </button>
           <button
             onClick={() => setShowSampleModal(false)}
             className="btn btn-outline"
+            disabled={sampleRequestLoading}
+            style={{
+              opacity: sampleRequestLoading ? 0.5 : 1,
+              cursor: sampleRequestLoading ? 'not-allowed' : 'pointer'
+            }}
           >
-            Cancel
+            {sampleRequestLoading ? 'Please wait...' : 'Cancel'}
           </button>
         </div>
       </div>
