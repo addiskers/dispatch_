@@ -803,9 +803,9 @@ async function isSyncCurrentlyRunning() {
     
     if (state.sync_status === 'running') {
       const lastUpdate = new Date(state.last_status_update || state.sync_start_time);
-      const sixHoursAgo = new Date(Date.now() - 6 * 60 * 60 * 1000);
+      const fortyFiveMinutesAgo = new Date(Date.now() - 45 * 60 * 1000);
       
-      if (lastUpdate < sixHoursAgo) {
+      if (lastUpdate < fortyFiveMinutesAgo) {
         console.log('🔄 Found stale running sync status, clearing it...');
         await stateCol.updateOne(
           { _id: 'contacts_sync' },
@@ -1262,7 +1262,7 @@ async function initialize() {
   await scheduledSync();
   
   // Schedule sync every 3 hours: 0:00, 3:00, 6:00, 9:00, 12:00, 15:00, 18:00, 21:00
-  cron.schedule('0 */3 * * *', scheduledSync, {
+  cron.schedule('*/15 * * * *', scheduledSync, {
     timezone: "Asia/Kolkata"
   });
   
