@@ -109,7 +109,9 @@ const sampleSchema = new mongoose.Schema({
   },
   salesRequirement: {
     type: String,
-    required: true
+    required: false,
+    default: ""
+    
   },
   contactRequirement: {
     type: String,
