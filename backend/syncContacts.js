@@ -1148,7 +1148,7 @@ async function scheduledSync() {
     
     if (!syncStarted) {
       console.log(`⏭️ Sync skipped at ${now.toLocaleString()} - another sync is already running`);
-      console.log(`⏰ Next sync attempt will be in 3 hours at ${new Date(now.getTime() + 3 * 60 * 60 * 1000).toLocaleString()}`);
+      console.log(`⏰ Next sync attempt will be in 15 minutes at ${new Date(now.getTime() + 15 * 60 * 1000).toLocaleString()}`);
     } else {
       console.log(`✅ Sync completed successfully at ${new Date().toLocaleString()}`);
     }

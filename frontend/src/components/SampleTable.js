@@ -254,29 +254,24 @@ const SampleTable = ({ token, userRole, currentUser }) => {
     }
   };
 
-  // Enhanced timing functions
-  const getTimingSinceRequest = (sample) => {
-    const requestedDate = new Date(sample.requestedAt);
-    const now = new Date();
-    const diffMs = now - requestedDate;
-    const diffDays = Math.floor(diffMs / (1000 * 60 * 60 * 24));
-    const diffHours = Math.floor((diffMs % (1000 * 60 * 60 * 24)) / (1000 * 60 * 60));
-    
-    if (diffDays > 0) {
-      return `${diffDays}d ${diffHours}h ago`;
-    } else if (diffHours > 0) {
-      return `${diffHours}h ago`;
-    } else {
-      const diffMinutes = Math.floor((diffMs % (1000 * 60 * 60)) / (1000 * 60));
-      return `${diffMinutes}m ago`;
+  const getTimingFromContactCreation = (sample) => {
+    if (sample.timeSinceContactCreation && !sample.timeSinceContactCreation.error) {
+      return sample.timeSinceContactCreation.formatted;
     }
+    return 'Contact data unavailable';
   };
+
 
   const getCompletionTime = (sample) => {
     if (!sample.completedAt) return '-';
     
-    const requestedDate = new Date(sample.requestedAt);
-    const completedDate = new Date(sample.completedAt);
+    const requestedDate = sample.requestedAtIST ? 
+      new Date(sample.requestedAtIST) : 
+      new Date(sample.requestedAt);
+    const completedDate = sample.completedAtIST ? 
+      new Date(sample.completedAtIST) : 
+      new Date(sample.completedAt);
+      
     const diffMs = completedDate - requestedDate;
     const diffDays = Math.floor(diffMs / (1000 * 60 * 60 * 24));
     const diffHours = Math.floor((diffMs % (1000 * 60 * 60 * 24)) / (1000 * 60 * 60));
@@ -292,12 +287,14 @@ const SampleTable = ({ token, userRole, currentUser }) => {
   };
 
   const formatDate = (dateString) => {
-    return new Date(dateString).toLocaleDateString('en-US', {
+    const date = dateString.includes('T') ? new Date(dateString) : new Date(dateString);
+    return date.toLocaleDateString('en-US', {
       year: 'numeric',
       month: 'short',
       day: 'numeric',
       hour: '2-digit',
-      minute: '2-digit'
+      minute: '2-digit',
+      timeZone: 'Asia/Kolkata'
     });
   };
 
@@ -323,23 +320,6 @@ const SampleTable = ({ token, userRole, currentUser }) => {
         {priorityOption?.label || priority}
       </span>
     );
-  };
-
-  const getTimingDisplay = (sample) => {
-    if (sample.timeToFirstUpload) {
-      return (
-        <span className="timing-success" title="Time from request to first upload">
-          📈 {sample.timeToFirstUpload.formatted}
-        </span>
-      );
-    } else if (sample.timeSinceRequest) {
-      return (
-        <span className="timing-pending" title="Time since request (no upload yet)">
-          ⏳ {sample.timeSinceRequest.formatted}
-        </span>
-      );
-    }
-    return <span className="timing-unknown">-</span>;
   };
 
   const getSortIcon = (column) => {
@@ -584,7 +564,7 @@ const SampleTable = ({ token, userRole, currentUser }) => {
                 Priority {getSortIcon('priority')}
               </th>
               <th>
-                Time Since Request
+                Time Since Contact Created
               </th>
               <th>
                 Completion Time
@@ -618,11 +598,12 @@ const SampleTable = ({ token, userRole, currentUser }) => {
                 <td className="country">{sample.clientCountry}</td>
                 <td className="status">{getStatusBadge(sample.status)}</td>
                 <td className="priority">{getPriorityBadge(sample.priority)}</td>
-                <td className="time-since-request">
-                  <span className="timing-since" title="Time elapsed since request was made">
-                    ⏰ {getTimingSinceRequest(sample)}
+                <td className="time-since-contact-creation">
+                  <span className="timing-contact" title="Time from contact creation to sample request">
+                    📞 {getTimingFromContactCreation(sample)}
                   </span>
                 </td>
+               
                 <td className="completion-time">
                   <span className={`timing-completion ${sample.completedAt ? 'completed' : 'pending'}`} 
                         title={sample.completedAt ? "Time taken from request to completion" : "Not completed yet"}>
@@ -675,7 +656,9 @@ const SampleTable = ({ token, userRole, currentUser }) => {
                     )}
                   </div>
                 </td>
-                <td className="requested-date">{formatDate(sample.requestedAt)}</td>
+                <td className="requested-date">
+                  {formatDate(sample.requestedAtIST || sample.requestedAt)}
+                </td>
                 <td className="actions">
                   <div className="action-buttons">
                     <button
@@ -814,7 +797,7 @@ const SampleTable = ({ token, userRole, currentUser }) => {
         </div>
       </div>
 
-      {/* Sample Details Modal - Updated */}
+      {/* Sample Details Modal - Updated with Contact Creation Time */}
       {showDetailsModal && selectedSample && (
         <div className="modal-overlay" onClick={() => setShowDetailsModal(false)}>
           <div className="modal-content sample-details-modal" onClick={(e) => e.stopPropagation()}>
@@ -891,21 +874,22 @@ const SampleTable = ({ token, userRole, currentUser }) => {
                   {getPriorityBadge(selectedSample.priority)}
                 </div>
                 <div className="detail-item">
-                  <label>Time Since Request:</label>
-                  <span>{getTimingSinceRequest(selectedSample)}</span>
+                  <label>Time Since Contact Created:</label>
+                  <span>{getTimingFromContactCreation(selectedSample)}</span>
                 </div>
+               
                 <div className="detail-item">
                   <label>Completion Time:</label>
                   <span>{getCompletionTime(selectedSample)}</span>
                 </div>
                 <div className="detail-item">
                   <label>Requested:</label>
-                  <span>{formatDate(selectedSample.requestedAt)}</span>
+                  <span>{formatDate(selectedSample.requestedAtIST || selectedSample.requestedAt)}</span>
                 </div>
                 {selectedSample.completedAt && (
                   <div className="detail-item">
                     <label>Completed:</label>
-                    <span>{formatDate(selectedSample.completedAt)}</span>
+                    <span>{formatDate(selectedSample.completedAtIST || selectedSample.completedAt)}</span>
                   </div>
                 )}
               </div>
@@ -918,7 +902,7 @@ const SampleTable = ({ token, userRole, currentUser }) => {
                     {selectedSample.requirementFiles.map((file) => (
                       <li key={file._id} className="file-item">
                         <span className="file-name">{file.originalName}</span>
-                        <span className="file-date">{formatDate(file.uploadedAt)}</span>
+                        <span className="file-date">{formatDate(file.uploadedAtIST || file.uploadedAt)}</span>
                         <span className="file-uploader">
                           by {file.uploadedBy?.username || 'Unknown'}
                         </span>
@@ -942,7 +926,7 @@ const SampleTable = ({ token, userRole, currentUser }) => {
                     {selectedSample.sampleFiles.map((file) => (
                       <li key={file._id} className="file-item">
                         <span className="file-name">{file.originalName}</span>
-                        <span className="file-date">{formatDate(file.uploadedAt)}</span>
+                        <span className="file-date">{formatDate(file.uploadedAtIST || file.uploadedAt)}</span>
                         <span className="file-uploader">
                           by {file.uploadedBy?.username || 'Unknown'}
                         </span>
@@ -1049,7 +1033,7 @@ const SampleTable = ({ token, userRole, currentUser }) => {
                       <span className="file-info">
                         <span className="file-name">{file.originalName}</span>
                         <span className="file-meta">
-                          {formatDate(file.uploadedAt)} • by {file.uploadedBy?.username || 'Unknown'}
+                          {formatDate(file.uploadedAtIST || file.uploadedAt)} • by {file.uploadedBy?.username || 'Unknown'}
                         </span>
                       </span>
                     </label>
