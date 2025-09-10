@@ -21,6 +21,15 @@ const SampleTable = ({ token, userRole, currentUser }) => {
   const [selectedFiles, setSelectedFiles] = useState([]);
   const [showDownloadModal, setShowDownloadModal] = useState(false);
   
+  // New allocation states
+  const [showAllocationModal, setShowAllocationModal] = useState(false);
+  const [teamMembers, setTeamMembers] = useState([]);
+  const [allocationData, setAllocationData] = useState({
+    allocatedToEmail: '',
+    qcedByEmail: ''
+  });
+  const [allocationLoading, setAllocationLoading] = useState(false);
+  
   const [filters, setFilters] = useState({
     status: [],
     querySource: '',
@@ -40,6 +49,7 @@ const SampleTable = ({ token, userRole, currentUser }) => {
 
   const statusOptions = [
     { value: 'requested', label: 'Requested', color: '#ff9800' },
+    { value: 'allocated', label: 'Allocated', color: '#9c27b0' },
     { value: 'in_progress', label: 'In Progress', color: '#2196f3' },
     { value: 'done', label: 'Done', color: '#4caf50' },
     { value: 'cancelled', label: 'Cancelled', color: '#f44336' }
@@ -56,8 +66,24 @@ const SampleTable = ({ token, userRole, currentUser }) => {
     if (token) {
       fetchSamples();
       fetchStatistics();
+      if (canAllocate()) {
+        fetchTeamMembers();
+      }
     }
   }, [currentPage, searchTerm, sortConfig, filters, token]);
+
+  const fetchTeamMembers = async () => {
+    try {
+      const response = await axios.get(`${API_BASE_URL}/samples/team-members`, {
+        headers: getAuthHeaders()
+      });
+      if (response.data.success) {
+        setTeamMembers(response.data.data);
+      }
+    } catch (err) {
+      console.error('Error fetching team members:', err);
+    }
+  };
 
   const fetchSamples = async () => {
     try {
@@ -110,6 +136,35 @@ const SampleTable = ({ token, userRole, currentUser }) => {
       }
     } catch (err) {
       console.error('Error fetching sample statistics:', err);
+    }
+  };
+
+  const handleAllocateSample = async () => {
+    if (!allocationData.allocatedToEmail || !allocationData.qcedByEmail) {
+      alert('Please select both Allocated To and QC person');
+      return;
+    }
+
+    try {
+      setAllocationLoading(true);
+      const response = await axios.patch(
+        `${API_BASE_URL}/samples/${selectedSample._id}/allocate`,
+        allocationData,
+        { headers: getAuthHeaders() }
+      );
+
+      if (response.data.success) {
+        fetchSamples();
+        setShowAllocationModal(false);
+        setAllocationData({ allocatedToEmail: '', qcedByEmail: '' });
+        setSelectedSample(null);
+        alert('Sample allocated successfully! Notification emails have been sent.');
+      }
+    } catch (err) {
+      console.error('Error allocating sample:', err);
+      alert('Error allocating sample: ' + (err.response?.data?.message || err.message));
+    } finally {
+      setAllocationLoading(false);
     }
   };
 
@@ -261,7 +316,6 @@ const SampleTable = ({ token, userRole, currentUser }) => {
     return 'Contact data unavailable';
   };
 
-
   const getCompletionTime = (sample) => {
     if (!sample.completedAt) return '-';
     
@@ -334,6 +388,7 @@ const SampleTable = ({ token, userRole, currentUser }) => {
   const canUpload = () => ['uploader', 'superadmin'].includes(userRole);
   const canDownload = () => true; 
   const canMarkAsDone = () => ['uploader', 'superadmin'].includes(userRole);
+  const canAllocate = () => ['uploader', 'superadmin'].includes(userRole);
 
   if (loading && samples.length === 0) {
     return (
@@ -392,6 +447,13 @@ const SampleTable = ({ token, userRole, currentUser }) => {
               <div className="stat-content">
                 <div className="stat-number">{statistics.overview.requestedCount}</div>
                 <div className="stat-label">Requested</div>
+              </div>
+            </div>
+            <div className="stat-card">
+              <div className="stat-icon allocated">👥</div>
+              <div className="stat-content">
+                <div className="stat-number">{statistics.overview.allocatedCount || 0}</div>
+                <div className="stat-label">Allocated</div>
               </div>
             </div>
             <div className="stat-card">
@@ -557,12 +619,21 @@ const SampleTable = ({ token, userRole, currentUser }) => {
               <th onClick={() => handleSort('clientCountry')}>
                 Country {getSortIcon('clientCountry')}
               </th>
+              <th onClick={() => handleSort('reportIndustry')}>
+                Industry {getSortIcon('reportIndustry')}
+              </th>
               <th onClick={() => handleSort('status')}>
                 Status {getSortIcon('status')}
               </th>
               <th onClick={() => handleSort('priority')}>
                 Priority {getSortIcon('priority')}
               </th>
+              {canAllocate() && (
+                <>
+                  <th>Allocated To</th>
+                  <th>QC'ed By</th>
+                </>
+              )}
               <th>
                 Time Since Contact Created
               </th>
@@ -596,8 +667,31 @@ const SampleTable = ({ token, userRole, currentUser }) => {
                 <td className="sales-person">{sample.salesPerson}</td>
                 <td className="client-company">{sample.clientCompany}</td>
                 <td className="country">{sample.clientCountry}</td>
+                <td className="industry">{sample.reportIndustry}</td>
                 <td className="status">{getStatusBadge(sample.status)}</td>
                 <td className="priority">{getPriorityBadge(sample.priority)}</td>
+                {canAllocate() && (
+                  <>
+                    <td className="allocated-to">
+                      {sample.allocatedToName ? (
+                        <span className="allocation-badge allocated">
+                          👤 {sample.allocatedToName}
+                        </span>
+                      ) : (
+                        <span className="allocation-badge unallocated">-</span>
+                      )}
+                    </td>
+                    <td className="qced-by">
+                      {sample.qcedByName ? (
+                        <span className="allocation-badge qc">
+                          🔍 {sample.qcedByName}
+                        </span>
+                      ) : (
+                        <span className="allocation-badge unallocated">-</span>
+                      )}
+                    </td>
+                  </>
+                )}
                 <td className="time-since-contact-creation">
                   <span className="timing-contact" title="Time from contact creation to sample request">
                     📞 {getTimingFromContactCreation(sample)}
@@ -671,6 +765,20 @@ const SampleTable = ({ token, userRole, currentUser }) => {
                     >
                       👁 View
                     </button>
+                    
+                    {canAllocate() && sample.status === 'requested' && (
+                      <button
+                        onClick={() => {
+                          setSelectedSample(sample);
+                          setAllocationData({ allocatedToEmail: '', qcedByEmail: '' });
+                          setShowAllocationModal(true);
+                        }}
+                        className="btn btn-sm btn-secondary"
+                        title="Allocate Sample"
+                      >
+                        👥 Allocate
+                      </button>
+                    )}
                     
                     {canUpload() && sample.status !== 'cancelled' && sample.status !== 'done' && (
                       <button
@@ -797,7 +905,92 @@ const SampleTable = ({ token, userRole, currentUser }) => {
         </div>
       </div>
 
-      {/* Sample Details Modal - Updated with Contact Creation Time */}
+      {/* Allocation Modal */}
+      {showAllocationModal && selectedSample && canAllocate() && (
+        <div className="modal-overlay" onClick={() => setShowAllocationModal(false)}>
+          <div className="modal-content allocation-modal" onClick={(e) => e.stopPropagation()}>
+            <div className="modal-header">
+              <h3>Allocate Sample - {selectedSample.sampleId}</h3>
+              <button 
+                onClick={() => setShowAllocationModal(false)}
+                className="close-button"
+              >
+                ✕
+              </button>
+            </div>
+            <div className="modal-body">
+              <div className="allocation-form">
+                <div className="form-group">
+                  <label>Allocate To *</label>
+                  <select
+                    value={allocationData.allocatedToEmail}
+                    onChange={(e) => setAllocationData(prev => ({ ...prev, allocatedToEmail: e.target.value }))}
+                    className="form-select"
+                    required
+                  >
+                    <option value="">Select team member...</option>
+                    {teamMembers.map(member => (
+                      <option key={member.email} value={member.email}>
+                        {member.name} ({member.email})
+                      </option>
+                    ))}
+                  </select>
+                </div>
+                
+                <div className="form-group">
+                  <label>QC'ed By *</label>
+                  <select
+                    value={allocationData.qcedByEmail}
+                    onChange={(e) => setAllocationData(prev => ({ ...prev, qcedByEmail: e.target.value }))}
+                    className="form-select"
+                    required
+                  >
+                    <option value="">Select QC person...</option>
+                    {teamMembers.map(member => (
+                      <option key={member.email} value={member.email}>
+                        {member.name} ({member.email})
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
+                <div className="sample-info">
+                  <h4>Sample Information</h4>
+                  <p><strong>Report Name:</strong> {selectedSample.reportName}</p>
+                  <p><strong>Client Company:</strong> {selectedSample.clientCompany}</p>
+                  <p><strong>Priority:</strong> <span style={{ color: priorityOptions.find(p => p.value === selectedSample.priority)?.color }}>{selectedSample.priority.toUpperCase()}</span></p>
+                  <p><strong>Sales Person:</strong> {selectedSample.salesPerson}</p>
+                </div>
+              </div>
+              
+              <div className="modal-actions">
+                <button
+                  onClick={handleAllocateSample}
+                  disabled={!allocationData.allocatedToEmail || !allocationData.qcedByEmail || allocationLoading}
+                  className="btn btn-primary"
+                >
+                  {allocationLoading ? (
+                    <>
+                      <span className="spinner"></span> Allocating...
+                    </>
+                  ) : (
+                    'Allocate Sample'
+                  )}
+                </button>
+                <button
+                  onClick={() => setShowAllocationModal(false)}
+                  className="btn btn-outline"
+                  disabled={allocationLoading}
+                >
+                  Cancel
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Sample Details Modal - Updated with Allocation Info */}
       {showDetailsModal && selectedSample && (
         <div className="modal-overlay" onClick={() => setShowDetailsModal(false)}>
           <div className="modal-content sample-details-modal" onClick={(e) => e.stopPropagation()}>
@@ -844,6 +1037,26 @@ const SampleTable = ({ token, userRole, currentUser }) => {
                   <label>Client Country:</label>
                   <span>{selectedSample.clientCountry}</span>
                 </div>
+                
+                {/* Allocation Information */}
+                {(selectedSample.allocatedToName || selectedSample.qcedByName) && (
+                  <>
+                    <div className="detail-item">
+                      <label>Allocated To:</label>
+                      <span>{selectedSample.allocatedToName || '-'}</span>
+                    </div>
+                    <div className="detail-item">
+                      <label>QC'ed By:</label>
+                      <span>{selectedSample.qcedByName || '-'}</span>
+                    </div>
+                    {selectedSample.allocatedAtIST && (
+                      <div className="detail-item">
+                        <label>Allocated On:</label>
+                        <span>{formatDate(selectedSample.allocatedAtIST)}</span>
+                      </div>
+                    )}
+                  </>
+                )}
                 
                 {/* Sales Requirement Section */}
                 {selectedSample.salesRequirement && (

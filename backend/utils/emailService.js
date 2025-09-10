@@ -17,8 +17,9 @@ const transporter = nodemailer.createTransport({
  * @param {string} html - Email HTML content.
  * @param {boolean} includeCc - Whether to include the default CC email.
  * @param {string[]} customCcList - Custom CC email addresses array.
+ * @param {Array} attachments - Array of attachment objects with filename, content, contentType.
  */
-const sendNotificationEmail = async (recipients, subject, html, includeCc = true, customCcList = []) => {
+const sendNotificationEmail = async (recipients, subject, html, includeCc = true, customCcList = [], attachments = []) => {
   try {
     const mailOptions = {
       from: '"Dispatch Notification" <matt@theskyquestt.org>',
@@ -42,10 +43,23 @@ const sendNotificationEmail = async (recipients, subject, html, includeCc = true
       mailOptions.cc = uniqueCcEmails.join(", ");
     }
 
+    if (attachments && attachments.length > 0) {
+      mailOptions.attachments = attachments.map(attachment => ({
+        filename: attachment.filename,
+        content: attachment.content,
+        contentType: attachment.contentType || 'application/octet-stream'
+      }));
+
+      console.log(`Adding ${attachments.length} attachment(s) to email:`, 
+        attachments.map(a => `${a.filename} (${(a.content.length / 1024 / 1024).toFixed(2)}MB)`).join(', ')
+      );
+    }
+
     console.log('Sending email with options:', {
       to: mailOptions.to,
       cc: mailOptions.cc,
-      subject: mailOptions.subject
+      subject: mailOptions.subject,
+      attachmentCount: attachments.length
     });
 
     await transporter.sendMail(mailOptions);

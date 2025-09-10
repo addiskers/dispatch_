@@ -1230,3 +1230,45 @@ body.modal-open {
 .file-item[data-type="png"]::before {
   content: "🖼️";
 }
+.allocation-badge {
+  padding: 4px 8px;
+  border-radius: 4px;
+  font-size: 12px;
+  font-weight: 500;
+}
+
+.allocation-badge.allocated {
+  background-color: #e3f2fd;
+  color: #1976d2;
+}
+
+.allocation-badge.qc {
+  background-color: #f3e5f5;
+  color: #7b1fa2;
+}
+
+.allocation-badge.unallocated {
+  color: #9e9e9e;
+}
+
+.allocation-modal .form-group {
+  margin-bottom: 20px;
+}
+
+.allocation-modal .form-select {
+  width: 100%;
+  padding: 10px;
+  border: 1px solid #ddd;
+  border-radius: 4px;
+}
+
+.allocation-modal .sample-info {
+  background-color: #f8f9fa;
+  padding: 15px;
+  border-radius: 5px;
+  margin-top: 20px;
+}
+
+.stat-icon.allocated {
+  background-color: #9c27b0;
+}

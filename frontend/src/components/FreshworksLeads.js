@@ -147,7 +147,6 @@ const FreshworksLeads = ({ initialFilters = {}, token }) => {
     };
   };
 
-  // Date filter options
   const dateFilterOptions = [
     { value: '', label: 'All Time' },
     { value: 'today', label: 'Today' },
@@ -157,8 +156,13 @@ const FreshworksLeads = ({ initialFilters = {}, token }) => {
     { value: 'custom', label: 'Custom Range' }
   ];
 
-   const fetchSampleStatuses = async (contactIds) => {
+  const fetchSampleStatuses = async (contactIds) => {
+    if (!contactIds || contactIds.length === 0) {
+      return;
+    }
+
     try {
+      
       const statusPromises = contactIds.map(async (contactId) => {
         try {
           const response = await fetch(`${API_BASE_URL}/samples/contact/${contactId}/status`, {
@@ -168,6 +172,7 @@ const FreshworksLeads = ({ initialFilters = {}, token }) => {
           if (data.success && data.data.length > 0) {
             // Get the latest sample status
             const latestSample = data.data[0];
+            console.log(`Sample status for contact ${contactId}:`, latestSample.status);
             return { contactId, status: latestSample.status, sampleId: latestSample.sampleId };
           }
           return { contactId, status: null, sampleId: null };
@@ -180,15 +185,25 @@ const FreshworksLeads = ({ initialFilters = {}, token }) => {
       const statuses = await Promise.all(statusPromises);
       const statusMap = {};
       statuses.forEach(({ contactId, status, sampleId }) => {
-        statusMap[contactId] = { status, sampleId };
+        if (status) {
+          statusMap[contactId] = { status, sampleId };
+        }
       });
-      setSampleStatuses(statusMap);
+      
+      
+      setSampleStatuses(prev => {
+        const merged = { ...prev };
+        Object.keys(statusMap).forEach(contactId => {
+          if (!merged[contactId] || merged[contactId].status !== statusMap[contactId].status) {
+            merged[contactId] = statusMap[contactId];
+          }
+        });
+        return merged;
+      });
     } catch (error) {
       console.error('Error fetching sample statuses:', error);
     }
   };
-
-  // Handle Request Sample button click
   const handleRequestSample = async (contact) => {
     try {
       const existingStatus = sampleStatuses[contact.id];
@@ -237,7 +252,6 @@ const handleSampleRequestSubmit = async () => {
     const data = await response.json();
 
     if (data.success) {
-      // Upload requirement files if any exist
       if (clientRequirementFiles && clientRequirementFiles.length > 0) {
         try {
           const formData = new FormData();
@@ -267,8 +281,17 @@ const handleSampleRequestSubmit = async () => {
           alert(`Sample created successfully: ${data.data.sampleId}, but file upload failed.`);
         }
       }
+      const contactId = currentSampleContact.id;
+      setSampleStatuses(prev => ({
+        ...prev,
+        [contactId]: { 
+          status: 'requested', 
+          sampleId: data.data.sampleId 
+        }
+      }));
 
       alert(`Sample request created successfully: ${data.data.sampleId}`);
+      
       setShowSampleModal(false);
       setSampleForm({
         querySource: 'SQ',
@@ -281,14 +304,28 @@ const handleSampleRequestSubmit = async () => {
         clientRequirementFileInputRef.current.value = '';
       }
       setCurrentSampleContact(null);
-      
-      setSampleStatuses(prev => ({
-        ...prev,
-        [currentSampleContact.id]: { 
-          status: 'requested', 
-          sampleId: data.data.sampleId 
+
+      setTimeout(async () => {
+        try {
+          const statusResponse = await fetch(`${API_BASE_URL}/samples/contact/${contactId}/status`, {
+            headers: getAuthHeaders()
+          });
+          const statusData = await statusResponse.json();
+          if (statusData.success && statusData.data.length > 0) {
+            const latestSample = statusData.data[0];
+            setSampleStatuses(prev => ({
+              ...prev,
+              [contactId]: { 
+                status: latestSample.status, 
+                sampleId: latestSample.sampleId 
+              }
+            }));
+          }
+        } catch (error) {
+          console.error('Error refetching sample status:', error);
         }
-      }));
+      }, 1000); 
+
     } else {
       alert(`Error creating sample request: ${data.message}`);
     }
@@ -296,13 +333,13 @@ const handleSampleRequestSubmit = async () => {
     console.error('Error creating sample request:', error);
     alert('Error creating sample request. Please try again.');
   } finally {
-    setSampleRequestLoading(false); // Stop loading
+    setSampleRequestLoading(false);
   }
 };
 
-  // Get sample button display
   const getSampleButtonDisplay = (contact) => {
     const sampleStatus = sampleStatuses[contact.id];
+    
     
     if (!sampleStatus || !sampleStatus.status) {
       return {
@@ -317,6 +354,12 @@ const handleSampleRequestSubmit = async () => {
         return {
           text: '📋 Requested',
           className: 'btn btn-sm btn-warning sample-status-btn',
+          disabled: true
+        };
+      case 'allocated':
+        return {
+          text: '👥 Allocated',
+          className: 'btn btn-sm btn-info sample-status-btn',
           disabled: true
         };
       case 'in_progress':
@@ -338,6 +381,7 @@ const handleSampleRequestSubmit = async () => {
           disabled: true
         };
       default:
+        console.warn(`Unknown sample status: ${sampleStatus.status} for contact ${contact.id}`);
         return {
           text: '📋 Request Sample',
           className: 'btn btn-sm btn-primary request-sample-btn',
@@ -346,7 +390,6 @@ const handleSampleRequestSubmit = async () => {
     }
   };
 
-  // Calculate conversation metrics for modal header
   const calculateConversationMetrics = (contact, conversations) => {
     if (!conversations || conversations.length === 0) {
       return {
@@ -359,7 +402,6 @@ const handleSampleRequestSubmit = async () => {
       };
     }
 
-    // Calculate sample sent timing using CRM analytics data
     let sampleSentTiming = null;
     if (contact.created_at && contact.crm_analytics?.first_email_with_attachment?.date) {
       const createdDate = new Date(contact.created_at);
@@ -370,13 +412,11 @@ const handleSampleRequestSubmit = async () => {
       }
     }
 
-    // Check if contact has replied
     const hasReplied = conversations.some(conv => 
       conv.type === 'email_thread' && 
       conv.messages?.some(msg => msg.direction === 'incoming')
     );
 
-    // Check if needs action (last message was outgoing and no recent response)
     const emailThreads = conversations.filter(conv => conv.type === 'email_thread');
     let needsAction = false;
     
@@ -799,7 +839,6 @@ const handleSampleRequestSubmit = async () => {
     }
   };
 
-  // Updated conversation counting function - counts all email messages, not just threads
   const getConversationCounts = () => {
     const emailMessageCount = conversations.reduce((total, conversation) => {
       if (conversation.type === 'email_thread') {
@@ -1003,7 +1042,6 @@ const handleSampleRequestSubmit = async () => {
     setDragOverColumn(null);
   };
 
-  // Column resizing (keeping existing)
   const handleMouseDown = (e, columnKey) => {
     e.preventDefault();
     e.stopPropagation();
@@ -1132,7 +1170,6 @@ const handleSampleRequestSubmit = async () => {
   };
 
   const renderCellContent = (columnKey, contact) => {
-    // Handle the new Request Sample button column
     if (columnKey === 'request_sample') {
       const buttonDisplay = getSampleButtonDisplay(contact);
       return (
@@ -1197,7 +1234,6 @@ const handleSampleRequestSubmit = async () => {
           }
           return '-';
         
-        // CRM Analytics fields
         case 'last_email_received':
           return formatDateTime(contact.last_email_received);
         case 'first_email_with_attachment':

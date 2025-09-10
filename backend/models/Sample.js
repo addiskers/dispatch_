@@ -111,7 +111,6 @@ const sampleSchema = new mongoose.Schema({
     type: String,
     required: false,
     default: ""
-    
   },
   contactRequirement: {
     type: String,
@@ -132,9 +131,27 @@ const sampleSchema = new mongoose.Schema({
     ref: 'User',
     default: null
   },
+  // New allocation fields
+  allocatedTo: {
+    type: String,
+    default: null
+  },
+  qcedBy: {
+    type: String,
+    default: null
+  },
+  allocatedAt: {
+    type: Date,
+    default: null
+  },
+  allocatedBy: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'User',
+    default: null
+  },
   status: {
     type: String,
-    enum: ['requested', 'in_progress', 'done', 'cancelled'],
+    enum: ['requested', 'in_progress', 'done', 'cancelled', 'allocated'],
     default: 'requested'
   },
   priority: {
@@ -163,7 +180,6 @@ const sampleSchema = new mongoose.Schema({
 }, {
   timestamps: true
 });
-
 
 sampleSchema.virtual('totalFilesCount').get(function() {
   return (this.sampleFiles ? this.sampleFiles.length : 0) + 

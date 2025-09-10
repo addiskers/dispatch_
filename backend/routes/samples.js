@@ -14,7 +14,9 @@ const {
   downloadRequirementFile,
   getSampleStats,
   deleteSample,
-  getSampleStatusByContact
+  getSampleStatusByContact,
+  getTeamMembers,
+  allocateSample
 } = require('../controllers/sampleController');
 
 const authMiddleware = require('../middleware/auth');
@@ -44,17 +46,19 @@ const requireRole = (allowedRoles) => {
 router.use(authMiddleware);
 
 router.get('/', getAllSamples);
-
 router.get('/statistics', getSampleStats);
-
+router.get('/team-members', 
+  requireRole(['uploader', 'superadmin']), 
+  getTeamMembers
+);
 router.get('/contact/:contactId/status', getSampleStatusByContact);
-
 router.get('/:id', getSampleById);
-
 router.post('/', createSampleRequest);
-
 router.patch('/:id/status', updateSampleStatus);
-
+router.patch('/:id/allocate', 
+  requireRole(['uploader', 'superadmin']),
+  allocateSample
+);
 router.post('/:id/upload', 
   requireRole(['uploader', 'superadmin']),
   uploadSampleFile
