@@ -508,46 +508,178 @@ const sendSampleRequestNotification = async (sample, requestingUser) => {
   }
 };
 
-const sendSampleCompletionNotification = async (sample, completingUser) => {
+const completeSampleWithQuery = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { includeQuery, queryContent } = req.body;
+
+    // Validate required permissions
+    if (!['uploader', 'superadmin'].includes(req.user.role)) {
+      return res.status(403).json({
+        success: false,
+        message: 'Access denied. Only uploaders can complete samples.'
+      });
+    }
+
+    const sample = await Sample.findById(id);
+    if (!sample) {
+      return res.status(404).json({
+        success: false,
+        message: 'Sample not found'
+      });
+    }
+
+    // Update sample status to done
+    sample.status = 'done';
+    sample.completedBy = req.user.userId;
+    sample.completedAt = getCurrentIST();
+
+    // Add query information if provided
+    if (includeQuery && queryContent) {
+      sample.queryForSales = queryContent;
+      sample.queryIncluded = true;
+    } else {
+      sample.queryIncluded = false;
+    }
+
+    await sample.save();
+
+    const updatingUser = await User.findById(req.user.userId).select('username email');
+    
+    // Send completion notification with query
+    await sendSampleCompletionNotificationWithQuery(sample, updatingUser, includeQuery, queryContent);
+
+    const updatedSample = await Sample.findById(id)
+      .populate('requestedBy', 'username email')
+      .populate('assignedTo', 'username email')
+      .populate('completedBy', 'username email')
+      .populate('allocatedBy', 'username email');
+
+    res.json({
+      success: true,
+      message: 'Sample completed successfully',
+      data: updatedSample
+    });
+  } catch (error) {
+    console.error('Error completing sample with query:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Error completing sample',
+      error: error.message
+    });
+  }
+};
+
+// Update the existing sendSampleCompletionNotification function
+const sendSampleCompletionNotificationWithQuery = async (sample, completingUser, includeQuery = false, queryContent = '') => {
   try {
     const salesPersons = await User.find({ role: "sales" }).select("email username");
     const requestingUser = await User.findById(sample.requestedBy).select("email username");
     let recipients = salesPersons.map(user => user.email);
+    
     if (requestingUser && !recipients.includes(requestingUser.email)) {
       recipients.push(requestingUser.email);
     }
     recipients = recipients.filter(Boolean);
+    
     const ccList = ['samples@skyquestt.com'];
     const subject = `Sample Completed - ${sample.sampleId}: ${sample.reportName}`;
+
+    let querySectionHTML = '';
+    if (includeQuery && queryContent) {
+      querySectionHTML = `
+        <div style="background-color: #fff3cd; padding: 20px; border-radius: 8px; margin: 25px 0; border-left: 4px solid #ffc107;">
+          <h4 style="color: #856404; margin-top: 0; display: flex; align-items: center;">
+            <span style="margin-right: 8px;">💬</span>Query for Sales Team
+          </h4>
+          <div style="background-color: #ffffff; padding: 15px; border-radius: 6px; border: 1px solid #e6e6e6; margin-top: 10px;">
+            ${queryContent}
+          </div>
+          <p style="margin: 10px 0 0 0; font-size: 14px; color: #856404;">
+            <strong>📋 Action Required:</strong> Please review the query above and follow up as needed.
+          </p>
+        </div>
+      `;
+    }
+
     const html = `
-      <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
-        <h2 style="color: #27ae60;">Sample Request Completed ✅</h2>
-        <div style="background-color: #f8f9fa; padding: 20px; border-radius: 5px; margin: 20px 0;">
-          <h3 style="color: #34495e; margin-top: 0;">Sample Details</h3>
-          <table style="width: 100%; border-collapse: collapse;">
-            <tr><td style="padding: 8px 0; font-weight: bold;">Sample ID:</td><td>${sample.sampleId}</td></tr>
-            <tr><td style="padding: 8px 0; font-weight: bold;">Report Name:</td><td>${sample.reportName}</td></tr>
-            <tr><td style="padding: 8px 0; font-weight: bold;">Client Company:</td><td>${sample.clientCompany}</td></tr>
-            <tr><td style="padding: 8px 0; font-weight: bold;">Sales Person:</td><td>${sample.salesPerson}</td></tr>
-            <tr><td style="padding: 8px 0; font-weight: bold;">Files Uploaded:</td><td>${sample.sampleFiles ? sample.sampleFiles.length : 0} files</td></tr>
-          </table>
+      <div style="font-family: Arial, sans-serif; max-width: 700px; margin: 0 auto; background-color: #f8f9fa; padding: 20px;">
+        <div style="background-color: #ffffff; border-radius: 10px; padding: 30px; box-shadow: 0 2px 10px rgba(0,0,0,0.1);">
+          <h2 style="color: #27ae60; margin-top: 0; display: flex; align-items: center;">
+            <span style="margin-right: 10px;">✅</span>Sample Request Completed
+          </h2>
+          
+          <div style="background-color: #f8f9fa; padding: 20px; border-radius: 8px; margin: 20px 0;">
+            <h3 style="color: #34495e; margin-top: 0;">Sample Details</h3>
+            <table style="width: 100%; border-collapse: collapse;">
+              <tr><td style="padding: 8px 0; font-weight: bold; width: 150px;">Sample ID:</td><td style="color: #2980b9; font-weight: bold;">${sample.sampleId}</td></tr>
+              <tr><td style="padding: 8px 0; font-weight: bold;">Report Name:</td><td>${sample.reportName}</td></tr>
+              <tr><td style="padding: 8px 0; font-weight: bold;">Client Company:</td><td style="color: #e74c3c; font-weight: bold;">${sample.clientCompany}</td></tr>
+              <tr><td style="padding: 8px 0; font-weight: bold;">Sales Person:</td><td style="color: #8e44ad; font-weight: bold;">${sample.salesPerson}</td></tr>
+              <tr><td style="padding: 8px 0; font-weight: bold;">Industry:</td><td>${sample.reportIndustry}</td></tr>
+              <tr><td style="padding: 8px 0; font-weight: bold;">Country:</td><td>${sample.clientCountry}</td></tr>
+              <tr><td style="padding: 8px 0; font-weight: bold;">Files Uploaded:</td><td style="color: #27ae60; font-weight: bold;">${sample.sampleFiles ? sample.sampleFiles.length : 0} files</td></tr>
+            </table>
+          </div>
+
+          ${querySectionHTML}
+
+          <div style="background-color: #e8f5e8; padding: 20px; border-radius: 8px; margin: 20px 0; border-left: 4px solid #27ae60;">
+            <h4 style="color: #1e7e34; margin-top: 0; display: flex; align-items: center;">
+              <span style="margin-right: 8px;">👤</span>Completion Information
+            </h4>
+            <table style="width: 100%; border-collapse: collapse;">
+              <tr><td style="padding: 8px 0; font-weight: bold; width: 150px;">Completed By:</td><td>${completingUser.username} (${completingUser.email})</td></tr>
+              <tr><td style="padding: 8px 0; font-weight: bold;">Completed On:</td><td>${getCurrentIST().toLocaleString()}</td></tr>
+              ${sample.allocatedToName ? `<tr><td style="padding: 8px 0; font-weight: bold;">Allocated To:</td><td>${sample.allocatedToName}</td></tr>` : ''}
+              ${sample.qcedByName ? `<tr><td style="padding: 8px 0; font-weight: bold;">QC'ed By:</td><td>${sample.qcedByName}</td></tr>` : ''}
+            </table>
+          </div>
+
+          <div style="background-color: #d1ecf1; padding: 20px; border-radius: 8px; margin: 20px 0; border-left: 4px solid #17a2b8;">
+            <h4 style="color: #0c5460; margin-top: 0; display: flex; align-items: center;">
+              <span style="margin-right: 8px;">📋</span>Original Requirements
+            </h4>
+            
+            ${sample.salesRequirement ? `
+              <div style="margin-bottom: 15px;">
+                <h5 style="color: #0c5460; margin: 0 0 5px 0;">Sales Requirement:</h5>
+                <div style="background-color: #ffffff; padding: 12px; border-radius: 4px; white-space: pre-wrap;">${sample.salesRequirement}</div>
+              </div>
+            ` : ''}
+            
+            ${sample.contactRequirement ? `
+              <div style="margin-bottom: 15px;">
+                <h5 style="color: #0c5460; margin: 0 0 5px 0;">Contact Requirement:</h5>
+                <div style="background-color: #ffffff; padding: 12px; border-radius: 4px; white-space: pre-wrap;">${sample.contactRequirement}</div>
+              </div>
+            ` : ''}
+          </div>
+
+          <div style="background-color: #d4edda; padding: 20px; border-radius: 8px; margin: 20px 0; text-align: center;">
+            <p style="margin: 0; color: #155724; font-size: 16px;">
+              <strong>📌 Next Steps:</strong> The sample files are now available for download in the Sample Management System.
+              ${includeQuery && queryContent ? ' Please review the query above and take appropriate follow-up actions.' : ''}
+            </p>
+          </div>
+
+          <hr style="border: none; border-top: 2px solid #ecf0f1; margin: 30px 0;">
+          <div style="text-align: center; padding: 15px 0;">
+            <p style="color: #95a5a6; font-size: 12px; margin: 0;">
+              This is an automated notification from the Sample Management System<br>
+              Requested by: ${sample.requestedBy?.username || 'System'} (${sample.requestedBy?.email || ''})
+            </p>
+          </div>
         </div>
-        <div style="background-color: #d4edda; padding: 15px; border-radius: 5px; margin: 20px 0;">
-          <h4 style="color: #155724; margin-top: 0;">Completion Details</h4>
-          <p style="margin: 0;"><strong>Completed by:</strong> ${completingUser.username} (${completingUser.email})</p>
-          <p style="margin: 5px 0 0 0;"><strong>Completed on:</strong> ${getCurrentIST().toLocaleString()}</p>
-        </div>
-        <p style="color: #7f8c8d;">The sample files are now available for download in the system.</p>
-        <hr style="border: none; border-top: 1px solid #ecf0f1; margin: 30px 0;">
-        <p style="color: #95a5a6; font-size: 12px; text-align: center;">
-          This is an automated notification from the Sample Management System
-        </p>
       </div>
     `;
+
     await sendNotificationEmail(recipients, subject, html, false, ccList);
-    console.log(`Sample completion notification sent for ${sample.sampleId}`);
+    
+    console.log(`Sample completion notification sent for ${sample.sampleId}${includeQuery ? ' with query' : ''}`);
   } catch (error) {
     console.error('Error sending sample completion notification:', error);
+    throw error;
   }
 };
 
@@ -1326,5 +1458,6 @@ module.exports = {
   deleteSample,
   getSampleStatusByContact,
   getTeamMembers,
-  allocateSample
+  allocateSample,
+  completeSampleWithQuery  
 };

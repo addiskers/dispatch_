@@ -30,6 +30,12 @@ const SampleTable = ({ token, userRole, currentUser }) => {
   });
   const [allocationLoading, setAllocationLoading] = useState(false);
   
+  const [showCompletionModal, setShowCompletionModal] = useState(false);
+  const [completionData, setCompletionData] = useState({
+    includeQuery: null, 
+    queryContent: ''
+  });
+const [completionLoading, setCompletionLoading] = useState(false);
   const [filters, setFilters] = useState({
     status: [],
     querySource: '',
@@ -209,6 +215,14 @@ const SampleTable = ({ token, userRole, currentUser }) => {
   };
 
   const handleUpdateStatus = async (sampleId, newStatus, notes = '') => {
+    if (newStatus === 'done') {
+      const sample = samples.find(s => s._id === sampleId);
+      setSelectedSample(sample);
+      setCompletionData({ includeQuery: null, queryContent: '' });
+      setShowCompletionModal(true);
+      return;
+    }
+
     try {
       const response = await axios.patch(
         `${API_BASE_URL}/samples/${sampleId}/status`,
@@ -227,6 +241,53 @@ const SampleTable = ({ token, userRole, currentUser }) => {
       console.error('Error updating sample status:', err);
       alert('Error updating sample status');
     }
+  };
+
+  const handleCompleteWithQuery = async () => {
+    if (completionData.includeQuery === null) {
+      alert('Please select whether to include a query or not before proceeding.');
+      return;
+    }
+
+    if (completionData.includeQuery && !completionData.queryContent.trim()) {
+      alert('Please enter the query content before proceeding.');
+      return;
+    }
+
+    try {
+      setCompletionLoading(true);
+      
+      const requestData = {
+        status: 'done',
+        includeQuery: completionData.includeQuery,
+        queryContent: completionData.includeQuery ? completionData.queryContent : ''
+      };
+
+      const response = await axios.patch(
+        `${API_BASE_URL}/samples/${selectedSample._id}/complete`,
+        requestData,
+        { headers: getAuthHeaders() }
+      );
+
+      if (response.data.success) {
+        fetchSamples();
+        setShowCompletionModal(false);
+        setCompletionData({ includeQuery: null, queryContent: '' });
+        setSelectedSample(null);
+        alert('Sample marked as completed successfully!');
+      }
+    } catch (err) {
+      console.error('Error completing sample:', err);
+      alert('Error completing sample: ' + (err.response?.data?.message || err.message));
+    } finally {
+      setCompletionLoading(false);
+    }
+  };
+
+  const applyFormatting = (command, value = null) => {
+    document.execCommand(command, false, value);
+    const editor = document.getElementById('queryEditor');
+    if (editor) editor.focus();
   };
 
   const handleMultipleFileUpload = async (sampleId) => {
@@ -1158,7 +1219,174 @@ const SampleTable = ({ token, userRole, currentUser }) => {
           </div>
         </div>
       )}
+      {/* Completion with Query Modal */}
+        {showCompletionModal && selectedSample && canMarkAsDone() && (
+          <div className="modal-overlay" onClick={() => {/* Don't close on overlay click for security */}}>
+            <div className="modal-content completion-modal" onClick={(e) => e.stopPropagation()}>
+              <div className="modal-header">
+                <h3>Complete Sample - {selectedSample.sampleId}</h3>
+                <button 
+                  onClick={() => {
+                    setShowCompletionModal(false);
+                    setCompletionData({ includeQuery: null, queryContent: '' });
+                    setSelectedSample(null);
+                  }}
+                  className="close-button"
+                  disabled={completionLoading}
+                >
+                  ✕
+                </button>
+              </div>
+              <div className="modal-body">
+                <div className="completion-form">
+                  <div className="sample-info-section">
+                    <h4>Sample Information</h4>
+                    <p><strong>Report Name:</strong> {selectedSample.reportName}</p>
+                    <p><strong>Client Company:</strong> {selectedSample.clientCompany}</p>
+                    <p><strong>Sales Person:</strong> {selectedSample.salesPerson}</p>
+                  </div>
 
+                  <div className="query-section">
+                    <h4>Query for Sales Team</h4>
+                    <p className="query-description">
+                      Do you want to include a follow-up query for the sales team in the completion email?
+                    </p>
+                    
+                    <div className="query-options">
+                      <label className="radio-option">
+                        <input
+                          type="radio"
+                          name="includeQuery"
+                          checked={completionData.includeQuery === true}
+                          onChange={() => setCompletionData(prev => ({ ...prev, includeQuery: true }))}
+                        />
+                        <span className="radio-label">Yes, include a query</span>
+                      </label>
+                      
+                      <label className="radio-option">
+                        <input
+                          type="radio"
+                          name="includeQuery"
+                          checked={completionData.includeQuery === false}
+                          onChange={() => setCompletionData(prev => ({ ...prev, includeQuery: false, queryContent: '' }))}
+                        />
+                        <span className="radio-label">No, just mark as completed</span>
+                      </label>
+                    </div>
+
+                    {completionData.includeQuery === true && (
+                      <div className="query-editor-section">
+                        <div className="editor-toolbar">
+                          <button
+                            type="button"
+                            onClick={() => applyFormatting('bold')}
+                            className="toolbar-btn"
+                            title="Bold"
+                          >
+                            <strong>B</strong>
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => applyFormatting('italic')}
+                            className="toolbar-btn"
+                            title="Italic"
+                          >
+                            <em>I</em>
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => applyFormatting('underline')}
+                            className="toolbar-btn"
+                            title="Underline"
+                          >
+                            <u>U</u>
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => applyFormatting('insertUnorderedList')}
+                            className="toolbar-btn"
+                            title="Bullet List"
+                          >
+                            • List
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => applyFormatting('insertOrderedList')}
+                            className="toolbar-btn"
+                            title="Numbered List"
+                          >
+                            1. List
+                          </button>
+                        </div>
+                        
+                        <div
+                          id="queryEditor"
+                          contentEditable
+                          className="query-editor"
+                          placeholder="Enter your query for the sales team here..."
+                          onInput={(e) => {
+                            setCompletionData(prev => ({ 
+                              ...prev, 
+                              queryContent: e.target.innerHTML 
+                            }));
+                          }}
+                          style={{
+                            minHeight: '120px',
+                            border: '1px solid #ddd',
+                            borderRadius: '4px',
+                            padding: '12px',
+                            outline: 'none',
+                            backgroundColor: '#fff'
+                          }}
+                        />
+                        
+                        <p className="editor-help">
+                          Use the toolbar above to format your text. You can make text <strong>bold</strong>, 
+                          <em>italic</em>, <u>underlined</u>, or create lists.
+                        </p>
+                      </div>
+                    )}
+                  </div>
+
+                  {completionData.includeQuery === null && (
+                    <div className="security-notice">
+                      <p className="warning-text">
+                        ⚠️ Please select an option above before proceeding. This is required for security.
+                      </p>
+                    </div>
+                  )}
+                </div>
+                
+                <div className="modal-actions">
+                  <button
+                    onClick={handleCompleteWithQuery}
+                    disabled={completionData.includeQuery === null || completionLoading}
+                    className={`btn btn-success ${completionData.includeQuery === null ? 'disabled' : ''}`}
+                  >
+                    {completionLoading ? (
+                      <>
+                        <span className="spinner"></span> Completing...
+                      </>
+                    ) : (
+                      'Complete Sample'
+                    )}
+                  </button>
+                  <button
+                    onClick={() => {
+                      setShowCompletionModal(false);
+                      setCompletionData({ includeQuery: null, queryContent: '' });
+                      setSelectedSample(null);
+                    }}
+                    className="btn btn-outline"
+                    disabled={completionLoading}
+                  >
+                    Cancel
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
       {/* Upload Multiple Files Modal */}
       {showUploadModal && selectedSample && canUpload() && (
         <div className="modal-overlay" onClick={() => setShowUploadModal(false)}>

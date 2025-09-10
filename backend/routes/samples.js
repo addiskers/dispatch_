@@ -16,7 +16,8 @@ const {
   deleteSample,
   getSampleStatusByContact,
   getTeamMembers,
-  allocateSample
+  allocateSample,
+  completeSampleWithQuery
 } = require('../controllers/sampleController');
 
 const authMiddleware = require('../middleware/auth');
@@ -79,7 +80,7 @@ router.get('/:id/download/:fileId', downloadSampleFile);
 router.post('/:id/download-multiple', downloadMultipleSampleFiles);
 
 router.get('/:id/download-requirement/:fileId', downloadRequirementFile);
-
+router.patch('/:id/complete', completeSampleWithQuery);
 router.delete('/:id', 
   requireRole(['superadmin']),
   deleteSample
