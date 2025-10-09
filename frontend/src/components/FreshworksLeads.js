@@ -48,7 +48,7 @@ const FreshworksLeads = ({ initialFilters = {}, token }) => {
     customTags: [],
     country: [],
     isActive: '',
-    dateFilter: '',
+    dateFilter: 'thismonth',
     startDate: '',
     endDate: ''
   });
@@ -149,6 +149,7 @@ const FreshworksLeads = ({ initialFilters = {}, token }) => {
 
   const dateFilterOptions = [
     { value: '', label: 'All Time' },
+    { value: 'thismonth', label: 'This Month' },
     { value: 'today', label: 'Today' },
     { value: 'yesterday', label: 'Yesterday' },
     { value: 'week', label: 'Last 7 Days' },
@@ -542,6 +543,16 @@ const handleSampleRequestSubmit = async () => {
       }));
       setShowFilters(true);
       filtersInitialized.current = true;
+    } else if (!filtersInitialized.current) {
+      console.log('Applying default "This Month" filter');
+      const defaultDateRange = getDateRange('thismonth');
+      setFilters(prev => ({
+        ...prev,
+        dateFilter: 'thismonth',
+        startDate: defaultDateRange.startDate,
+        endDate: defaultDateRange.endDate
+      }));
+      filtersInitialized.current = true;
     }
   }, [initialFilters]);
 
@@ -601,13 +612,23 @@ const handleSampleRequestSubmit = async () => {
           startDate: monthAgo.toISOString(),
           endDate: todayEndMonth.toISOString()
         };
-      
+      case 'thismonth':
+        const monthStart = new Date(now.getFullYear(), now.getMonth(), 1);
+        monthStart.setHours(0, 0, 0, 0);
+        
+        const monthEnd = new Date(now);
+        monthEnd.setHours(23, 59, 59, 999);
+        
+        return {
+          startDate: monthStart.toISOString(),
+          endDate: monthEnd.toISOString()
+        };
+    
       default:
         return { startDate: '', endDate: '' };
     }
   };
-
-  useEffect(() => {
+    useEffect(() => {
     if (token) {
       fetchContacts();
     }
@@ -791,8 +812,14 @@ const handleSampleRequestSubmit = async () => {
           setShowCustomDatePicker(true);
         } else {
           setShowCustomDatePicker(false);
-          newFilters.startDate = '';
-          newFilters.endDate = '';
+          if (value && value !== '') {
+            const dateRange = getDateRange(value);
+            newFilters.startDate = dateRange.startDate;
+            newFilters.endDate = dateRange.endDate;
+          } else {
+            newFilters.startDate = '';
+            newFilters.endDate = '';
+          }
         }
       } else if (['status', 'owner', 'territory', 'leadLevel', 'contactCategory', 'customTags', 'country'].includes(filterName)) {
         const currentValues = newFilters[filterName] || [];
@@ -895,6 +922,7 @@ const handleSampleRequestSubmit = async () => {
   };
 
   const clearFilters = () => {
+  const defaultDateRange = getDateRange('thismonth');
     setFilters({ 
       status: [], 
       owner: [], 
@@ -904,15 +932,15 @@ const handleSampleRequestSubmit = async () => {
       customTags: [],
       country: [],
       isActive: '',
-      dateFilter: '',
-      startDate: '',
-      endDate: ''
+      dateFilter: 'thismonth',
+      startDate: defaultDateRange.startDate,
+      endDate: defaultDateRange.endDate
     });
     setSearchTerm('');
     setCurrentPage(1);
     setShowCustomDatePicker(false);
     setAnalyticsCountryFilter([]);
-    filtersInitialized.current = false;
+    filtersInitialized.current = true;
   };
 
   const handleAnalyticsCountryFilter = (country) => {
@@ -932,11 +960,18 @@ const handleSampleRequestSubmit = async () => {
     if (!filters.dateFilter) return '';
     
     const option = dateFilterOptions.find(opt => opt.value === filters.dateFilter);
-    if (filters.dateFilter === 'custom' && (filters.startDate || filters.endDate)) {
+    
+    if ((filters.dateFilter === 'custom' || filters.dateFilter === 'thismonth') && (filters.startDate || filters.endDate)) {
       const start = filters.startDate ? new Date(filters.startDate).toLocaleDateString() : '';
       const end = filters.endDate ? new Date(filters.endDate).toLocaleDateString() : '';
-      return `Custom: ${start} - ${end}`;
+      
+      if (filters.dateFilter === 'thismonth') {
+        return `This Month: ${start} - ${end}`;
+      } else {
+        return `Custom: ${start} - ${end}`;
+      }
     }
+    
     return option ? option.label : '';
   };
 

@@ -10,6 +10,7 @@ import Sale from "./Sale";
 import GIIForm from "./GIIForm";
 import "../styles/superAdminDashboard.css";
 import SampleTable from "./SampleTable";
+import SalespersonActivity from './SalespersonActivity';
 
 function SuperAdminDashboard({ token, onLogout }) {
   const location = useLocation();
@@ -71,6 +72,8 @@ function SuperAdminDashboard({ token, onLogout }) {
         return <GIIForm token={token} />;
       case "Sample Table":
         return <SampleTable token={token} />;
+      case "Salesperson Activity":
+        return <SalespersonActivity token={token} />;
       default:
         return <ManageAccessSection token={token} />;
     }
@@ -81,6 +84,7 @@ function SuperAdminDashboard({ token, onLogout }) {
     { name: "Leads", section: "Leads" },
     { name: "Freshworks Leads", section: "Freshworks Leads" },
     { name: "Analytics", section: "Analytics" },
+    { name: "Salesperson Activity", section: "Salesperson Activity" },
     { name: "GII", section: "GII" },
     { name: "Contracts", section: "Contracts" },
     { name: "Upload", section: "Uploads" },
