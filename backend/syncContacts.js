@@ -8,7 +8,6 @@ const {
   MONGO_URI,
   FRESHWORKS_API_KEY,
   FRESHWORKS_API_KEY_2,
-  FRESHWORKS_API_KEY_3,
   FRESHWORKS_BASE_URL
 } = process.env;
 
@@ -20,7 +19,6 @@ if (!FRESHWORKS_API_KEY || !FRESHWORKS_BASE_URL) {
 const API_KEYS = [
   FRESHWORKS_API_KEY,
   FRESHWORKS_API_KEY_2,
-  FRESHWORKS_API_KEY_3
 ].filter(key => key && key.trim() !== ''); 
 
 let currentKeyIndex = 0;
@@ -68,7 +66,10 @@ function rotateAPIKey() {
 /**
  * Make API request with automatic rate limiting and key rotation
  */
-async function makeAPIRequest(url, options = {}) {
+/**
+ * Make API request with automatic rate limiting, key rotation, and retry logic
+ */
+async function makeAPIRequest(url, options = {}, retries = 3) {
   if (apiCallCount >= MAX_CALLS_PER_KEY) {
     await rotateAPIKey();
   }
@@ -78,39 +79,63 @@ async function makeAPIRequest(url, options = {}) {
     ...options,
     headers: { ...headers, ...options.headers },
     validateStatus: status => status < 500,
-    timeout: 15000
+    timeout: 30000  
   };
   
-  try {
-    apiCallCount++;
-    const response = await axios.get(url, requestOptions);
-    
-    // Check for rate limit response
-    if (response.status === 429 || 
-        (response.data && typeof response.data === 'string' && response.data.includes('Rate limit'))) {
-      console.log(`⚠️Rate limit hit on API key ${currentKeyIndex + 1}. Rotating...`);
-      await rotateAPIKey();
-      
-      // Retry with new key
-      const newHeaders = getAPIHeaders();
+  for (let attempt = 0; attempt <= retries; attempt++) {
+    try {
       apiCallCount++;
-      return await axios.get(url, { ...requestOptions, headers: newHeaders });
-    }
-    
-    return response;
-  } catch (error) {
-    // If we get a rate limit error, try rotating and retrying
-    if (error.response && error.response.status === 429) {
-      console.log(` Rate limit error on API key ${currentKeyIndex + 1}. Rotating...`);
-      await rotateAPIKey();
+      const response = await axios.get(url, requestOptions);
       
-      // Retry once with new key
-      const newHeaders = getAPIHeaders();
-      apiCallCount++;
-      return await axios.get(url, { ...requestOptions, headers: newHeaders });
+      // Check for rate limit response
+      if (response.status === 429 || 
+          (response.data && typeof response.data === 'string' && response.data.includes('Rate limit'))) {
+        console.log(`⚠️ Rate limit hit on API key ${currentKeyIndex + 1}. Rotating...`);
+        await rotateAPIKey();
+        
+        const newHeaders = getAPIHeaders();
+        apiCallCount++;
+        return await axios.get(url, { ...requestOptions, headers: newHeaders });
+      }
+      
+      return response;
+      
+    } catch (error) {
+      const isLastAttempt = attempt === retries;
+      
+      // Handle socket/network errors with retry
+      if (error.code === 'ECONNRESET' || 
+          error.code === 'ETIMEDOUT' ||
+          error.code === 'ECONNABORTED' ||
+          error.message.includes('socket hang up') ||
+          error.message.includes('timeout')) {
+        
+        if (!isLastAttempt) {
+          const waitTime = Math.pow(2, attempt) * 1000; // Exponential backoff: 1s, 2s, 4s
+          console.log(`⚠️ Network error (${error.message}). Retrying in ${waitTime/1000}s... (Attempt ${attempt + 1}/${retries + 1})`);
+          await new Promise(resolve => setTimeout(resolve, waitTime));
+          continue;
+        }
+      }
+      
+      // Handle rate limit errors
+      if (error.response && error.response.status === 429) {
+        console.log(`⚠️ Rate limit error on API key ${currentKeyIndex + 1}. Rotating...`);
+        await rotateAPIKey();
+        
+        if (!isLastAttempt) {
+          const newHeaders = getAPIHeaders();
+          apiCallCount++;
+          return await axios.get(url, { ...requestOptions, headers: newHeaders });
+        }
+      }
+      
+      // If last attempt, throw the error
+      if (isLastAttempt) {
+        console.error(`❌ Failed after ${retries + 1} attempts:`, error.message);
+        throw error;
+      }
     }
-    
-    throw error;
   }
 }
 

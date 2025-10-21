@@ -464,7 +464,7 @@ const SalespersonActivity = ({ token }) => {
       <div className="freshworks-leads-container">
         <div className="dashboard-card">
           <div className="dashboard-header">
-            <h1 className="dashboard-title">Salesperson Activity Tracker</h1>
+            <h1 className="dashboard-title">Salesperson Helper </h1>
           </div>
           <div className="empty-state">
             <div className="empty-icon">
