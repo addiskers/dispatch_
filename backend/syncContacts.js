@@ -936,7 +936,7 @@ async function syncContacts() {
         const contactDate = new Date(contact.updated_at);
         const lastSyncDate = new Date(lastSync);
         
-        if (!isFirstRun && contactDate <= lastSyncDate) {
+        if (!isFirstRun && contactDate < lastSyncDate) {
           console.log(`Reached old data at contact ${contact.id}, stopping sync`);
           keepGoing = false;
           break;
@@ -1286,8 +1286,7 @@ async function initialize() {
   console.log('\n🏃‍♂️ Running initial sync...');
   await scheduledSync();
   
-  // Schedule sync every 3 hours: 0:00, 3:00, 6:00, 9:00, 12:00, 15:00, 18:00, 21:00
-  cron.schedule('*/15 * * * *', scheduledSync, {
+  cron.schedule('*/2 * * * *', scheduledSync, {
     timezone: "Asia/Kolkata"
   });
   
