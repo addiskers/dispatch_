@@ -55,8 +55,12 @@ function rotateAPIKey() {
   currentKeyIndex = (currentKeyIndex + 1) % API_KEYS.length;
   apiCallCount = 0;
   
+  console.log(`🔄 Rotating from API Key ${oldIndex + 1} to ${currentKeyIndex + 1}`);
+  console.log(`   Key ${oldIndex + 1} used ${apiCallCount} calls`);
+  
   if (currentKeyIndex === 0 && oldIndex > 0) {
-    console.log('Cycled through all API keys. Waiting 60 seconds before continuing...');
+    console.log('⚠️ Cycled through all API keys. All keys exhausted!');
+    console.log('   Waiting 60 seconds before continuing...');
     return new Promise(resolve => setTimeout(resolve, 60000));
   }
   
@@ -1279,14 +1283,18 @@ async function getSyncStatus() {
 async function initialize() {
   console.log(' Starting Freshworks Contact Sync Service...');
   console.log(`🚫Email domains to ignore: ${IGNORED_EMAIL_DOMAINS.join(', ')}`);
-
+  if (API_KEYS.length === 2 && API_KEYS[0] === API_KEYS[1]) {
+      console.error('❌ ERROR: Both API keys are identical!');
+      console.error('   Please provide 2 DIFFERENT API keys in .env file');
+      process.exit(1);
+    }
   
   await getSyncStatus();
   
   console.log('\n🏃‍♂️ Running initial sync...');
   await scheduledSync();
   
-  cron.schedule('*/2 * * * *', scheduledSync, {
+  cron.schedule('*/15 * * * *', scheduledSync, {
     timezone: "Asia/Kolkata"
   });
   
