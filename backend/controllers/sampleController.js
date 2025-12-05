@@ -18,8 +18,6 @@ const TEAM_MEMBERS = [
   { email: 'prachi.mishra@skyquestt.com', name: 'Prachi Mishra' },
   { email: 'falak.jamal@skyquestt.com', name: 'Falak Jamal' },
   { email: 'maharshi.pancholi@skyquestt.com', name: 'Maharishi Pacholi' },
-  { email: 'akshay.arya@skyquestt.com', name: 'Akshay Arya' },
-  { email: 'shashin.patel@skyquestt.com', name: 'Shashin Patel' },
   { email: 'rajat.baranwal@skyquestt.com', name: 'Rajat Baranwal' }
 ];
 

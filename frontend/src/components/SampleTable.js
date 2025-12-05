@@ -695,9 +695,7 @@ const [completionLoading, setCompletionLoading] = useState(false);
                   <th>QC'ed By</th>
                 </>
               )}
-              <th>
-                Time Since Contact Created
-              </th>
+             
               <th>
                 Completion Time
               </th>
@@ -753,11 +751,7 @@ const [completionLoading, setCompletionLoading] = useState(false);
                     </td>
                   </>
                 )}
-                <td className="time-since-contact-creation">
-                  <span className="timing-contact" title="Time from contact creation to sample request">
-                    📞 {getTimingFromContactCreation(sample)}
-                  </span>
-                </td>
+              
                
                 <td className="completion-time">
                   <span className={`timing-completion ${sample.completedAt ? 'completed' : 'pending'}`} 
@@ -1044,7 +1038,7 @@ const [completionLoading, setCompletionLoading] = useState(false);
                   disabled={allocationLoading}
                 >
                   Cancel
-                </button>
+                </button> Sample Details Modal
               </div>
             </div>
           </div>
@@ -1138,6 +1132,21 @@ const [completionLoading, setCompletionLoading] = useState(false);
                     </div>
                   </div>
                 )}
+                 {/* ===== ADD THIS SECTION - Query from Research Team ===== */}
+          {selectedSample.queryIncluded && selectedSample.queryForSales && (
+            <div className="detail-item full-width">
+              <label className="query-label">
+                <span className="query-icon">💬</span>
+                Query from Research Team:
+              </label>
+              <div className="query-box research-query">
+                <div 
+                  className="query-content"
+                  dangerouslySetInnerHTML={{ __html: selectedSample.queryForSales }}
+                />
+              </div>
+            </div>
+          )}
                 
                 <div className="detail-item">
                   <label>Status:</label>
@@ -1147,10 +1156,7 @@ const [completionLoading, setCompletionLoading] = useState(false);
                   <label>Priority:</label>
                   {getPriorityBadge(selectedSample.priority)}
                 </div>
-                <div className="detail-item">
-                  <label>Time Since Contact Created:</label>
-                  <span>{getTimingFromContactCreation(selectedSample)}</span>
-                </div>
+               
                
                 <div className="detail-item">
                   <label>Completion Time:</label>
