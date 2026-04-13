@@ -9,16 +9,13 @@ const s3 = require("../config/s3");
 const { GetObjectCommand } = require('@aws-sdk/client-s3');
 
 const TEAM_MEMBERS = [
-  { email: 'sakshi.chavan@skyquestt.com', name: 'Sakshi Chavan' },
-  { email: 'mridu.singh@skyquestt.com', name: 'Mridu Singh' },
-  { email: 'samiksha.bohre@skyquestt.com', name: 'Samiksha Bohre' },
   { email: 'shivani.chaudhary@skyquestt.com', name: 'Shivani Chaudary' },
   { email: 'swapna.singh@skyquestt.com', name: 'Swapna Singh' },
   { email: 'linu.dash@skyquestt.com', name: 'Linu Dash' },
   { email: 'prachi.mishra@skyquestt.com', name: 'Prachi Mishra' },
-  { email: 'falak.jamal@skyquestt.com', name: 'Falak Jamal' },
   { email: 'maharshi.pancholi@skyquestt.com', name: 'Maharishi Pacholi' },
-  { email: 'rajat.baranwal@skyquestt.com', name: 'Rajat Baranwal' }
+  { email: 'rajat.baranwal@skyquestt.com', name: 'Rajat Baranwal' },
+  { email: 'jatan.pandya@skyquestt.com', name: 'Jatan Pandya' }
 ];
 
 const convertToIST = (utcDate) => {
@@ -1441,6 +1438,132 @@ const getSampleStatusByContact = async (req, res) => {
   }
 };
 
+const getSampleAnalytics = async (req, res) => {
+  try {
+    const { startDate, endDate, days = 7 } = req.query;
+
+    let start, end;
+    if (startDate && endDate) {
+      start = new Date(startDate);
+      end = new Date(endDate);
+      end.setHours(23, 59, 59, 999);
+    } else {
+      end = getCurrentIST();
+      start = new Date(end);
+      start.setDate(start.getDate() - (parseInt(days) - 1));
+      start.setHours(0, 0, 0, 0);
+    }
+
+    // Get all completed samples in the date range
+    const completedSamples = await Sample.find({
+      status: 'done',
+      completedAt: { $gte: start, $lte: end }
+    }).select('allocatedTo completedAt requestedAt allocatedAt');
+
+    // Build date columns
+    const dates = [];
+    const current = new Date(start);
+    while (current <= end) {
+      dates.push(new Date(current));
+      current.setDate(current.getDate() + 1);
+    }
+
+    const dateKeys = dates.map(d => {
+      const ist = convertToIST(d);
+      return {
+        key: `${ist.getFullYear()}-${String(ist.getMonth() + 1).padStart(2, '0')}-${String(ist.getDate()).padStart(2, '0')}`,
+        label: ist.toLocaleDateString('en-US', { day: '2-digit', month: 'short' })
+      };
+    });
+
+    // Build production data per analyst
+    const analysts = TEAM_MEMBERS.map(m => m.name);
+    const productionData = {};
+    const timingData = {};
+
+    analysts.forEach(analyst => {
+      productionData[analyst] = {};
+      timingData[analyst] = { totalMs: 0, count: 0 };
+      dateKeys.forEach(dk => {
+        productionData[analyst][dk.key] = 0;
+      });
+    });
+
+    completedSamples.forEach(sample => {
+      const completedIST = convertToIST(sample.completedAt);
+      const dateKey = `${completedIST.getFullYear()}-${String(completedIST.getMonth() + 1).padStart(2, '0')}-${String(completedIST.getDate()).padStart(2, '0')}`;
+
+      // Find analyst name from email
+      const member = TEAM_MEMBERS.find(m => m.email === sample.allocatedTo);
+      const analystName = member ? member.name : null;
+
+      if (analystName && productionData[analystName] && productionData[analystName][dateKey] !== undefined) {
+        productionData[analystName][dateKey]++;
+      }
+
+      // Compute completion time
+      if (analystName && sample.requestedAt && sample.completedAt) {
+        const diffMs = new Date(sample.completedAt) - new Date(sample.requestedAt);
+        if (diffMs > 0) {
+          timingData[analystName].totalMs += diffMs;
+          timingData[analystName].count++;
+        }
+      }
+    });
+
+    // Format output
+    const production = analysts.map(analyst => {
+      const row = { analyst };
+      dateKeys.forEach(dk => {
+        row[dk.key] = productionData[analyst][dk.key];
+      });
+      const total = dateKeys.reduce((sum, dk) => sum + productionData[analyst][dk.key], 0);
+      row.total = total;
+      return row;
+    });
+
+    const timing = analysts.map(analyst => {
+      const data = timingData[analyst];
+      if (data.count === 0) {
+        return { analyst, avgHours: 0, avgFormatted: '-', samplesCompleted: 0 };
+      }
+      const avgMs = data.totalMs / data.count;
+      const avgHours = avgMs / (1000 * 60 * 60);
+      const days = Math.floor(avgHours / 24);
+      const hours = Math.floor(avgHours % 24);
+      const minutes = Math.floor((avgMs % (1000 * 60 * 60)) / (1000 * 60));
+      let formatted;
+      if (days > 0) {
+        formatted = `${days}d ${hours}h ${minutes}m`;
+      } else {
+        formatted = `${hours}h ${minutes}m`;
+      }
+      return { analyst, avgHours: parseFloat(avgHours.toFixed(1)), avgFormatted: formatted, samplesCompleted: data.count };
+    });
+
+    res.json({
+      success: true,
+      data: {
+        dateColumns: dateKeys,
+        production,
+        timing,
+        totalCompleted: completedSamples.length,
+        dateRange: {
+          start: start.toISOString(),
+          end: end.toISOString()
+        }
+      }
+    });
+  } catch (error) {
+    console.error('Error fetching sample analytics:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Error fetching sample analytics',
+      error: error.message
+    });
+  }
+};
+
 module.exports = {
   createSampleRequest,
   getAllSamples,
@@ -1457,5 +1580,6 @@ module.exports = {
   getSampleStatusByContact,
   getTeamMembers,
   allocateSample,
-  completeSampleWithQuery  
+  completeSampleWithQuery,
+  getSampleAnalytics
 };

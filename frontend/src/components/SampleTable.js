@@ -35,7 +35,15 @@ const SampleTable = ({ token, userRole, currentUser }) => {
     includeQuery: null, 
     queryContent: ''
   });
-const [completionLoading, setCompletionLoading] = useState(false);
+  const [completionLoading, setCompletionLoading] = useState(false);
+  
+  // Analytics states
+  const [showAnalyticsModal, setShowAnalyticsModal] = useState(false);
+  const [analyticsData, setAnalyticsData] = useState(null);
+  const [analyticsLoading, setAnalyticsLoading] = useState(false);
+  const [analyticsDays, setAnalyticsDays] = useState(7);
+  const [analyticsStartDate, setAnalyticsStartDate] = useState('');
+  const [analyticsEndDate, setAnalyticsEndDate] = useState('');
   const [filters, setFilters] = useState({
     status: [],
     querySource: '',
@@ -76,6 +84,7 @@ const [completionLoading, setCompletionLoading] = useState(false);
         fetchTeamMembers();
       }
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [currentPage, searchTerm, sortConfig, filters, token]);
 
   const fetchTeamMembers = async () => {
@@ -88,6 +97,29 @@ const [completionLoading, setCompletionLoading] = useState(false);
       }
     } catch (err) {
       console.error('Error fetching team members:', err);
+    }
+  };
+
+  const fetchAnalytics = async (daysOverride) => {
+    try {
+      setAnalyticsLoading(true);
+      const params = new URLSearchParams();
+      if (analyticsStartDate && analyticsEndDate) {
+        params.append('startDate', analyticsStartDate);
+        params.append('endDate', analyticsEndDate);
+      } else {
+        params.append('days', daysOverride || analyticsDays);
+      }
+      const response = await axios.get(`${API_BASE_URL}/samples/analytics?${params}`, {
+        headers: getAuthHeaders()
+      });
+      if (response.data.success) {
+        setAnalyticsData(response.data.data);
+      }
+    } catch (err) {
+      console.error('Error fetching analytics:', err);
+    } finally {
+      setAnalyticsLoading(false);
     }
   };
 
@@ -370,13 +402,6 @@ const [completionLoading, setCompletionLoading] = useState(false);
     }
   };
 
-  const getTimingFromContactCreation = (sample) => {
-    if (sample.timeSinceContactCreation && !sample.timeSinceContactCreation.error) {
-      return sample.timeSinceContactCreation.formatted;
-    }
-    return 'Contact data unavailable';
-  };
-
   const getCompletionTime = (sample) => {
     if (!sample.completedAt) return '-';
     
@@ -403,7 +428,7 @@ const [completionLoading, setCompletionLoading] = useState(false);
 
   const formatDate = (dateString) => {
     const date = dateString.includes('T') ? new Date(dateString) : new Date(dateString);
-    return date.toLocaleDateString('en-US', {
+    return date.toLocaleString('en-US', {
       year: 'numeric',
       month: 'short',
       day: 'numeric',
@@ -447,7 +472,6 @@ const [completionLoading, setCompletionLoading] = useState(false);
   }).length;
 
   const canUpload = () => ['uploader', 'superadmin'].includes(userRole);
-  const canDownload = () => true; 
   const canMarkAsDone = () => ['uploader', 'superadmin'].includes(userRole);
   const canAllocate = () => ['uploader', 'superadmin'].includes(userRole);
 
@@ -489,6 +513,15 @@ const [completionLoading, setCompletionLoading] = useState(false);
           </p>
         </div>
         <div className="header-actions">
+          <button 
+            onClick={() => {
+              setShowAnalyticsModal(true);
+              fetchAnalytics();
+            }}
+            className="btn btn-analytics"
+          >
+            📊 Analytics
+          </button>
           <button 
             onClick={fetchSamples}
             className="btn btn-outline refresh-btn"
@@ -689,18 +722,11 @@ const [completionLoading, setCompletionLoading] = useState(false);
               <th onClick={() => handleSort('priority')}>
                 Priority {getSortIcon('priority')}
               </th>
-              {canAllocate() && (
-                <>
-                  <th>Allocated To</th>
-                  <th>QC'ed By</th>
-                </>
-              )}
+              <th>Allocated To</th>
+              <th>QC'ed By</th>
              
               <th>
                 Completion Time
-              </th>
-              <th>
-                Files ({samples.reduce((total, sample) => total + (sample.sampleFiles?.length || 0), 0)})
               </th>
               <th>
                 Requirements & Downloads
@@ -729,38 +755,40 @@ const [completionLoading, setCompletionLoading] = useState(false);
                 <td className="industry">{sample.reportIndustry}</td>
                 <td className="status">{getStatusBadge(sample.status)}</td>
                 <td className="priority">{getPriorityBadge(sample.priority)}</td>
-                {canAllocate() && (
-                  <>
-                    <td className="allocated-to">
-                      {sample.allocatedToName ? (
-                        <span className="allocation-badge allocated">
-                          👤 {sample.allocatedToName}
-                        </span>
-                      ) : (
-                        <span className="allocation-badge unallocated">-</span>
+                <td className="allocated-to">
+                  {sample.allocatedToName ? (
+                    <div className="allocation-info">
+                      <span className="allocation-badge allocated">
+                        👤 {sample.allocatedToName}
+                      </span>
+                      {sample.allocatedAtIST && (
+                        <span className="allocation-date">{formatDate(sample.allocatedAtIST)}</span>
                       )}
-                    </td>
-                    <td className="qced-by">
-                      {sample.qcedByName ? (
-                        <span className="allocation-badge qc">
-                          🔍 {sample.qcedByName}
-                        </span>
-                      ) : (
-                        <span className="allocation-badge unallocated">-</span>
+                    </div>
+                  ) : (
+                    <span className="allocation-badge unallocated">-</span>
+                  )}
+                </td>
+                <td className="qced-by">
+                  {sample.qcedByName ? (
+                    <div className="allocation-info">
+                      <span className="allocation-badge qc">
+                        🔍 {sample.qcedByName}
+                      </span>
+                      {sample.allocatedAtIST && (
+                        <span className="allocation-date">{formatDate(sample.allocatedAtIST)}</span>
                       )}
-                    </td>
-                  </>
-                )}
-              
+                    </div>
+                  ) : (
+                    <span className="allocation-badge unallocated">-</span>
+                  )}
+                </td>
                
                 <td className="completion-time">
                   <span className={`timing-completion ${sample.completedAt ? 'completed' : 'pending'}`} 
                         title={sample.completedAt ? "Time taken from request to completion" : "Not completed yet"}>
                     {sample.completedAt ? `✅ ${getCompletionTime(sample)}` : '⏳ Pending'}
                   </span>
-                </td>
-                <td className="files-count">
-                  {sample.sampleFiles?.length || 0} files
                 </td>
                 <td className="requirements-downloads">
                   <div className="requirement-info">
@@ -1517,6 +1545,166 @@ const [completionLoading, setCompletionLoading] = useState(false);
                   Cancel
                 </button>
               </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Analytics Modal */}
+      {showAnalyticsModal && (
+        <div className="modal-overlay" onClick={() => setShowAnalyticsModal(false)}>
+          <div className="modal-content analytics-modal" onClick={(e) => e.stopPropagation()}>
+            <div className="modal-header">
+              <h3>📊 Sample Analytics</h3>
+              <button 
+                onClick={() => setShowAnalyticsModal(false)}
+                className="close-button"
+              >
+                ✕
+              </button>
+            </div>
+            <div className="modal-body">
+              {/* Date Range Controls */}
+              <div className="analytics-controls">
+                <div className="quick-range">
+                  {[7, 14, 30].map(d => (
+                    <button
+                      key={d}
+                      className={`btn btn-sm ${analyticsDays === d && !analyticsStartDate ? 'btn-primary' : 'btn-outline'}`}
+                      onClick={() => {
+                        setAnalyticsDays(d);
+                        setAnalyticsStartDate('');
+                        setAnalyticsEndDate('');
+                        fetchAnalytics(d);
+                      }}
+                    >
+                      Last {d} Days
+                    </button>
+                  ))}
+                </div>
+                <div className="custom-range">
+                  <input
+                    type="date"
+                    value={analyticsStartDate}
+                    onChange={(e) => setAnalyticsStartDate(e.target.value)}
+                    className="date-input"
+                  />
+                  <span>to</span>
+                  <input
+                    type="date"
+                    value={analyticsEndDate}
+                    onChange={(e) => setAnalyticsEndDate(e.target.value)}
+                    className="date-input"
+                  />
+                  <button
+                    className="btn btn-sm btn-primary"
+                    onClick={() => fetchAnalytics()}
+                    disabled={!analyticsStartDate || !analyticsEndDate}
+                  >
+                    Apply
+                  </button>
+                </div>
+              </div>
+
+              {analyticsLoading && (
+                <div className="loading-state">
+                  <div className="spinner"></div>
+                  <p>Loading analytics...</p>
+                </div>
+              )}
+
+              {analyticsData && !analyticsLoading && (
+                <>
+                  {/* Sample Production Table */}
+                  <div className="analytics-section">
+                    <h4 className="section-title">
+                      <span className="section-icon">📊</span>
+                      Sample Production
+                      <span className="analytics-subtitle"> ({analyticsData.totalCompleted} completed in period)</span>
+                    </h4>
+                    <div className="analytics-table-container">
+                      <table className="analytics-table">
+                        <thead>
+                          <tr>
+                            <th className="analyst-col">Analyst</th>
+                            {analyticsData.dateColumns.map(dc => (
+                              <th key={dc.key} className="date-col">{dc.label}</th>
+                            ))}
+                            <th className="total-col">Total</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {analyticsData.production.map((row) => (
+                            <tr key={row.analyst}>
+                              <td className="analyst-name sticky-col">{row.analyst}</td>
+                              {analyticsData.dateColumns.map(dc => (
+                                <td key={dc.key} className={`count-cell ${row[dc.key] > 0 ? 'has-value' : ''}`}>
+                                  {row[dc.key] === 0 ? '-' : row[dc.key]}
+                                </td>
+                              ))}
+                              <td className={`total-cell sticky-col-right ${row.total > 0 ? 'has-value' : ''}`}>
+                                <strong>{row.total}</strong>
+                              </td>
+                            </tr>
+                          ))}
+                          {/* Totals row */}
+                          <tr className="totals-row">
+                            <td className="analyst-name sticky-col"><strong>Daily Total</strong></td>
+                            {analyticsData.dateColumns.map(dc => {
+                              const dayTotal = analyticsData.production.reduce((sum, row) => sum + row[dc.key], 0);
+                              return (
+                                <td key={dc.key} className={`count-cell totals ${dayTotal > 0 ? 'has-value' : ''}`}>
+                                  <strong>{dayTotal === 0 ? '-' : dayTotal}</strong>
+                                </td>
+                              );
+                            })}
+                            <td className="total-cell totals has-value sticky-col-right">
+                              <strong>{analyticsData.production.reduce((sum, row) => sum + row.total, 0)}</strong>
+                            </td>
+                          </tr>
+                        </tbody>
+                      </table>
+                    </div>
+                  </div>
+
+                  {/* Average Completion Time */}
+                  <div className="analytics-section">
+                    <h4 className="section-title">
+                      <span className="section-icon">⏱️</span>
+                      Average Completion Time
+                    </h4>
+                    <div className="analytics-table-container">
+                      <table className="analytics-table timing-table">
+                        <thead>
+                          <tr>
+                            <th>Analyst</th>
+                            <th>Samples Completed</th>
+                            <th>Avg Time</th>
+                            <th>Avg Hours</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {analyticsData.timing.filter(t => t.samplesCompleted > 0).map((row) => (
+                            <tr key={row.analyst}>
+                              <td className="analyst-name">{row.analyst}</td>
+                              <td className="count-cell has-value">{row.samplesCompleted}</td>
+                              <td className="timing-cell">{row.avgFormatted}</td>
+                              <td className="timing-cell">{row.avgHours}h</td>
+                            </tr>
+                          ))}
+                          {analyticsData.timing.filter(t => t.samplesCompleted > 0).length === 0 && (
+                            <tr>
+                              <td colSpan={4} style={{ textAlign: 'center', padding: '20px', color: '#999' }}>
+                                No completion data available for this period
+                              </td>
+                            </tr>
+                          )}
+                        </tbody>
+                      </table>
+                    </div>
+                  </div>
+                </>
+              )}
             </div>
           </div>
         </div>

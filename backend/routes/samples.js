@@ -17,7 +17,8 @@ const {
   getSampleStatusByContact,
   getTeamMembers,
   allocateSample,
-  completeSampleWithQuery
+  completeSampleWithQuery,
+  getSampleAnalytics
 } = require('../controllers/sampleController');
 
 const authMiddleware = require('../middleware/auth');
@@ -48,6 +49,7 @@ router.use(authMiddleware);
 
 router.get('/', getAllSamples);
 router.get('/statistics', getSampleStats);
+router.get('/analytics', getSampleAnalytics);
 router.get('/team-members', 
   requireRole(['uploader', 'superadmin']), 
   getTeamMembers
